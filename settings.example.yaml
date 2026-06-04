@@ -1,0 +1,13 @@
+notifications:
+  telegram:
+    enabled: false
+    bot_token: "YOUR_BOT_TOKEN"
+    chat_id: "YOUR_CHAT_ID"
+  email:
+    enabled: false
+    mailgun:
+      api_key: "YOUR_API_KEY"
+      domain: "YOUR_DOMAIN"
+      from: "scenarii <notifications@YOUR_DOMAIN>"
+    to:
+      - "admin@example.com"

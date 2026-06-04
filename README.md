@@ -1,6 +1,6 @@
 # scenarii
 
-Execute periodic YAML-defined web test scenarios, store metrics in SQLite, and view them on a dashboard.
+Execute periodic YAML-defined web test scenarios via a headless browser, store metrics in SQLite, and monitor them on a modern Angular dashboard.
 
 ## Quick start
 
@@ -8,11 +8,11 @@ Execute periodic YAML-defined web test scenarios, store metrics in SQLite, and v
 npm install
 npm run build
 
-# Run a scenario once
-node dist/index.js --once scenarios/lusk.yml
-
 # Start the server (schedules scenarios + serves dashboard)
 node dist/index.js server
+
+# Or run a scenario once
+node dist/index.js --once scenarios/lusk.yml
 ```
 
 Open http://localhost:3000 to see the dashboard.
@@ -73,6 +73,16 @@ steps:
 
 Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses using the `variables` field with a `json_path` selector.
 
+## Dashboard
+
+The Angular dashboard provides:
+
+- **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes every 5s
+- **Scenario detail** — response time trend chart, success rate over time, step breakdown, full run history
+- **Dark/light theme** — toggle with the sun/moon button in the navbar, preference saved to localStorage
+- **Manual refresh** — refresh button on both list and detail pages
+- **Bootstrap UI** — modern responsive layout with Bootstrap 5 and Bootstrap Icons
+
 ## Running
 
 ```bash
@@ -82,19 +92,45 @@ yarn dev
 # Or run them separately:
 yarn dev:server     # Express API + scenario scheduling on :3000
 yarn dev:frontend   # Angular dev server on :4200 with HMR
-
-# Run a scenario once (no server)
-yarn dev:once
+yarn dev:once       # Run the lusk scenario once
 
 # Production
 npm run build
 node dist/index.js server
 ```
 
-Options for the `server` command:
-- `--port <number>` — HTTP port (default: 3000)
-- `--db <path>` — SQLite database path (default: `db/scenarii.db`)
-- `--scenarios-dir <path>` — directory with `.yml` scenario files (default: `./scenarios`)
+### Server options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--port` | `3000` | HTTP port |
+| `--db` | `db/scenarii.db` | SQLite database path |
+| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files |
+| `--settings` | auto-detect | Path to settings file (see Notifications below) |
+
+Scenarios are executed sequentially (Lightpanda CDP supports one connection at a time). Each runs once on startup, then on their `schedule` cron expression.
+
+## Notifications
+
+Get alerted when a scenario fails and when it recovers. Create a `settings.yaml` file:
+
+```yaml
+notifications:
+  telegram:
+    enabled: true
+    bot_token: "YOUR_BOT_TOKEN"
+    chat_id: "YOUR_CHAT_ID"
+  email:
+    enabled: true
+    mailgun:
+      api_key: "YOUR_API_KEY"
+      domain: "YOUR_DOMAIN"
+      from: "scenarii <notifications@YOUR_DOMAIN>"
+    to:
+      - "admin@example.com"
+```
+
+The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions: failure (pass→fail) and recovery (fail→pass).
 
 ## Container
 
@@ -106,12 +142,24 @@ npm run package
 
 # Run
 mkdir -p scenarios db
+cp settings.example.yaml settings.yaml  # or provide your own settings.yaml
 podman run -d \
   --name scenarii \
   -p 3000:3000 \
   -v $(pwd)/scenarios:/scenarios:z \
   -v $(pwd)/db:/app/db:z \
+  -v $(pwd)/settings.yaml:/app/settings.yaml:z \
   scenarii:latest
 ```
 
 The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once on startup, and schedules them by their `schedule` cron field.
+
+## Tech stack
+
+- **Runtime** — Node.js + TypeScript
+- **CLI** — Commander
+- **Browser** — Lightpanda headless browser via Playwright CDP
+- **Database** — SQLite (better-sqlite3)
+- **Scheduling** — node-cron
+- **Frontend** — Angular 19 (standalone components), Bootstrap 5, Chart.js
+- **Container** — Alpine + multi-stage build

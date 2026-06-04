@@ -7,6 +7,10 @@ dist/
 db/*.db
 db/*.db-shm
 db/*.db-wal
+
+# Settings (contains secrets like API keys)
+settings.yaml
+settings.yml
 .angular
 .vscode
 .idea

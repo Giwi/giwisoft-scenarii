@@ -29,6 +29,7 @@ EXPOSE 3000
 
 VOLUME /scenarios
 VOLUME /app/db
+VOLUME /app/settings
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js", "server", "--scenarios-dir", "/scenarios", "--db", "/app/db/scenarii.db"]

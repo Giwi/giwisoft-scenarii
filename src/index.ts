@@ -7,6 +7,7 @@ import { loadScenarioFile } from './parser';
 import { runScenario } from './runner';
 import { scheduleScenario, stopAll, listScheduled } from './scheduler';
 import { initStorage, closeStorage } from './storage';
+import { loadSettings } from './settings';
 import { createServer } from './server';
 
 const program = new Command();
@@ -24,7 +25,8 @@ program
   .option('--db <path>', 'SQLite database path for persisting metrics')
   .action(async (files: string[], options) => {
     if (options.db) {
-      initStorage(options.db);
+    initStorage(options.db);
+    loadSettings();
     }
 
     const headless = options.headless !== 'false';
@@ -78,6 +80,7 @@ program
   .option('--scenarios-dir <path>', 'Directory containing YAML scenario files', './scenarios')
   .action(async (options) => {
     initStorage(options.db);
+    loadSettings(options.settings);
 
     const scenariosDir = path.resolve(options.scenariosDir);
     let scenarioFiles: string[];

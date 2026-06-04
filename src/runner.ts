@@ -6,6 +6,7 @@ import { Scenario, ScenarioMetrics, StepMetrics } from './types';
 import { executeStep } from './actions/index';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
 import { storeMetrics, purgeOldData } from './storage';
+import { notifyIfStateChanged } from './notifications/index';
 
 // Sequential execution queue — Lightpanda CDP only supports one connection at a time
 let executionQueue: Promise<void> = Promise.resolve();
@@ -171,6 +172,10 @@ export async function runScenario(
     jsonReporter(metrics);
   } else {
     consoleReporter(metrics);
+  }
+
+  if (options.persist) {
+    notifyIfStateChanged(metrics).catch(() => {});
   }
 
   return metrics;
