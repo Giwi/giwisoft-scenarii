@@ -18,9 +18,14 @@ import { RouterOutlet, RouterLink } from '@angular/router';
         </div>
       </div>
     </nav>
-    <div class="container py-3">
+    <div class="container py-3 min-vh-100">
       <router-outlet />
     </div>
+    <footer class="text-center py-3 small text-secondary border-top" style="border-color: var(--border) !important; background: var(--header-bg); backdrop-filter: blur(12px);">
+      <div class="container">
+        &copy; <a href="https://giwi.fr" target="_blank" rel="noopener" class="text-decoration-none fw-medium" style="color: var(--accent)">GiwiSoft</a> 2026
+      </div>
+    </footer>
   `,
 })
 export class App implements OnInit {

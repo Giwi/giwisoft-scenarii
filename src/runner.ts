@@ -1,4 +1,4 @@
-import { chromium, request as playwrightRequest, Browser, Page, BrowserContext, APIRequestContext } from 'playwright-core';
+import { chromium, request as playwrightRequest, Page, BrowserContext, Browser, APIRequestContext } from 'playwright-core';
 import { lightpanda } from '@lightpanda/browser';
 import net from 'net';
 import { ChildProcess } from 'child_process';
@@ -6,6 +6,15 @@ import { Scenario, ScenarioMetrics, StepMetrics } from './types';
 import { executeStep } from './actions/index';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
 import { storeMetrics, purgeOldData } from './storage';
+
+// Sequential execution queue — Lightpanda CDP only supports one connection at a time
+let executionQueue: Promise<void> = Promise.resolve();
+
+function sequential<T>(fn: () => Promise<T>): Promise<T> {
+  const next = executionQueue.then(fn, fn);
+  executionQueue = next.then(() => {}, () => {});
+  return next;
+}
 
 function waitForProcessExit(proc: ChildProcess, timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -70,6 +79,7 @@ export async function runScenario(
   scenario: Scenario,
   options: RunOptions = {}
 ): Promise<ScenarioMetrics> {
+  return sequential(async () => {
   const metrics = createScenarioMetrics(scenario.name);
   const vars: Record<string, string> = {};
 
@@ -164,4 +174,5 @@ export async function runScenario(
   }
 
   return metrics;
+  });
 }

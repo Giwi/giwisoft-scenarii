@@ -197,8 +197,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
       const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
       const gridColor = isDark ? '#30363d' : '#e0e0e0';
       const textColor = isDark ? '#8b949e' : '#666';
-      const accent = isDark ? '#58a6ff' : '#4361ee';
-      const green = isDark ? '#3fb950' : '#2dc653';
+      const accent = isDark ? '#00d4ff' : '#6366f1';
+      const green = isDark ? '#3fb950' : '#10b981';
 
       // Duration trend chart
       const labels = history.map(r => new Date(r.started_at).toLocaleString()).reverse();
@@ -212,7 +212,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
             label: 'Duration (ms)',
             data: durations,
             borderColor: accent,
-            backgroundColor: isDark ? 'rgba(88, 166, 255, 0.1)' : 'rgba(67, 97, 238, 0.1)',
+            backgroundColor: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(99, 102, 241, 0.08)',
             fill: true,
             tension: 0.3,
             pointRadius: 3,
@@ -261,8 +261,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
       // Step response time chart (if multiple steps)
       if (this.detail.stepNames.length > 1) {
         const stepColors = isDark
-          ? ['#58a6ff', '#3fb950', '#f85149', '#d29922', '#bc8cff', '#f778ba']
-          : ['#4361ee', '#2dc653', '#e63946', '#f77f00', '#8338ec', '#ff006e'];
+          ? ['#00d4ff', '#3fb950', '#f85149', '#d29922', '#bc8cff', '#f778ba']
+          : ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#a855f7', '#ec4899'];
         const datasets = this.detail.stepNames.map((stepName, i) => {
           const data = history.map(run => {
             const step = run.steps.find(s => s.step_name === stepName);
