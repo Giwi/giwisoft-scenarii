@@ -125,15 +125,15 @@ interface ScenarioDetail {
                   <td>
                     <details>
                       <summary class="text-primary small" style="cursor:pointer">{{ run.steps.length }} steps</summary>
-                      <table class="table table-sm mt-2 mb-0">
-                        <tr *ngFor="let step of run.steps">
-                          <td class="small">{{ step.step_name }}</td>
-                          <td class="font-monospace small">{{ step.response_time_ms }}ms</td>
-                          <td>
-                            <span class="badge bg-success" *ngIf="step.success">OK</span>
-                            <span class="badge bg-danger" *ngIf="!step.success">ERR</span>
+                      <table class="table table-sm mt-2 mb-0" style="font-size: .75rem">
+                        <tr *ngFor="let step of run.steps" class="align-top">
+                          <td class="py-0 ps-0 pe-2 border-0">{{ step.step_name }}</td>
+                          <td class="font-monospace py-0 px-2 border-0 text-nowrap">{{ step.response_time_ms }}ms</td>
+                          <td class="py-0 px-2 border-0">
+                            <span class="badge bg-success" *ngIf="step.success" style="font-size: .65rem">OK</span>
+                            <span class="badge bg-danger" *ngIf="!step.success" style="font-size: .65rem">ERR</span>
                           </td>
-                          <td class="text-danger small" *ngIf="step.error">{{ step.error }}</td>
+                          <td class="text-danger py-0 ps-2 pe-0 border-0" *ngIf="step.error" style="font-size: .65rem">{{ step.error }}</td>
                         </tr>
                       </table>
                     </details>
