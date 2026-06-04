@@ -195,7 +195,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
       if (history.length === 0) return;
 
       const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-      const gridColor = isDark ? '#30363d' : '#e0e0e0';
+      const gridColor = isDark ? '#4a5568' : '#e0e0e0';
       const textColor = isDark ? '#8b949e' : '#666';
       const accent = isDark ? '#00d4ff' : '#6366f1';
       const green = isDark ? '#3fb950' : '#10b981';

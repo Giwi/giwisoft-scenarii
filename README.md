@@ -1,6 +1,6 @@
 # scenarii
 
-Execute periodic YAML-defined web test scenarios via a headless browser, store metrics in SQLite, and monitor them on a modern Angular dashboard.
+Execute periodic YAML-defined web test scenarios via a headless browser, store metrics in SQLite, and monitor them on a modern Angular dashboard with dark/light themes.
 
 ## Quick start
 
@@ -79,9 +79,10 @@ The Angular dashboard provides:
 
 - **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes every 5s
 - **Scenario detail** — response time trend chart, success rate over time, step breakdown, full run history
-- **Dark/light theme** — toggle with the sun/moon button in the navbar, preference saved to localStorage
+- **Dark/light theme** — toggle with the sun/moon button in the navbar, preference saved to localStorage, favicon adapts to the active theme
 - **Manual refresh** — refresh button on both list and detail pages
-- **Bootstrap UI** — modern responsive layout with Bootstrap 5 and Bootstrap Icons
+- **Footer** — © GiwiSoft 2026 with link to https://giwi.fr
+- **Bootstrap UI** — modern responsive layout with Bootstrap 5, Bootstrap Icons, and glassmorphism design
 
 ## Running
 
@@ -112,7 +113,7 @@ Scenarios are executed sequentially (Lightpanda CDP supports one connection at a
 
 ## Notifications
 
-Get alerted when a scenario fails and when it recovers. Create a `settings.yaml` file:
+Get alerted when a scenario fails and when it recovers. Create a `settings.yaml` file (use `settings.example.yaml` as a template):
 
 ```yaml
 notifications:
@@ -130,7 +131,7 @@ notifications:
       - "admin@example.com"
 ```
 
-The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions: failure (pass→fail) and recovery (fail→pass).
+The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions: failure (pass→fail) and recovery (fail→pass). Only the first run after a state change sends a notification.
 
 ## Container
 
@@ -142,13 +143,13 @@ npm run package
 
 # Run
 mkdir -p scenarios db
-cp settings.example.yaml settings.yaml  # or provide your own settings.yaml
+cp settings.example.yaml settings.yaml  # optional, for notifications
 podman run -d \
   --name scenarii \
   -p 3000:3000 \
   -v $(pwd)/scenarios:/scenarios:z \
   -v $(pwd)/db:/app/db:z \
-  -v $(pwd)/settings.yaml:/app/settings.yaml:z \
+  -v $(pwd)/settings.yaml:/app/settings.yaml:z \  # optional
   scenarii:latest
 ```
 
@@ -161,5 +162,6 @@ The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once
 - **Browser** — Lightpanda headless browser via Playwright CDP
 - **Database** — SQLite (better-sqlite3)
 - **Scheduling** — node-cron
-- **Frontend** — Angular 19 (standalone components), Bootstrap 5, Chart.js
+- **Notifications** — Telegram Bot API, Mailgun API
+- **Frontend** — Angular 19 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
 - **Container** — Alpine + multi-stage build
