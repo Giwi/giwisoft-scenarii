@@ -9,12 +9,15 @@ interface ScenarioInfo {
   last_success: number | null;
   last_duration_ms: number | null;
   total_runs: number;
+  passed_runs: number;
+  failed_runs: number;
+  pass_rate: number;
 }
 
 interface StepMetricsData {
   step_name: string;
   action: string;
-  success: number;
+  success: boolean;
   status_code: number | null;
   response_time_ms: number;
   error: string | null;
@@ -26,7 +29,7 @@ interface ScenarioRun {
   started_at: string;
   finished_at: string;
   duration_ms: number;
-  success: number;
+  success: boolean;
   steps: StepMetricsData[];
 }
 
@@ -41,114 +44,108 @@ interface ScenarioDetail {
   standalone: true,
   imports: [NgFor, NgIf, DatePipe, RouterModule],
   template: `
-    <div class="container" *ngIf="loading">
-      <a routerLink="/" class="back">&larr; Back</a>
-      <p class="empty">Loading...</p>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <a routerLink="/" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <button class="btn btn-sm btn-outline-primary" (click)="refresh()" [disabled]="loading">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
     </div>
 
-    <div class="container" *ngIf="!loading && !detail">
-      <a routerLink="/" class="back">&larr; Back</a>
-      <p class="empty">Scenario not found.</p>
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+      <h1 class="h4 mb-0">{{ detail?.info?.name }}</h1>
+      <span class="small text-secondary" *ngIf="detail">
+        <span class="fw-semibold">{{ detail.info.total_runs }}</span> runs ·
+        <span class="text-success fw-semibold">{{ detail.info.passed_runs }}</span> passed ·
+        <span class="text-danger fw-semibold">{{ detail.info.failed_runs }}</span> failed ·
+        <span class="fw-semibold">{{ detail.info.pass_rate }}%</span>
+      </span>
     </div>
 
-    <div class="container" *ngIf="detail">
-      <a routerLink="/" class="back">&larr; Back</a>
+    <div class="text-center py-5 text-secondary" *ngIf="loading">
+      <i class="bi bi-hourglass-split fs-2 mb-2 d-block"></i>
+      Loading...
+    </div>
 
-      <header>
-        <h1>{{ detail.info.name }}</h1>
-        <span class="badge" [class.success]="detail.info.last_success === 1" [class.fail]="detail.info.last_success === 0">
-          {{ detail.info.last_success === 1 ? 'PASS' : 'FAIL' }}
-        </span>
-        <span class="meta">Total runs: {{ detail.info.total_runs }}</span>
-      </header>
+    <div class="text-center py-5 text-secondary" *ngIf="!loading && !detail">
+      <i class="bi bi-search fs-2 mb-2 d-block"></i>
+      Scenario not found.
+    </div>
 
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Response Time Trend (last {{ limitDays }} days)</h3>
-          <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
+    <ng-container *ngIf="detail">
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title small text-secondary text-uppercase">Response Time Trend ({{ limitDays }}d)</h3>
+              <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
+            </div>
+          </div>
         </div>
-
-        <div class="chart-card">
-          <h3>Success Rate Over Time</h3>
-          <div class="chart-wrapper"><canvas id="successChart"></canvas></div>
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title small text-secondary text-uppercase">Success Rate Over Time</h3>
+              <div class="chart-wrapper"><canvas id="successChart"></canvas></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="chart-card" *ngIf="detail.stepNames.length > 1">
-        <h3>Step Response Times</h3>
-        <div class="chart-wrapper"><canvas id="stepChart"></canvas></div>
+      <div class="card border-0 shadow-sm mb-4" *ngIf="detail.stepNames.length > 1">
+        <div class="card-body">
+          <h3 class="card-title small text-secondary text-uppercase">Step Response Times</h3>
+          <div class="chart-wrapper"><canvas id="stepChart"></canvas></div>
+        </div>
       </div>
 
-      <div class="chart-card">
-        <h3>Recent Runs</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Duration</th>
-              <th>Status</th>
-              <th>Steps</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let run of detail.history.slice(0, 50)">
-              <td>{{ run.started_at | date:'MMM d, HH:mm:ss' }}</td>
-              <td class="num">{{ run.duration_ms }}ms</td>
-              <td>
-                <span class="badge-sm" [class.success]="run.success === 1" [class.fail]="run.success === 0">
-                  {{ run.success === 1 ? 'PASS' : 'FAIL' }}
-                </span>
-              </td>
-              <td>
-                <details>
-                  <summary>{{ run.steps.length }} steps</summary>
-                  <table class="sub">
-                    <tr *ngFor="let step of run.steps">
-                      <td>{{ step.step_name }}</td>
-                      <td class="num">{{ step.response_time_ms }}ms</td>
-                      <td>
-                        <span class="badge-sm" [class.success]="step.success === 1" [class.fail]="step.success === 0">
-                          {{ step.success === 1 ? 'OK' : 'ERR' }}
-                        </span>
-                      </td>
-                      <td class="err" *ngIf="step.error"> {{ step.error }}</td>
-                    </tr>
-                  </table>
-                </details>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title small text-secondary text-uppercase mb-3">Recent Runs</h3>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Time</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Steps</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let run of detail.history.slice(0, 50)">
+                  <td class="small">{{ run.started_at | date:'MMM d, HH:mm:ss' }}</td>
+                  <td class="font-monospace small">{{ run.duration_ms }}ms</td>
+                  <td>
+                    <span class="badge" [class.bg-success]="run.success" [class.bg-danger]="!run.success">
+                      {{ run.success ? 'Pass' : 'Fail' }}
+                    </span>
+                  </td>
+                  <td>
+                    <details>
+                      <summary class="text-primary small" style="cursor:pointer">{{ run.steps.length }} steps</summary>
+                      <table class="table table-sm mt-2 mb-0">
+                        <tr *ngFor="let step of run.steps">
+                          <td class="small">{{ step.step_name }}</td>
+                          <td class="font-monospace small">{{ step.response_time_ms }}ms</td>
+                          <td>
+                            <span class="badge bg-success" *ngIf="step.success">OK</span>
+                            <span class="badge bg-danger" *ngIf="!step.success">ERR</span>
+                          </td>
+                          <td class="text-danger small" *ngIf="step.error">{{ step.error }}</td>
+                        </tr>
+                      </table>
+                    </details>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-    </div>
+    </ng-container>
   `,
-  styles: [`
-    .container { max-width: 1100px; margin: 0 auto; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    .back { display: inline-block; margin-bottom: 16px; color: #4361ee; text-decoration: none; font-size: 14px; }
-    .back:hover { text-decoration: underline; }
-    header { margin-bottom: 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    h1 { margin: 0; font-size: 24px; color: #1a1a2e; }
-    .meta { color: #666; font-size: 13px; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 13px; font-weight: 600; }
-    .badge.success { background: #d4edda; color: #155724; }
-    .badge.fail { background: #f8d7da; color: #721c24; }
-    .badge-sm { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
-    .badge-sm.success { background: #d4edda; color: #155724; }
-    .badge-sm.fail { background: #f8d7da; color: #721c24; }
-    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    .chart-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
-    .chart-card h3 { margin: 0 0 16px; font-size: 14px; color: #666; }
-    .chart-card.full { grid-column: 1 / -1; }
-    .chart-wrapper { position: relative; height: 250px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
-    th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; background: #f8f9fa; }
-    .num { font-family: monospace; }
-    .err { color: #dc3545; font-size: 12px; }
-    details summary { cursor: pointer; color: #4361ee; font-size: 12px; }
-    .sub { margin-top: 4px; }
-    .sub td { padding: 4px 8px; font-size: 12px; }
-  `]
 })
 export class ScenarioDetailComponent implements OnInit, OnDestroy {
   detail: ScenarioDetail | null = null;
@@ -159,6 +156,22 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   constructor(private route: ActivatedRoute, private cdr: ChangeDetectorRef) {}
 
   async ngOnInit(): Promise<void> {
+    await this.loadDetail();
+  }
+
+  ngOnDestroy(): void {
+    this.charts.forEach(c => c.destroy());
+  }
+
+  async refresh(): Promise<void> {
+    this.charts.forEach(c => c.destroy());
+    this.charts = [];
+    this.loading = true;
+    this.cdr.detectChanges();
+    await this.loadDetail();
+  }
+
+  private async loadDetail(): Promise<void> {
     const name = this.route.snapshot.paramMap.get('name')!;
     try {
       const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
@@ -175,15 +188,17 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {
-    this.charts.forEach(c => c.destroy());
-  }
-
   private renderCharts(): void {
     try {
       if (!this.detail) return;
       const history = this.detail.history;
       if (history.length === 0) return;
+
+      const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+      const gridColor = isDark ? '#30363d' : '#e0e0e0';
+      const textColor = isDark ? '#8b949e' : '#666';
+      const accent = isDark ? '#58a6ff' : '#4361ee';
+      const green = isDark ? '#3fb950' : '#2dc653';
 
       // Duration trend chart
       const labels = history.map(r => new Date(r.started_at).toLocaleString()).reverse();
@@ -196,8 +211,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           datasets: [{
             label: 'Duration (ms)',
             data: durations,
-            borderColor: '#4361ee',
-            backgroundColor: 'rgba(67, 97, 238, 0.1)',
+            borderColor: accent,
+            backgroundColor: isDark ? 'rgba(88, 166, 255, 0.1)' : 'rgba(67, 97, 238, 0.1)',
             fill: true,
             tension: 0.3,
             pointRadius: 3,
@@ -208,14 +223,14 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { maxTicksLimit: 10, font: { size: 10 } } },
-            y: { beginAtZero: true }
+            x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
+            y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } }
           }
         }
       }));
 
       // Success rate chart
-      const successCounts = history.map(r => r.success === 1 ? 1 : 0).reverse();
+      const successCounts = history.map(r => r.success ? 1 : 0).reverse();
       const runningAvg = this.runningAverage(successCounts, 5);
 
       this.charts.push(new Chart('successChart', {
@@ -225,8 +240,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           datasets: [{
             label: 'Success',
             data: runningAvg,
-            borderColor: '#2dc653',
-            backgroundColor: 'rgba(45, 198, 83, 0.1)',
+            borderColor: green,
+            backgroundColor: isDark ? 'rgba(63, 185, 80, 0.1)' : 'rgba(45, 198, 83, 0.1)',
             fill: true,
             tension: 0.3,
             pointRadius: 3,
@@ -237,15 +252,17 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { ticks: { maxTicksLimit: 10, font: { size: 10 } } },
-            y: { min: 0, max: 1, ticks: { callback: (v) => (v as number) * 100 + '%' } }
+            x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
+            y: { min: 0, max: 1, ticks: { font: { size: 10 }, color: textColor, callback: (v) => (v as number) * 100 + '%' }, grid: { color: gridColor } }
           }
         }
       }));
 
       // Step response time chart (if multiple steps)
       if (this.detail.stepNames.length > 1) {
-        const stepColors = ['#4361ee', '#2dc653', '#e63946', '#f77f00', '#8338ec', '#ff006e'];
+        const stepColors = isDark
+          ? ['#58a6ff', '#3fb950', '#f85149', '#d29922', '#bc8cff', '#f778ba']
+          : ['#4361ee', '#2dc653', '#e63946', '#f77f00', '#8338ec', '#ff006e'];
         const datasets = this.detail.stepNames.map((stepName, i) => {
           const data = history.map(run => {
             const step = run.steps.find(s => s.step_name === stepName);
@@ -266,10 +283,10 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } },
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: textColor } } },
             scales: {
-              x: { ticks: { maxTicksLimit: 10, font: { size: 10 } } },
-              y: { beginAtZero: true }
+              x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
+              y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } }
             }
           }
         }));

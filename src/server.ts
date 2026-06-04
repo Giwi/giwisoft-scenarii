@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import http from 'http';
 import { getScenarioList, getScenarioHistory, getScenarioStepNames } from './storage';
 
@@ -32,7 +33,20 @@ export function createApp(): express.Application {
       const history = getScenarioHistory(req.params.name);
       const stepNames = getScenarioStepNames(req.params.name);
 
-      res.json({ info: scenario, history, stepNames });
+      const totalRuns = history.length;
+      const passedRuns = history.filter(r => r.success).length;
+
+      res.json({
+        info: {
+          ...scenario,
+          total_runs: totalRuns,
+          passed_runs: passedRuns,
+          failed_runs: totalRuns - passedRuns,
+          pass_rate: totalRuns > 0 ? Math.round(passedRuns / totalRuns * 100) : 0,
+        },
+        history,
+        stepNames,
+      });
     } catch (err: unknown) {
       res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
     }
@@ -49,16 +63,23 @@ export function createApp(): express.Application {
     }
   });
 
-  // Serve Angular frontend in production
-  const frontendPath = path.join(__dirname, '../frontend/dist/frontend/browser');
-  app.use(express.static(frontendPath));
-  app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api/')) {
-      res.sendFile(path.join(frontendPath, 'index.html'));
-    } else {
-      next();
-    }
-  });
+  // Serve Angular frontend in production (only if built)
+  const frontendDir = path.join(__dirname, '../frontend/dist/frontend/browser');
+  const frontendBuilt = fs.existsSync(path.join(frontendDir, 'index.html'));
+  if (frontendBuilt) {
+    app.use(express.static(frontendDir));
+    app.use((req, res, next) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+        res.sendFile(path.join(frontendDir, 'index.html'));
+      } else {
+        next();
+      }
+    });
+  } else {
+    app.get('/', (_req, res) => {
+      res.json({ message: 'scenarii API server — frontend not built, run `npm run build:frontend`' });
+    });
+  }
 
   return app;
 }

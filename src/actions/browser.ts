@@ -73,7 +73,12 @@ export async function executeBrowserStep(
       case 'browser.navigate': {
         if (!step.url) throw new Error('browser.navigate requires a "url" field');
         const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
-        await page.goto(resolvedUrl, { waitUntil: 'load' });
+        try {
+          await page.goto(resolvedUrl, { waitUntil: 'load', timeout: 30000 });
+        } catch {
+          // Lightpanda CDP can drop on complex pages; retry with domcontentloaded
+          await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        }
         break;
       }
 

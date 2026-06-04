@@ -6,7 +6,7 @@ import path from 'path';
 import { loadScenarioFile } from './parser';
 import { runScenario } from './runner';
 import { scheduleScenario, stopAll, listScheduled } from './scheduler';
-import { initStorage } from './storage';
+import { initStorage, closeStorage } from './storage';
 import { createServer } from './server';
 
 const program = new Command();
@@ -58,11 +58,13 @@ program
       process.on('SIGINT', () => {
         console.log('\nStopping all scheduled tasks...');
         stopAll();
+        closeStorage();
         process.exit(0);
       });
 
       process.on('SIGTERM', () => {
         stopAll();
+        closeStorage();
         process.exit(0);
       });
     }
@@ -132,10 +134,12 @@ program
     process.on('SIGINT', () => {
       console.log('\nShutting down...');
       stopAll();
+      closeStorage();
       process.exit(0);
     });
     process.on('SIGTERM', () => {
       stopAll();
+      closeStorage();
       process.exit(0);
     });
   });

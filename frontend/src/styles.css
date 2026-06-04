@@ -1,1 +1,117 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --bg: #f0f2f5;
+  --card-bg: #fff;
+  --text: #1a1a2e;
+  --text-muted: #6c757d;
+  --border: #dee2e6;
+  --header-bg: #fff;
+  --accent: #4361ee;
+}
+
+[data-bs-theme="dark"] {
+  --bg: #0d1117;
+  --card-bg: #161b22;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --border: #30363d;
+  --header-bg: #161b22;
+  --accent: #58a6ff;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  transition: background .2s, color .2s;
+}
+
+.card, .bg-white, .chart-card {
+  background: var(--card-bg) !important;
+  color: var(--text);
+  border: 1px solid var(--border) !important;
+}
+
+.table {
+  --bs-table-bg: var(--card-bg);
+  --bs-table-color: var(--text);
+  --bs-table-striped-bg: rgba(0,0,0,.02);
+  --bs-table-hover-bg: rgba(0,0,0,.04);
+}
+
+[data-bs-theme="dark"] .table {
+  --bs-table-striped-bg: rgba(255,255,255,.03);
+  --bs-table-hover-bg: rgba(255,255,255,.06);
+}
+
+[data-bs-theme="dark"] .table-light {
+  --bs-table-bg: #0d1117 !important;
+  --bs-table-color: #e6edf3 !important;
+  --bs-table-border-color: var(--border);
+}
+
+.table-light th {
+  font-weight: 600;
+}
+
+.navbar {
+  background: var(--header-bg) !important;
+  border-bottom: 1px solid var(--border);
+}
+
+[data-bs-theme="dark"] .navbar {
+  box-shadow: 0 1px 0 var(--border);
+}
+
+[data-bs-theme="dark"] .btn-outline-primary {
+  --bs-btn-color: #58a6ff;
+  --bs-btn-border-color: #58a6ff;
+  --bs-btn-hover-bg: #58a6ff;
+  --bs-btn-hover-color: #0d1117;
+  --bs-btn-active-bg: #58a6ff;
+  --bs-btn-active-color: #0d1117;
+}
+
+[data-bs-theme="dark"] .btn-outline-secondary {
+  --bs-btn-color: #8b949e;
+  --bs-btn-border-color: #30363d;
+  --bs-btn-hover-bg: #30363d;
+  --bs-btn-hover-color: #e6edf3;
+  --bs-btn-active-bg: #30363d;
+  --bs-btn-active-color: #e6edf3;
+}
+
+[data-bs-theme="dark"] .text-primary {
+  color: #58a6ff !important;
+}
+
+[data-bs-theme="dark"] .text-success {
+  color: #3fb950 !important;
+}
+
+[data-bs-theme="dark"] .text-danger {
+  color: #f85149 !important;
+}
+
+[data-bs-theme="dark"] .bg-success {
+  background-color: #238636 !important;
+}
+
+[data-bs-theme="dark"] .bg-danger {
+  background-color: #da3633 !important;
+}
+
+[data-bs-theme="dark"] .bg-secondary {
+  background-color: #21262d !important;
+}
+
+[data-bs-theme="dark"] .badge {
+  color: #fff;
+}
+
+.chart-wrapper { position: relative; height: 250px; }
+
+.empty-state {
+  padding: 4rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}

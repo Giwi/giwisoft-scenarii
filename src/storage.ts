@@ -21,7 +21,7 @@ export function initStorage(dbPath?: string): void {
       finished_at TEXT NOT NULL,
       duration_ms INTEGER NOT NULL,
       success INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS step_metrics (
@@ -47,8 +47,8 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
   if (!db) throw new Error('Database not initialized');
 
   const insertRun = db.prepare(`
-    INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
 
   const insertStep = db.prepare(`
@@ -57,12 +57,14 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
   `);
 
   const transaction = db.transaction(() => {
+    const now = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
     const result = insertRun.run(
       metrics.scenario_name,
       metrics.started_at.toISOString(),
       metrics.finished_at.toISOString(),
       metrics.duration_ms,
-      metrics.success ? 1 : 0
+      metrics.success ? 1 : 0,
+      now
     );
     const runId = result.lastInsertRowid as number;
 
@@ -124,7 +126,7 @@ export function getScenarioHistory(
 ): ScenarioMetrics[] {
   if (!db) throw new Error('Database not initialized');
 
-  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 
   const runs = db.prepare(`
     SELECT * FROM scenario_runs
@@ -188,7 +190,14 @@ export function getScenarioStepNames(name: string): string[] {
 
 export function purgeOldData(days: number = 7): number {
   if (!db) throw new Error('Database not initialized');
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
   const result = db.prepare(`DELETE FROM scenario_runs WHERE created_at < ?`).run(since);
   return result.changes;
+}
+
+export function closeStorage(): void {
+  if (db) {
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.close();
+  }
 }

@@ -1,4 +1,4 @@
-import { chromium, request as playwrightRequest, Page, BrowserContext, APIRequestContext } from 'playwright-core';
+import { chromium, request as playwrightRequest, Browser, Page, BrowserContext, APIRequestContext } from 'playwright-core';
 import { lightpanda } from '@lightpanda/browser';
 import net from 'net';
 import { ChildProcess } from 'child_process';
@@ -6,6 +6,14 @@ import { Scenario, ScenarioMetrics, StepMetrics } from './types';
 import { executeStep } from './actions/index';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
 import { storeMetrics, purgeOldData } from './storage';
+
+function waitForProcessExit(proc: ChildProcess, timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(), timeoutMs);
+    proc.once('exit', () => { clearTimeout(timer); resolve(); });
+    proc.once('error', () => { clearTimeout(timer); resolve(); });
+  });
+}
 
 export interface RunOptions {
   headless?: boolean;
@@ -69,6 +77,7 @@ export async function runScenario(
   let page: Page | null = null;
   let apiContext: APIRequestContext | null = null;
   let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
+  let browser: Browser | null = null;
 
   const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
 
@@ -77,7 +86,7 @@ export async function runScenario(
       const { proc, port } = await startLightpanda(options.lightpandaPort ?? 9222);
       lightpandaProc = proc;
 
-      const browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
+      browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
       browserContext = await browser.newContext({
         viewport: { width: 1280, height: 720 },
         ignoreHTTPSErrors: true,
@@ -112,18 +121,23 @@ export async function runScenario(
     };
     metrics.steps.push(stepMetrics);
   } finally {
-    if (browserContext) {
+    if (browser) {
       try {
-        await browserContext.close();
-        const browser = (browserContext as any)._browser;
-        if (browser) await browser.close();
+        const contexts = browser.contexts();
+        for (const ctx of contexts) {
+          try { await ctx.close(); } catch { /* ignore */ }
+        }
+        await browser.close();
       } catch { /* ignore close errors */ }
+    } else if (browserContext) {
+      try { await browserContext.close(); } catch { /* ignore */ }
     }
     if (lightpandaProc) {
       try {
         lightpandaProc.stdout?.destroy();
         lightpandaProc.stderr?.destroy();
         lightpandaProc.kill();
+        await waitForProcessExit(lightpandaProc, 3000);
       } catch { /* ignore kill errors */ }
     }
     if (apiContext) {
