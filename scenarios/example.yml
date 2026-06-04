@@ -1,0 +1,41 @@
+name: Example API health check
+description: Basic HTTP scenario to verify API health
+schedule: "*/5 * * * *"
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Get posts
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+      response_time_under: 3000
+
+  - name: Verify JSON content
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+      json_path: $.userId
+      json_value: 1
+    variables:
+      postId: $.id
+
+  - name: Verify body contains text
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+      body_contains: "title"
+
+  - name: Create a post
+    action: http.post
+    url: /posts
+    body:
+      title: foo
+      body: bar
+      userId: 1
+    headers:
+      Content-Type: application/json
+    expect:
+      status: 201

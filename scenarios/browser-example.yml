@@ -1,0 +1,22 @@
+name: Browser form test
+description: Tests a form submission flow in the browser
+schedule: "*/10 * * * *"
+base_url: https://example.com
+headless: true
+
+steps:
+  - name: Open page
+    action: browser.navigate
+    url: /
+
+  - name: Verify page loaded
+    action: browser.wait_for
+    selector: body
+    expect:
+      has_text: "Example"
+
+  - name: Check URL
+    action: browser.evaluate
+    script: "window.location.href"
+    expect:
+      url_contains: "example.com"
