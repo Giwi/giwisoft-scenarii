@@ -109,7 +109,42 @@ node dist/index.js server
 | `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files |
 | `--settings` | auto-detect | Path to settings file (see Notifications below) |
 
-Scenarios are executed sequentially (Lightpanda CDP supports one connection at a time). Each runs once on startup, then on their `schedule` cron expression.
+Scenarios are executed sequentially (Lightpanda CDP supports one connection at a time). Each runs once on startup, then on their `schedule` cron expression. A per-scenario timeout (default 120s) prevents hung scenarios from blocking the queue indefinitely.
+
+## API endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/scenarios` | List all scenarios with last run status |
+| `GET /api/scenarios/:name` | Scenario detail with full run history |
+| `GET /api/scenarios/:name/history` | Raw run history for a scenario |
+| `GET /api/health` | Health check (200 = ready, 503 = initializing) |
+| `GET /api/metrics` | Prometheus/OpenMetrics format (see below) |
+
+Prometheus can scrape `http://localhost:3000/api/metrics` for:
+
+- `scenarii_scenario_runs_total{scenario}` — total run count
+- `scenarii_scenario_duration_ms{scenario}` — latest run duration (ms)
+- `scenarii_scenario_success{scenario}` — latest run 1=pass / 0=fail
+- `scenarii_scenario_last_run_seconds{scenario}` — last run timestamp
+- `scenarii_step_duration_ms{scenario,step,action}` — per-step duration
+- `scenarii_step_success{scenario,step,action}` — per-step success
+
+## Real-time updates
+
+The server exposes a WebSocket endpoint at `/ws`. After each scenario run, a JSON message is broadcast to all connected clients:
+
+```json
+{
+  "type": "scenario_run",
+  "scenario_name": "Lusk.bzh validation",
+  "success": true,
+  "duration_ms": 2500,
+  "timestamp": "2026-06-06T12:00:00.000Z"
+}
+```
+
+The dashboard uses this for instant UI updates (list auto-refreshes on any run; detail page refreshes only for the viewed scenario). The 5s polling fallback remains active.
 
 ## Notifications
 
@@ -153,7 +188,26 @@ podman run -d \
   scenarii:latest
 ```
 
-The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once on startup, and schedules them by their `schedule` cron field.
+The container includes a `HEALTHCHECK` that pings `/api/health` every 30s (10s startup grace period, 3 retries). The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once on startup, and schedules them by their `schedule` cron field.
+
+## CI/CD
+
+On push to `main`, GitHub Actions:
+
+1. Installs dependencies and runs `tsc --noEmit`
+2. Executes unit tests (`npm test`)
+3. Builds the frontend and backend
+4. Builds and publishes the Docker image to `ghcr.io/<owner>/scenarii:latest`
+
+The workflow is in `.github/workflows/ci.yml`.
+
+## Testing
+
+```bash
+npm test
+```
+
+Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests cover the sequential execution queue, notification state machine, and settings schema validation.
 
 ## Tech stack
 
