@@ -77,12 +77,17 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 
 The Angular dashboard provides:
 
-- **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes every 5s
+- **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes every 5s via WebSocket
 - **Scenario detail** — response time trend chart, success rate over time, step breakdown, full run history
 - **Dark/light theme** — toggle with the sun/moon button in the navbar, preference saved to localStorage, favicon adapts to the active theme
 - **Manual refresh** — refresh button on both list and detail pages
 - **Footer** — © GiwiSoft 2026 with link to https://giwi.fr
 - **Bootstrap UI** — modern responsive layout with Bootstrap 5, Bootstrap Icons, and glassmorphism design
+
+![Scenario list (light)](frontend/public/screenshots/scenario-list.png)
+![Scenario detail (light)](frontend/public/screenshots/scenario-detail.png)
+![Scenario list (dark)](frontend/public/screenshots/scenario-list-dark.png)
+![Scenario detail (dark)](frontend/public/screenshots/scenario-detail-dark.png)
 
 ## Running
 

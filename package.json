@@ -18,6 +18,7 @@
     "dev:once": "ts-node src/index.ts --once scenarios/lusk.yml",
     "lint": "tsc --noEmit",
     "test": "npm run build:backend && node --test dist/*.test.js",
+    "screenshots": "ts-node take-screenshots.ts",
     "package": "npm run build && sh build-container.sh"
   },
   "dependencies": {
