@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm ci
+          npm install --ignore-scripts
           cd frontend && npm ci
 
       - name: Lint (TypeScript check)
