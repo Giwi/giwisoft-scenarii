@@ -14,7 +14,7 @@ RUN npm run build
 
 FROM docker.io/node:22-alpine
 
-RUN apk add --no-cache libstdc++ dumb-init
+RUN apk add --no-cache libstdc++ dumb-init curl
 
 WORKDIR /app
 
@@ -26,6 +26,9 @@ RUN rm -rf node_modules/{typescript,@types/*,ts-node} && \
     npm cache clean --force
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -sf http://localhost:3000/api/health || exit 1
 
 VOLUME /scenarios
 VOLUME /app/db

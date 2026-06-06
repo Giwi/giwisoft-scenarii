@@ -38,6 +38,21 @@ body {
   transition: background .35s ease, color .35s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+app-root {
+  display: contents;
+}
+
+app-root > .container:nth-child(2) {
+  flex: 1;
+}
+
+app-root > footer {
+  flex-shrink: 0;
 }
 
 body::before {
@@ -487,4 +502,39 @@ details summary {
   padding: 4rem 1rem;
   text-align: center;
   color: var(--text-muted);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.35);
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.15);
+}
+
+[data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.3);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.2) transparent;
+}
+
+[data-bs-theme="dark"] * {
+  scrollbar-color: rgba(0, 212, 255, 0.15) transparent;
 }

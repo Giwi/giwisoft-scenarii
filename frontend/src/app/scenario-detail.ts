@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgFor, NgIf, DatePipe } from '@angular/common';
 import Chart from 'chart.js/auto';
+import { onScenarioRun, removeScenarioRunListener } from './ws';
 
 interface ScenarioInfo {
   name: string;
@@ -152,15 +153,19 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   loading = true;
   limitDays = 7;
   private charts: Chart[] = [];
+  private scenarioName = '';
 
   constructor(private route: ActivatedRoute, private cdr: ChangeDetectorRef) {}
 
   async ngOnInit(): Promise<void> {
+    this.scenarioName = this.route.snapshot.paramMap.get('name')!;
     await this.loadDetail();
+    onScenarioRun(this.wsCallback);
   }
 
   ngOnDestroy(): void {
     this.charts.forEach(c => c.destroy());
+    removeScenarioRunListener(this.wsCallback);
   }
 
   async refresh(): Promise<void> {
@@ -171,8 +176,14 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     await this.loadDetail();
   }
 
+  private wsCallback = (event: import('./ws').ScenarioRunEvent) => {
+    if (event.scenario_name === this.scenarioName && !this.loading) {
+      this.refresh();
+    }
+  };
+
   private async loadDetail(): Promise<void> {
-    const name = this.route.snapshot.paramMap.get('name')!;
+    const name = this.scenarioName;
     try {
       const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
       if (res.ok) {

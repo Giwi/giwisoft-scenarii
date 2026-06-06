@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from './ws';
 
 interface ScenarioInfo {
   name: string;
@@ -113,11 +114,16 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     this.pollTimer = setInterval(() => {
       if (!this.fetching) this.fetchScenarios();
     }, 5000);
+
+    onScenarioRun(this.wsCallback);
   }
 
   ngOnDestroy(): void {
     if (this.pollTimer) clearInterval(this.pollTimer);
+    removeScenarioRunListener(this.wsCallback);
   }
+
+  private wsCallback = () => { if (!this.fetching) this.fetchScenarios(); };
 
   async fetchScenarios(): Promise<void> {
     if (this.fetching) return;

@@ -18,7 +18,7 @@ import { RouterOutlet, RouterLink } from '@angular/router';
         </div>
       </div>
     </nav>
-    <div class="container py-3 min-vh-100">
+    <div class="container py-3 flex-fill">
       <router-outlet />
     </div>
     <footer class="text-center py-3 small text-secondary border-top" style="border-color: var(--border) !important; background: var(--header-bg); backdrop-filter: blur(12px);">

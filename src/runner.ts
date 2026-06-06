@@ -7,6 +7,7 @@ import { executeStep } from './actions/index';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
 import { storeMetrics, purgeOldData } from './storage';
 import { notifyIfStateChanged } from './notifications/index';
+import { broadcastScenarioRun } from './ws';
 
 // Sequential execution queue — Lightpanda CDP only supports one connection at a time
 let executionQueue: Promise<void> = Promise.resolve();
@@ -30,6 +31,7 @@ export interface RunOptions {
   json_output?: boolean;
   persist?: boolean;
   lightpandaPort?: number;
+  timeout?: number;
 }
 
 function getRandomPort(): number {
@@ -81,80 +83,105 @@ export async function runScenario(
   options: RunOptions = {}
 ): Promise<ScenarioMetrics> {
   return sequential(async () => {
-  const metrics = createScenarioMetrics(scenario.name);
-  const vars: Record<string, string> = {};
+    const metrics = createScenarioMetrics(scenario.name);
+    const vars: Record<string, string> = {};
+    let browserContext: BrowserContext | null = null;
+    let page: Page | null = null;
+    let apiContext: APIRequestContext | null = null;
+    let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
+    let browser: Browser | null = null;
 
-  let browserContext: BrowserContext | null = null;
-  let page: Page | null = null;
-  let apiContext: APIRequestContext | null = null;
-  let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
-  let browser: Browser | null = null;
+    const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
+    const timeoutMs = options.timeout ?? 120_000;
 
-  const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
+    const run = async () => {
+      try {
+        if (hasBrowserActions) {
+          const { proc, port } = await startLightpanda(options.lightpandaPort ?? 9222);
+          lightpandaProc = proc;
 
-  try {
-    if (hasBrowserActions) {
-      const { proc, port } = await startLightpanda(options.lightpandaPort ?? 9222);
-      lightpandaProc = proc;
+          browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
+          browserContext = await browser.newContext({
+            viewport: { width: 1280, height: 720 },
+            ignoreHTTPSErrors: true,
+          });
+          page = await browserContext.newPage();
+          apiContext = await playwrightRequest.newContext({
+            ignoreHTTPSErrors: true,
+          });
+        } else {
+          apiContext = await playwrightRequest.newContext({
+            ignoreHTTPSErrors: true,
+          });
+        }
 
-      browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
-      browserContext = await browser.newContext({
-        viewport: { width: 1280, height: 720 },
-        ignoreHTTPSErrors: true,
-      });
-      page = await browserContext.newPage();
-      apiContext = await playwrightRequest.newContext({
-        ignoreHTTPSErrors: true,
-      });
-    } else {
-      apiContext = await playwrightRequest.newContext({
-        ignoreHTTPSErrors: true,
-      });
-    }
+        for (const step of scenario.steps) {
+          const stepMetrics = await executeStep(step, page, apiContext!, scenario.base_url, vars);
+          metrics.steps.push(stepMetrics);
 
-    for (const step of scenario.steps) {
-      const stepMetrics = await executeStep(step, page, apiContext!, scenario.base_url, vars);
-      metrics.steps.push(stepMetrics);
-
-      if (!stepMetrics.success) {
+          if (!stepMetrics.success) {
+            metrics.success = false;
+          }
+        }
+      } catch (err: unknown) {
         metrics.success = false;
+        const stepMetrics: StepMetrics = {
+          step_name: 'runtime_error',
+          action: 'unknown',
+          success: false,
+          response_time_ms: 0,
+          error: err instanceof Error ? err.message : String(err),
+          timestamp: new Date(),
+        };
+        metrics.steps.push(stepMetrics);
+      } finally {
+        if (browser) {
+          try {
+            const contexts = browser.contexts();
+            for (const ctx of contexts) {
+              try { await ctx.close(); } catch { /* ignore */ }
+            }
+            await browser.close();
+          } catch { /* ignore close errors */ }
+        } else if (browserContext) {
+          try { await browserContext.close(); } catch { /* ignore */ }
+        }
+        if (lightpandaProc) {
+          try {
+            lightpandaProc.stdout?.destroy();
+            lightpandaProc.stderr?.destroy();
+            lightpandaProc.kill();
+            await waitForProcessExit(lightpandaProc, 3000);
+          } catch { /* ignore kill errors */ }
+        }
+        if (apiContext) {
+          try { await apiContext.dispose(); } catch {}
+        }
+      }
+    };
+
+    try {
+      await Promise.race([
+        run(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Scenario "${scenario.name}" timed out after ${timeoutMs}ms`)), timeoutMs)
+        ),
+      ]);
+    } catch (err: unknown) {
+      // Ensure a runtime_error step is recorded on timeout
+      if (metrics.steps.length === 0 || metrics.steps[metrics.steps.length - 1].step_name !== 'runtime_error') {
+        metrics.success = false;
+        const stepMetrics: StepMetrics = {
+          step_name: 'runtime_error',
+          action: 'unknown',
+          success: false,
+          response_time_ms: 0,
+          error: err instanceof Error ? err.message : String(err),
+          timestamp: new Date(),
+        };
+        metrics.steps.push(stepMetrics);
       }
     }
-  } catch (err: unknown) {
-    metrics.success = false;
-    const stepMetrics: StepMetrics = {
-      step_name: 'runtime_error',
-      action: 'unknown',
-      success: false,
-      response_time_ms: 0,
-      error: err instanceof Error ? err.message : String(err),
-      timestamp: new Date(),
-    };
-    metrics.steps.push(stepMetrics);
-  } finally {
-    if (browser) {
-      try {
-        const contexts = browser.contexts();
-        for (const ctx of contexts) {
-          try { await ctx.close(); } catch { /* ignore */ }
-        }
-        await browser.close();
-      } catch { /* ignore close errors */ }
-    } else if (browserContext) {
-      try { await browserContext.close(); } catch { /* ignore */ }
-    }
-    if (lightpandaProc) {
-      try {
-        lightpandaProc.stdout?.destroy();
-        lightpandaProc.stderr?.destroy();
-        lightpandaProc.kill();
-        await waitForProcessExit(lightpandaProc, 3000);
-      } catch { /* ignore kill errors */ }
-    }
-    if (apiContext) {
-      try { await apiContext.dispose(); } catch {}
-    }
-  }
 
   metrics.finished_at = new Date();
   metrics.duration_ms = metrics.finished_at.getTime() - metrics.started_at.getTime();
@@ -177,6 +204,12 @@ export async function runScenario(
   if (options.persist) {
     notifyIfStateChanged(metrics).catch(() => {});
   }
+
+  broadcastScenarioRun({
+    scenario_name: metrics.scenario_name,
+    success: metrics.success,
+    duration_ms: metrics.duration_ms,
+  });
 
   return metrics;
   });

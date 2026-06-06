@@ -201,3 +201,7 @@ export function closeStorage(): void {
     db.close();
   }
 }
+
+export function isStorageReady(): boolean {
+  return db !== undefined && db !== null;
+}

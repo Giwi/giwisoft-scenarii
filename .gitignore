@@ -11,6 +11,11 @@ db/*.db-wal
 # Settings (contains secrets like API keys)
 settings.yaml
 settings.yml
+
+# User scenario files (custom per environment)
+scenarios/*.yml
+scenarios/*.yaml
+!scenarios/*.example.*
 .angular
 .vscode
 .idea
