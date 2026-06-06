@@ -43,6 +43,10 @@ jobs:
       - name: Build backend
         run: npm run build:backend
 
+      - name: Set lowercase image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Log in to GitHub Container Registry
         if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
@@ -57,7 +61,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ steps.image.outputs.name }}:latest
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
