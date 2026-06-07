@@ -48,7 +48,7 @@ jobs:
         run: npm run build:backend
 
       - name: Build Docker image (smoke test)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Containerfile
@@ -88,7 +88,7 @@ jobs:
 
       - name: Build and push Docker image
         if: github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Containerfile
