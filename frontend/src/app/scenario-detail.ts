@@ -59,6 +59,17 @@ interface ScenarioDetail {
       <button class="btn btn-sm btn-outline-primary" (click)="refresh()" [disabled]="loading">
         <i class="bi bi-arrow-clockwise"></i>
       </button>
+      <div class="ms-auto" *ngIf="detail">
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+            <i class="bi bi-download me-1"></i>Export
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" [href]="exportUrl('json')" target="_blank"><i class="bi bi-filetype-json me-2"></i>JSON</a></li>
+            <li><a class="dropdown-item" [href]="exportUrl('csv')" target="_blank"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
@@ -217,6 +228,10 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
       this.refresh();
     }
   };
+
+  exportUrl(format: string): string {
+    return `/api/scenarios/${encodeURIComponent(this.scenarioName)}/export/${format}`;
+  }
 
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
