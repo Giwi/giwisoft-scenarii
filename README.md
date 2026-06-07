@@ -1,6 +1,6 @@
 # scenarii
 
-Execute periodic YAML-defined web test scenarios via a headless browser, store metrics in SQLite, and monitor them on a modern Angular dashboard with dark/light themes.
+Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite, and monitor them on a modern Angular dashboard with dark/light themes.
 
 ## Quick start
 
@@ -17,14 +17,47 @@ node dist/index.js --once scenarios/lusk.yml
 
 Open http://localhost:3000 to see the dashboard.
 
+## Requirements
+
+- Node.js ≥ 24.15.0 or ≥ 26.0.0 (for Angular 22)
+- For browser scenarios: `@lightpanda/browser` (optional — HTTP-only scenarios use native fetch)
+
+## CLI
+
+| Command | Description |
+|---------|-------------|
+| `server` | Start API server + Angular dashboard |
+| `validate <file>` | Validate a scenario YAML without running it |
+| `trigger <file>` | Run a scenario immediately |
+| `status` | Show scheduled scenarios and storage status |
+| `config --init` | Generate a `settings.yaml` template |
+
+```bash
+node dist/index.js validate scenarios/lusk.yml
+node dist/index.js trigger scenarios/lusk.yml
+node dist/index.js status
+node dist/index.js config --init
+```
+
+### Server options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-p, --port` | `3000` | HTTP port |
+| `--db` | `db/scenarii.db` | SQLite database path |
+| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files |
+| `--settings` | auto-detect | Path to settings file (see Notifications below) |
+
 ## Writing scenarios
 
-Scenarios are YAML files. Each step is either an HTTP request or a browser action.
+Scenarios are YAML files. HTTP-only steps run in parallel using native fetch; browser steps are serialised (Lightpanda CDP supports one connection at a time).
 
 ```yaml
 name: Example
 base_url: https://example.com
 schedule: "*/5 * * * *"   # optional cron expression
+timeout: 120000           # per-scenario timeout override (default 120s)
+ignoreHTTPSErrors: false  # per-scenario SSL override
 
 steps:
   - name: Homepage
@@ -49,6 +82,8 @@ steps:
 
 ### HTTP actions
 
+HTTP-only scenarios use the native `fetch` API — no Playwright or browser needed for simple API monitoring.
+
 | Action | Fields |
 |--------|--------|
 | `http.get` / `http.post` / `http.put` / `http.patch` / `http.delete` | `url`, `headers`, `body`, `expect` |
@@ -69,6 +104,8 @@ steps:
 | `browser.check` / `browser.uncheck` | `selector` |
 | `browser.screenshot` | `value` (output path) |
 
+Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.
+
 ### Variables
 
 Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses using the `variables` field with a `json_path` selector.
@@ -77,9 +114,9 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 
 The dashboard provides:
 
-- **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes every 5s via WebSocket
-- **Scenario detail** — response time trend chart, success rate over time, step breakdown, full run history
-- **Dark/light theme** — toggle with the sun/moon button in the navbar, preference saved to localStorage, favicon adapts to the active theme
+- **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes via WebSocket
+- **Scenario detail** — response time trend chart, success rate over time, step breakdown, paginated run history, **JSON/CSV export** buttons
+- **Dark/light theme** — toggle in the navbar, preference saved to localStorage
 - **Manual refresh** — refresh button on both list and detail pages
 
 <p align="center">
@@ -94,38 +131,31 @@ The dashboard provides:
 
 ```bash
 # Development (both API + Angular HMR with one command)
-yarn dev
+npm run dev
 
 # Or run them separately:
-yarn dev:server     # Express API + scenario scheduling on :3000
-yarn dev:frontend   # Angular dev server on :4200 with HMR
-yarn dev:once       # Run the lusk scenario once
+npm run dev:server     # Express API + scenario scheduling on :3000
+npm run dev:frontend   # Angular dev server on :4200 with HMR
+npm run dev:once       # Run the lusk scenario once
 
 # Production
 npm run build
 node dist/index.js server
 ```
 
-### Server options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--port` | `3000` | HTTP port |
-| `--db` | `db/scenarii.db` | SQLite database path |
-| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files |
-| `--settings` | auto-detect | Path to settings file (see Notifications below) |
-
-Scenarios are executed sequentially (Lightpanda CDP supports one connection at a time). Each runs once on startup, then on their `schedule` cron expression. A per-scenario timeout (default 120s) prevents hung scenarios from blocking the queue indefinitely.
-
 ## API endpoints
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/scenarios` | List all scenarios with last run status |
-| `GET /api/scenarios/:name` | Scenario detail with full run history |
-| `GET /api/scenarios/:name/history` | Raw run history for a scenario |
+| `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=`) |
+| `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=`) |
+| `GET /api/scenarios/:name/export/json` | Download all history as JSON |
+| `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
 | `GET /api/health` | Health check (200 = ready, 503 = initializing) |
 | `GET /api/metrics` | Prometheus/OpenMetrics format (see below) |
+
+Responses include an `X-Request-Id` header for tracing.
 
 Prometheus can scrape `http://localhost:3000/api/metrics` for:
 
@@ -150,11 +180,11 @@ The server exposes a WebSocket endpoint at `/ws`. After each scenario run, a JSO
 }
 ```
 
-The dashboard uses this for instant UI updates (list auto-refreshes on any run; detail page refreshes only for the viewed scenario). The 5s polling fallback remains active.
+The dashboard uses this for instant UI updates.
 
 ## Notifications
 
-Get alerted when a scenario fails and when it recovers. Create a `settings.yaml` file (use `settings.example.yaml` as a template):
+Get alerted when a scenario fails and when it recovers. Create a `settings.yaml` file:
 
 ```yaml
 notifications:
@@ -172,7 +202,28 @@ notifications:
       - "admin@example.com"
 ```
 
-The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions: failure (pass→fail) and recovery (fail→pass). Only the first run after a state change sends a notification.
+Secrets can be overridden via environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`.
+
+The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions (pass→fail, fail→pass). Notifications include retry logic (3 attempts, exponential backoff).
+
+A **daily email report** is automatically sent at 8:00 AM (cron) if email notifications are configured.
+
+### Per-scenario overrides
+
+You can override settings per scenario in `settings.yaml`:
+
+```yaml
+scenarios:
+  my-scenario:
+    ignoreHTTPSErrors: true
+    timeout: 60000
+    notifications:
+      enabled: false
+```
+
+### Hot-reload
+
+`settings.yaml` is watched for changes and reloaded automatically — no server restart needed.
 
 ## Container
 
@@ -185,12 +236,12 @@ docker pull ghcr.io/giwi/giwisoft-scenarii:latest
 
 mkdir -p scenarios db
 cp settings.example.yaml settings.yaml  # optional, for notifications
-podman run -d \
+docker run -d \
   --name scenarii \
   -p 3000:3000 \
-  -v $(pwd)/scenarios:/scenarios:z \
-  -v $(pwd)/db:/app/db:z \
-  -v $(pwd)/settings.yaml:/app/settings.yaml:z \
+  -v $(pwd)/scenarios:/scenarios \
+  -v $(pwd)/db:/app/db \
+  -v $(pwd)/settings.yaml:/app/settings.yaml:ro \
   ghcr.io/giwi/giwisoft-scenarii:latest
 ```
 
@@ -201,16 +252,16 @@ podman run -d \
 # or
 npm run package
 
-podman run -d \
+docker run -d \
   --name scenarii \
   -p 3000:3000 \
-  -v $(pwd)/scenarios:/scenarios:z \
-  -v $(pwd)/db:/app/db:z \
-  -v $(pwd)/settings.yaml:/app/settings.yaml:z \
+  -v $(pwd)/scenarios:/scenarios \
+  -v $(pwd)/db:/app/db \
+  -v $(pwd)/settings.yaml:/app/settings.yaml:ro \
   giwisoft-scenarii:latest
 ```
 
-The container includes a `HEALTHCHECK` that pings `/api/health` every 30s (10s startup grace period, 3 retries). The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once on startup, and schedules them by their `schedule` cron field.
+The container includes a `HEALTHCHECK` that pings `/api/health` every 30s, runs as non-root (`USER node`), and uses `dumb-init` for proper signal handling.
 
 ## CI/CD
 
@@ -219,13 +270,10 @@ On push to `main`, GitHub Actions:
 1. Installs dependencies and runs `tsc --noEmit`
 2. Executes unit tests (`npm test`)
 3. Builds the frontend and backend
-4. Builds and publishes the Docker image to **GitHub Container Registry**
+4. Builds the Docker image with a smoke test and vulnerability scan
+5. Publishes the Docker image to **GitHub Container Registry** (tagged `latest` + git SHA)
 
-```bash
-docker pull ghcr.io/giwi/giwisoft-scenarii:latest
-```
-
-The workflow is in `.github/workflows/ci.yml`.
+The workflow is in `.github/workflows/ci.yml`. Dependabot is configured for weekly npm and GitHub Actions updates.
 
 ## Testing
 
@@ -237,11 +285,14 @@ Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests 
 
 ## Tech stack
 
-- **Runtime** — Node.js + TypeScript
+- **Runtime** — Node.js 26 + TypeScript (strict mode)
 - **CLI** — Commander
-- **Browser** — Lightpanda headless browser via Playwright CDP
-- **Database** — SQLite (better-sqlite3)
+- **HTTP** — Native `fetch` (no Playwright needed for API monitoring)
+- **Browser** — Lightpanda headless browser via Playwright CDP (with retry)
+- **Database** — SQLite (better-sqlite3, WAL mode)
 - **Scheduling** — node-cron
-- **Notifications** — Telegram Bot API, Mailgun API
-- **Frontend** — Angular 19 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
-- **Container** — Alpine + multi-stage build
+- **Notifications** — Telegram Bot API, Mailgun API (with retry)
+- **Logging** — pino (structured JSON, ISO timestamps)
+- **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.)
+- **Frontend** — Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
+- **Container** — Alpine + multi-stage build, non-root user
