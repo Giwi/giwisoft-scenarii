@@ -7,10 +7,14 @@ export function initWebSocket(server: HttpServer): void {
   wss = new WebSocketServer({ server, path: '/ws' });
 
   wss.on('connection', (ws) => {
-    ws.on('error', () => {});
+    ws.on('error', (err) => {
+      console.warn('WebSocket client error:', err);
+    });
   });
 
-  wss.on('error', () => {});
+  wss.on('error', (err) => {
+    console.error('WebSocket server error:', err);
+  });
 }
 
 export function broadcastScenarioRun(data: {

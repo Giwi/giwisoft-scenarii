@@ -1,4 +1,4 @@
-import { chromium, request as playwrightRequest, Page, BrowserContext, Browser, APIRequestContext } from 'playwright-core';
+import { chromium, Page, BrowserContext, Browser } from 'playwright-core';
 import { lightpanda } from '@lightpanda/browser';
 import net from 'net';
 import { ChildProcess } from 'child_process';
@@ -12,7 +12,7 @@ import { broadcastScenarioRun } from './ws';
 // Sequential execution queue — Lightpanda CDP only supports one connection at a time
 let executionQueue: Promise<void> = Promise.resolve();
 
-function sequential<T>(fn: () => Promise<T>): Promise<T> {
+export function sequential<T>(fn: () => Promise<T>): Promise<T> {
   const next = executionQueue.then(fn, fn);
   executionQueue = next.then(() => {}, () => {});
   return next;
@@ -32,6 +32,7 @@ export interface RunOptions {
   persist?: boolean;
   lightpandaPort?: number;
   timeout?: number;
+  ignoreHTTPSErrors?: boolean;
 }
 
 function getRandomPort(): number {
@@ -58,7 +59,7 @@ function waitForPort(host: string, port: number, timeoutMs: number): Promise<voi
 }
 
 async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { wsEndpoint?: string }; port: number }> {
-  const lastErr: Error = new Error('Could not start Lightpanda');
+  let lastErr: Error | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const p = attempt === 0 ? port : getRandomPort();
     try {
@@ -68,6 +69,7 @@ async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { w
     } catch (err: unknown) {
       if (err instanceof Error) {
         const msg = err.message;
+        lastErr = err;
         if (msg.includes('EADDRINUSE') || msg.includes('address in use')) {
           continue;
         }
@@ -75,7 +77,7 @@ async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { w
       }
     }
   }
-  throw lastErr;
+  throw lastErr || new Error('Could not start Lightpanda');
 }
 
 export async function runScenario(
@@ -87,12 +89,12 @@ export async function runScenario(
     const vars: Record<string, string> = {};
     let browserContext: BrowserContext | null = null;
     let page: Page | null = null;
-    let apiContext: APIRequestContext | null = null;
     let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
     let browser: Browser | null = null;
 
     const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
-    const timeoutMs = options.timeout ?? 120_000;
+    const timeoutMs = options.timeout ?? scenario.timeout ?? 120_000;
+    const ignoreHTTPSErrors = options.ignoreHTTPSErrors ?? scenario.ignoreHTTPSErrors ?? false;
 
     const run = async () => {
       try {
@@ -103,20 +105,13 @@ export async function runScenario(
           browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
           browserContext = await browser.newContext({
             viewport: { width: 1280, height: 720 },
-            ignoreHTTPSErrors: true,
+            ignoreHTTPSErrors,
           });
           page = await browserContext.newPage();
-          apiContext = await playwrightRequest.newContext({
-            ignoreHTTPSErrors: true,
-          });
-        } else {
-          apiContext = await playwrightRequest.newContext({
-            ignoreHTTPSErrors: true,
-          });
         }
 
         for (const step of scenario.steps) {
-          const stepMetrics = await executeStep(step, page, apiContext!, scenario.base_url, vars);
+          const stepMetrics = await executeStep(step, page, scenario.base_url, vars);
           metrics.steps.push(stepMetrics);
 
           if (!stepMetrics.success) {
@@ -137,14 +132,12 @@ export async function runScenario(
       } finally {
         if (browser) {
           try {
-            const contexts = browser.contexts();
-            for (const ctx of contexts) {
-              try { await ctx.close(); } catch { /* ignore */ }
-            }
             await browser.close();
-          } catch { /* ignore close errors */ }
+          } catch (err) {
+            console.warn('Failed to close browser:', err);
+          }
         } else if (browserContext) {
-          try { await browserContext.close(); } catch { /* ignore */ }
+          try { await browserContext.close(); } catch (err) { console.warn('Failed to close browser context:', err); }
         }
         if (lightpandaProc) {
           try {
@@ -152,10 +145,9 @@ export async function runScenario(
             lightpandaProc.stderr?.destroy();
             lightpandaProc.kill();
             await waitForProcessExit(lightpandaProc, 3000);
-          } catch { /* ignore kill errors */ }
-        }
-        if (apiContext) {
-          try { await apiContext.dispose(); } catch {}
+          } catch (err) {
+            console.warn('Failed to kill Lightpanda:', err);
+          }
         }
       }
     };
@@ -168,7 +160,6 @@ export async function runScenario(
         ),
       ]);
     } catch (err: unknown) {
-      // Ensure a runtime_error step is recorded on timeout
       if (metrics.steps.length === 0 || metrics.steps[metrics.steps.length - 1].step_name !== 'runtime_error') {
         metrics.success = false;
         const stepMetrics: StepMetrics = {
@@ -202,7 +193,9 @@ export async function runScenario(
   }
 
   if (options.persist) {
-    notifyIfStateChanged(metrics).catch(() => {});
+    notifyIfStateChanged(metrics).catch((err) => {
+      console.error('Notification failed:', err);
+    });
   }
 
   broadcastScenarioRun({

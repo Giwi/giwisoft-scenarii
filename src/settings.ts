@@ -28,9 +28,30 @@ export interface Settings {
   notifications?: NotificationsConfig;
 }
 
-let settings: Settings = {};
+let settings: Settings | undefined;
+
+function applyEnvOverrides(s: Settings): void {
+  if (!s.notifications) return;
+  if (s.notifications.telegram && !s.notifications.telegram.bot_token && process.env.TELEGRAM_BOT_TOKEN) {
+    s.notifications.telegram.bot_token = process.env.TELEGRAM_BOT_TOKEN;
+  }
+  if (s.notifications.telegram && !s.notifications.telegram.chat_id && process.env.TELEGRAM_CHAT_ID) {
+    s.notifications.telegram.chat_id = process.env.TELEGRAM_CHAT_ID;
+  }
+  if (s.notifications.email?.mailgun && !s.notifications.email.mailgun.api_key && process.env.MAILGUN_API_KEY) {
+    s.notifications.email.mailgun.api_key = process.env.MAILGUN_API_KEY;
+  }
+  if (s.notifications.email?.mailgun && !s.notifications.email.mailgun.domain && process.env.MAILGUN_DOMAIN) {
+    s.notifications.email.mailgun.domain = process.env.MAILGUN_DOMAIN;
+  }
+}
 
 export function loadSettings(path?: string): Settings {
+  if (settings !== undefined) {
+    console.log('Settings already loaded, skipping');
+    return settings;
+  }
+
   const resolved = path || findSettingsFile();
   if (!resolved) {
     settings = {};
@@ -46,6 +67,7 @@ export function loadSettings(path?: string): Settings {
     settings = {};
   }
 
+  applyEnvOverrides(settings);
   return settings;
 }
 
@@ -63,5 +85,5 @@ function findSettingsFile(): string | null {
 }
 
 export function getSettings(): Settings {
-  return settings;
+  return settings || {};
 }

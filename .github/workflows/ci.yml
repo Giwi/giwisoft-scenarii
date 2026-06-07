@@ -47,6 +47,25 @@ jobs:
       - name: Build backend
         run: npm run build:backend
 
+      - name: Build Docker image (smoke test)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Containerfile
+          push: false
+          tags: scenarii:ci-${{ github.sha }}
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name scenarii-test -p 3000:3000 \
+            -e TELEGRAM_BOT_TOKEN=test \
+            -e MAILGUN_API_KEY=test \
+            scenarii:ci-${{ github.sha }}
+          sleep 3
+          curl -sf http://localhost:3000/api/health || (docker logs scenarii-test && exit 1)
+          docker stop scenarii-test
+          docker rm scenarii-test
+
       - name: Set lowercase image name
         id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
@@ -66,7 +85,9 @@ jobs:
           context: .
           file: ./Containerfile
           push: true
-          tags: ${{ steps.image.outputs.name }}:latest
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}

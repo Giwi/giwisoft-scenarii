@@ -56,6 +56,8 @@ export interface Scenario {
   schedule?: string;
   base_url?: string;
   headless?: boolean;
+  ignoreHTTPSErrors?: boolean;
+  timeout?: number;
   steps: Step[];
 }
 

@@ -1,32 +1,24 @@
 import { getSettings } from '../settings';
 import { ScenarioMetrics } from '../types';
-import { getScenarioHistory } from '../storage';
+import { getPreviousRunSuccess } from '../storage';
 import { sendTelegram } from './telegram';
 import { sendEmail } from './mailgun';
-
-function wasPreviouslySuccessful(scenarioName: string): boolean | null {
-  try {
-    const history = getScenarioHistory(scenarioName, 365);
-    // history is ordered by created_at DESC, first entry is the current run just stored
-    const previous = history[1];
-    if (!previous) return null;
-    return previous.success;
-  } catch {
-    return null;
-  }
-}
 
 export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<void> {
   const settings = getSettings();
   if (!settings.notifications) return;
 
-  const prevSuccess = wasPreviouslySuccessful(metrics.scenario_name);
+  let prevSuccess: boolean | null;
+  try {
+    prevSuccess = getPreviousRunSuccess(metrics.scenario_name);
+  } catch (err) {
+    console.error('Failed to get previous run success:', err);
+    return;
+  }
 
-  // null = no previous run, skip notification
   if (prevSuccess === null) return;
 
   const currentSuccess = metrics.success;
-  // No state change, skip
   if (prevSuccess === currentSuccess) return;
 
   const event = currentSuccess ? 'recovery' : 'failure';
@@ -42,5 +34,10 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
 
   if (promises.length === 0) return;
 
-  await Promise.allSettled(promises);
+  const results = await Promise.allSettled(promises);
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error('Notification delivery failed:', result.reason);
+    }
+  }
 }

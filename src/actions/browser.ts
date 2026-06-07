@@ -1,15 +1,6 @@
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
-
-function resolveUrl(base_url: string | undefined, url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (!base_url) throw new Error('No base_url configured and url is relative');
-  return `${base_url.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
-}
-
-function interpolateVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
-}
+import { resolveUrl, interpolateVars } from '../helpers';
 
 async function checkBrowserExpectations(
   page: Page,
@@ -76,7 +67,6 @@ export async function executeBrowserStep(
         try {
           await page.goto(resolvedUrl, { waitUntil: 'load', timeout: 30000 });
         } catch {
-          // Lightpanda CDP can drop on complex pages; retry with domcontentloaded
           await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         }
         break;

@@ -3,9 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import { ScenarioMetrics, StepMetrics } from './types';
 
-let db: Database.Database;
+let db: Database.Database | undefined;
 
 export function initStorage(dbPath?: string): void {
+  if (db) throw new Error('Storage already initialized');
   const resolved = dbPath || path.join(process.cwd(), 'db', 'scenarii.db');
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   db = new Database(resolved);
@@ -128,54 +129,71 @@ export function getScenarioHistory(
 
   const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
 
-  const runs = db.prepare(`
-    SELECT * FROM scenario_runs
-    WHERE scenario_name = ? AND created_at >= ?
-    ORDER BY created_at DESC
+  const rows = db.prepare(`
+    SELECT
+      r.id AS run_id,
+      r.scenario_name,
+      r.started_at,
+      r.finished_at,
+      r.duration_ms,
+      r.success,
+      r.created_at,
+      s.id AS step_id,
+      s.step_name,
+      s.action,
+      s.success AS step_success,
+      s.status_code,
+      s.response_time_ms,
+      s.error,
+      s.timestamp
+    FROM scenario_runs r
+    LEFT JOIN step_metrics s ON s.run_id = r.id
+    WHERE r.scenario_name = ? AND r.created_at >= ?
+    ORDER BY r.created_at DESC, s.id
   `).all(name, since) as Array<{
-    id: number;
+    run_id: number;
     scenario_name: string;
     started_at: string;
     finished_at: string;
     duration_ms: number;
     success: number;
     created_at: string;
+    step_id: number | null;
+    step_name: string | null;
+    action: string | null;
+    step_success: number | null;
+    status_code: number | null;
+    response_time_ms: number | null;
+    error: string | null;
+    timestamp: string | null;
   }>;
 
-  const getSteps = db.prepare(`
-    SELECT * FROM step_metrics
-    WHERE run_id = ?
-    ORDER BY id
-  `);
-
-  return runs.map((run) => {
-    const steps = getSteps.all(run.id) as Array<{
-      step_name: string;
-      action: string;
-      success: number;
-      status_code: number | null;
-      response_time_ms: number;
-      error: string | null;
-      timestamp: string;
-    }>;
-
-    return {
-      scenario_name: run.scenario_name,
-      started_at: new Date(run.started_at),
-      finished_at: new Date(run.finished_at),
-      duration_ms: run.duration_ms,
-      success: run.success === 1,
-      steps: steps.map((s) => ({
-        step_name: s.step_name,
-        action: s.action,
-        success: s.success === 1,
-        status_code: s.status_code ?? undefined,
-        response_time_ms: s.response_time_ms,
-        error: s.error ?? undefined,
-        timestamp: new Date(s.timestamp),
-      })),
-    };
-  });
+  const runMap = new Map<number, ScenarioMetrics>();
+  for (const row of rows) {
+    if (!runMap.has(row.run_id)) {
+      runMap.set(row.run_id, {
+        scenario_name: row.scenario_name,
+        started_at: new Date(row.started_at),
+        finished_at: new Date(row.finished_at),
+        duration_ms: row.duration_ms,
+        success: row.success === 1,
+        steps: [],
+      });
+    }
+    if (row.step_id !== null) {
+      const run = runMap.get(row.run_id)!;
+      run.steps.push({
+        step_name: row.step_name!,
+        action: row.action!,
+        success: row.step_success === 1,
+        status_code: row.status_code ?? undefined,
+        response_time_ms: row.response_time_ms!,
+        error: row.error ?? undefined,
+        timestamp: new Date(row.timestamp!),
+      });
+    }
+  }
+  return Array.from(runMap.values());
 }
 
 export function getScenarioStepNames(name: string): string[] {
@@ -188,6 +206,17 @@ export function getScenarioStepNames(name: string): string[] {
   `).pluck().all(name) as string[];
 }
 
+export function getPreviousRunSuccess(scenarioName: string): boolean | null {
+  if (!db) throw new Error('Database not initialized');
+  const row = db.prepare(`
+    SELECT success FROM scenario_runs
+    WHERE scenario_name = ?
+    ORDER BY created_at DESC
+    LIMIT 1 OFFSET 1
+  `).get(scenarioName) as { success: number } | undefined;
+  return row ? row.success === 1 : null;
+}
+
 export function purgeOldData(days: number = 7): number {
   if (!db) throw new Error('Database not initialized');
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
@@ -197,11 +226,16 @@ export function purgeOldData(days: number = 7): number {
 
 export function closeStorage(): void {
   if (db) {
-    db.pragma('wal_checkpoint(TRUNCATE)');
-    db.close();
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+    } catch (err) {
+      console.error('Error closing database:', err);
+    }
+    db = undefined;
   }
 }
 
 export function isStorageReady(): boolean {
-  return db !== undefined && db !== null;
+  return db !== undefined;
 }

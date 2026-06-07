@@ -10,7 +10,9 @@ RUN apk add --no-cache python3 make g++ && \
 
 COPY src/ ./src/
 COPY frontend/ ./frontend/
-RUN npm run build
+RUN npm run build && \
+    npm prune --omit=dev && \
+    rm -rf /build/frontend/node_modules
 
 FROM docker.io/node:22-alpine
 
@@ -22,8 +24,7 @@ COPY --from=builder /build/node_modules ./node_modules
 COPY --from=builder /build/dist/ ./dist/
 COPY --from=builder /build/frontend/dist/ ./frontend/dist/
 
-RUN rm -rf node_modules/{typescript,@types/*,ts-node} && \
-    npm cache clean --force
+RUN npm cache clean --force
 
 EXPOSE 3000
 
@@ -33,6 +34,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 VOLUME /scenarios
 VOLUME /app/db
 VOLUME /app/settings
+
+USER node
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js", "server", "--scenarios-dir", "/scenarios", "--db", "/app/db/scenarii.db"]

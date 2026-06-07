@@ -7,8 +7,25 @@ import { getScenarioList, getScenarioHistory, getScenarioStepNames } from './sto
 import { initWebSocket } from './ws';
 import { isStorageReady } from './storage';
 
-function escapeLabel(value: string): string {
+function escapePrometheusLabel(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
+function parseDaysParam(value: string | undefined): number {
+  if (value === undefined) return 7;
+  const n = parseInt(value);
+  if (isNaN(n) || n < 1 || n > 365) return 7;
+  return n;
+}
+
+function sendError(res: express.Response, status: number, err: unknown): void {
+  console.error(`[${status}]`, err instanceof Error ? err.message : err);
+  res.status(status).json({ error: 'Internal server error' });
+}
+
+function requestLogger(req: express.Request, _res: express.Response, next: express.NextFunction): void {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  next();
 }
 
 export function createApp(): express.Application {
@@ -16,14 +33,14 @@ export function createApp(): express.Application {
 
   app.use(cors());
   app.use(express.json());
+  app.use(requestLogger);
 
-  // API routes
   app.get('/api/scenarios', (_req, res) => {
     try {
       const list = getScenarioList();
       res.json(list);
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+      sendError(res, 500, err);
     }
   });
 
@@ -54,18 +71,18 @@ export function createApp(): express.Application {
         stepNames,
       });
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+      sendError(res, 500, err);
     }
   });
 
   app.get('/api/scenarios/:name/history', (req, res) => {
     try {
-      const days = parseInt(req.query.days as string) || 7;
+      const days = parseDaysParam(req.query.days as string);
       const history = getScenarioHistory(req.params.name, days);
       const stepNames = getScenarioStepNames(req.params.name);
       res.json({ history, stepNames });
     } catch (err: unknown) {
-      res.status(500).json({ error: err instanceof Error ? err.message : 'Unknown error' });
+      sendError(res, 500, err);
     }
   });
 
@@ -85,7 +102,7 @@ export function createApp(): express.Application {
       lines.push('# HELP scenarii_scenario_runs_total Total number of scenario runs');
       lines.push('# TYPE scenarii_scenario_runs_total counter');
       for (const s of list) {
-        lines.push(`scenarii_scenario_runs_total{scenario="${escapeLabel(s.name)}"} ${s.total_runs}`);
+        lines.push(`scenarii_scenario_runs_total{scenario="${escapePrometheusLabel(s.name)}"} ${s.total_runs}`);
       }
 
       lines.push('');
@@ -93,7 +110,7 @@ export function createApp(): express.Application {
       lines.push('# TYPE scenarii_scenario_duration_ms gauge');
       for (const s of list) {
         if (s.last_duration_ms !== null) {
-          lines.push(`scenarii_scenario_duration_ms{scenario="${escapeLabel(s.name)}"} ${s.last_duration_ms}`);
+          lines.push(`scenarii_scenario_duration_ms{scenario="${escapePrometheusLabel(s.name)}"} ${s.last_duration_ms}`);
         }
       }
 
@@ -102,7 +119,7 @@ export function createApp(): express.Application {
       lines.push('# TYPE scenarii_scenario_success gauge');
       for (const s of list) {
         if (s.last_success !== null) {
-          lines.push(`scenarii_scenario_success{scenario="${escapeLabel(s.name)}"} ${s.last_success}`);
+          lines.push(`scenarii_scenario_success{scenario="${escapePrometheusLabel(s.name)}"} ${s.last_success}`);
         }
       }
 
@@ -112,11 +129,11 @@ export function createApp(): express.Application {
       for (const s of list) {
         if (s.last_run) {
           const ts = Math.floor(new Date(s.last_run).getTime() / 1000);
-          lines.push(`scenarii_scenario_last_run_seconds{scenario="${escapeLabel(s.name)}"} ${ts}`);
+          lines.push(`scenarii_scenario_last_run_seconds{scenario="${escapePrometheusLabel(s.name)}"} ${ts}`);
         }
       }
 
-      // Step-level metrics from the last run
+      // Step-level metrics from the last run — single pass through recent runs
       const stepLines: string[] = [];
       for (const s of list) {
         try {
@@ -124,11 +141,13 @@ export function createApp(): express.Application {
           if (history.length > 0) {
             const latest = history[0];
             for (const step of latest.steps) {
-              stepLines.push(`scenarii_step_duration_ms{scenario="${escapeLabel(s.name)}",step="${escapeLabel(step.step_name)}",action="${escapeLabel(step.action)}"} ${step.response_time_ms}`);
-              stepLines.push(`scenarii_step_success{scenario="${escapeLabel(s.name)}",step="${escapeLabel(step.step_name)}",action="${escapeLabel(step.action)}"} ${step.success ? 1 : 0}`);
+              stepLines.push(`scenarii_step_duration_ms{scenario="${escapePrometheusLabel(s.name)}",step="${escapePrometheusLabel(step.step_name)}",action="${escapePrometheusLabel(step.action)}"} ${step.response_time_ms}`);
+              stepLines.push(`scenarii_step_success{scenario="${escapePrometheusLabel(s.name)}",step="${escapePrometheusLabel(step.step_name)}",action="${escapePrometheusLabel(step.action)}"} ${step.success ? 1 : 0}`);
             }
           }
-        } catch { /* skip if no history */ }
+        } catch (err) {
+          console.warn(`Failed to fetch history for scenario "${s.name}" metrics:`, err);
+        }
       }
 
       if (stepLines.length > 0) {
@@ -146,7 +165,8 @@ export function createApp(): express.Application {
       res.type('text/plain; charset=utf-8');
       res.send(lines.join('\n'));
     } catch (err: unknown) {
-      res.status(500).type('text/plain').send(`# error: ${err instanceof Error ? err.message : 'Unknown error'}\n`);
+      console.error('Failed to generate metrics:', err);
+      res.status(500).type('text/plain').send('# error: Internal server error\n');
     }
   });
 

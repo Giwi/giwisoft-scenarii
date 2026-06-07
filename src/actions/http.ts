@@ -1,22 +1,35 @@
-import { APIRequestContext } from 'playwright-core';
 import { HttpStep, StepMetrics } from '../types';
+import { resolveUrl, interpolateVars, resolveJsonPath } from '../helpers';
 
-function resolveUrl(base_url: string | undefined, url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (!base_url) throw new Error('No base_url configured and url is relative');
-  return `${base_url.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
+interface FetchResponse {
+  status: number;
+  headers: Record<string, string>;
+  text(): Promise<string>;
 }
 
-function checkExpectations(step: HttpStep, response: { status(): number; headers(): Record<string, string> }, body: string, elapsed_ms: number): string | null {
+async function doFetch(url: string, method: string, headers: Record<string, string> | undefined, body: string | undefined): Promise<FetchResponse> {
+  const res = await fetch(url, {
+    method,
+    headers: headers as Record<string, string> | undefined,
+    body,
+  });
+  return {
+    status: res.status,
+    headers: Object.fromEntries(res.headers.entries()),
+    text: () => res.text(),
+  };
+}
+
+function checkExpectations(step: HttpStep, response: FetchResponse, body: string, elapsed_ms: number): string | null {
   const expect = step.expect;
   if (!expect) return null;
 
-  if (expect.status !== undefined && response.status() !== expect.status) {
-    return `Expected status ${expect.status}, got ${response.status()}`;
+  if (expect.status !== undefined && response.status !== expect.status) {
+    return `Expected status ${expect.status}, got ${response.status}`;
   }
 
-  if (expect.status_in && !expect.status_in.includes(response.status())) {
-    return `Expected status in [${expect.status_in.join(', ')}], got ${response.status()}`;
+  if (expect.status_in && !expect.status_in.includes(response.status)) {
+    return `Expected status in [${expect.status_in.join(', ')}], got ${response.status}`;
   }
 
   if (expect.body_contains && !body.includes(expect.body_contains)) {
@@ -33,17 +46,9 @@ function checkExpectations(step: HttpStep, response: { status(): number; headers
   if (expect.json_path) {
     try {
       const parsed = JSON.parse(body);
-      const parts = expect.json_path.replace('$.', '').split('.');
-      let value: unknown = parsed;
-      for (const part of parts) {
-        const arrMatch = part.match(/^(\w+)\[(\d+)\]$/);
-        if (arrMatch) {
-          value = (value as Record<string, unknown>)[arrMatch[1]];
-          if (Array.isArray(value)) value = value[parseInt(arrMatch[2])];
-          else return `JSON path "${expect.json_path}" failed at "${part}": not an array`;
-        } else {
-          value = (value as Record<string, unknown>)[part];
-        }
+      const value = resolveJsonPath(parsed, expect.json_path);
+      if (value === undefined) {
+        return `JSON path "${expect.json_path}" not found`;
       }
       if (expect.json_value !== undefined && value !== expect.json_value) {
         return `JSON path "${expect.json_path}" expected "${expect.json_value}", got "${value}"`;
@@ -65,31 +70,18 @@ function extractVariables(step: HttpStep, body: string, vars: Record<string, str
   for (const [key, path] of Object.entries(step.variables)) {
     try {
       const parsed = JSON.parse(body);
-      const parts = path.replace('$.', '').split('.');
-      let value: unknown = parsed;
-      for (const part of parts) {
-        const arrMatch = part.match(/^(\w+)\[(\d+)\]$/);
-        if (arrMatch) {
-          value = (value as Record<string, unknown>)[arrMatch[1]];
-          if (Array.isArray(value)) value = value[parseInt(arrMatch[2])];
-        } else {
-          value = (value as Record<string, unknown>)[part];
-        }
+      const value = resolveJsonPath(parsed, path);
+      if (value !== undefined) {
+        vars[key] = String(value);
       }
-      vars[key] = String(value);
     } catch {
       // silently skip variable extraction on failure
     }
   }
 }
 
-function interpolateVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
-}
-
 export async function executeHttpStep(
   step: HttpStep,
-  apiContext: APIRequestContext,
   base_url: string | undefined,
   vars: Record<string, string>
 ): Promise<StepMetrics> {
@@ -118,16 +110,12 @@ export async function executeHttpStep(
       body = String(step.body);
     }
 
-    const response = await apiContext.fetch(resolvedUrl, {
-      method,
-      headers,
-      data: body,
-    });
+    const response = await doFetch(resolvedUrl, method, headers, body);
 
     const elapsed = Date.now() - start;
     const responseBody = await response.text();
 
-    stepMetrics.status_code = response.status();
+    stepMetrics.status_code = response.status;
     stepMetrics.response_time_ms = elapsed;
 
     const error = checkExpectations(step, response, responseBody, elapsed);
