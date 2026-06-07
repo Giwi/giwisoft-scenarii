@@ -176,13 +176,13 @@ The server looks for `settings.yaml` in the current directory or `/app/settings.
 
 ## Container
 
-```bash
-# Build
-./build-container.sh
-# or
-npm run package
+### Pre-built image (recommended)
 
-# Run
+Published on each push to `main`:
+
+```bash
+docker pull ghcr.io/giwi/giwisoft-scenarii:latest
+
 mkdir -p scenarios db
 cp settings.example.yaml settings.yaml  # optional, for notifications
 podman run -d \
@@ -190,8 +190,24 @@ podman run -d \
   -p 3000:3000 \
   -v $(pwd)/scenarios:/scenarios:z \
   -v $(pwd)/db:/app/db:z \
-  -v $(pwd)/settings.yaml:/app/settings.yaml:z \  # optional
-  scenarii:latest
+  -v $(pwd)/settings.yaml:/app/settings.yaml:z \
+  ghcr.io/giwi/giwisoft-scenarii:latest
+```
+
+### Build locally
+
+```bash
+./build-container.sh
+# or
+npm run package
+
+podman run -d \
+  --name scenarii \
+  -p 3000:3000 \
+  -v $(pwd)/scenarios:/scenarios:z \
+  -v $(pwd)/db:/app/db:z \
+  -v $(pwd)/settings.yaml:/app/settings.yaml:z \
+  ghcr.io/giwi/giwisoft-scenarii:latest
 ```
 
 The container includes a `HEALTHCHECK` that pings `/api/health` every 30s (10s startup grace period, 3 retries). The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once on startup, and schedules them by their `schedule` cron field.
@@ -203,7 +219,11 @@ On push to `main`, GitHub Actions:
 1. Installs dependencies and runs `tsc --noEmit`
 2. Executes unit tests (`npm test`)
 3. Builds the frontend and backend
-4. Builds and publishes the Docker image to `ghcr.io/<owner>/scenarii:latest`
+4. Builds and publishes the Docker image to **GitHub Container Registry**
+
+```bash
+docker pull ghcr.io/giwi/giwisoft-scenarii:latest
+```
 
 The workflow is in `.github/workflows/ci.yml`.
 

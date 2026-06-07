@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-IMAGE_NAME="${IMAGE_NAME:-scenarii}"
+IMAGE_NAME="${IMAGE_NAME:-ghcr.io/giwi/giwisoft-scenarii}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 
 podman build \
