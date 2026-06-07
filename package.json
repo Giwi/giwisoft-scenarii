@@ -26,7 +26,7 @@
     "@lightpanda/browser": "^1.2.0",
     "better-sqlite3": "^12.10.0",
     "chalk": "^4.1.2",
-    "commander": "^13.1.0",
+    "commander": "^15.0.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "helmet": "^8.2.0",
