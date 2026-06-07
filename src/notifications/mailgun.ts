@@ -1,6 +1,15 @@
 import { EmailConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok || attempt === retries) return res;
+    await new Promise(r => setTimeout(r, attempt * 1000));
+  }
+  throw new Error('Unreachable');
+}
+
 export async function sendEmail(
   config: EmailConfig,
   metrics: ScenarioMetrics,
@@ -35,7 +44,7 @@ export async function sendEmail(
     const url = `https://api.mailgun.net/v3/${mailgun.domain}/messages`;
 
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithRetry(url, {
         method: 'POST',
         headers: {
           Authorization: `Basic ${auth}`,

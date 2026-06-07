@@ -1,6 +1,15 @@
 import { TelegramConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
 
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const res = await fetch(url, options);
+    if (res.ok || attempt === retries) return res;
+    await new Promise(r => setTimeout(r, attempt * 1000));
+  }
+  throw new Error('Unreachable');
+}
+
 export async function sendTelegram(
   config: TelegramConfig,
   metrics: ScenarioMetrics,
@@ -32,7 +41,7 @@ export async function sendTelegram(
     disable_web_page_preview: true,
   };
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

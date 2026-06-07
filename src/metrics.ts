@@ -1,4 +1,5 @@
 import { StepMetrics, ScenarioMetrics, Reporter } from './types';
+import chalk from 'chalk';
 
 export function createStepMetrics(step_name: string, action: string): StepMetrics {
   return {
@@ -29,8 +30,6 @@ export function createScenarioMetrics(scenario_name: string): ScenarioMetrics {
 }
 
 export const consoleReporter: Reporter = (metrics: ScenarioMetrics): void => {
-  // Dynamic import for CJS compatibility
-  const chalk = require('chalk');
   const status = metrics.success ? chalk.green('✓ PASS') : chalk.red('✗ FAIL');
   console.log(`\n${status} ${metrics.scenario_name}`);
   console.log(`  Duration: ${metrics.duration_ms}ms`);
