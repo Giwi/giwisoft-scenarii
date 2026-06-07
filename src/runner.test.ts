@@ -2,15 +2,15 @@ import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
 
 // Test the sequential queue logic using the actual exported function
-import { sequential } from './runner';
+import { sequentialBrowser } from './runner';
 
 describe('sequential queue', () => {
   it('runs tasks in order', async () => {
     const order: number[] = [];
 
-    await sequential(async () => { order.push(1); });
-    await sequential(async () => { order.push(2); });
-    await sequential(async () => { order.push(3); });
+    await sequentialBrowser(async () => { order.push(1); });
+    await sequentialBrowser(async () => { order.push(2); });
+    await sequentialBrowser(async () => { order.push(3); });
 
     assert.deepStrictEqual(order, [1, 2, 3]);
   });
@@ -18,8 +18,8 @@ describe('sequential queue', () => {
   it('continues after a failing task', async () => {
     const order: number[] = [];
 
-    await sequential(async () => { throw new Error('fail'); }).catch(() => {});
-    await sequential(async () => { order.push(1); });
+    await sequentialBrowser(async () => { throw new Error('fail'); }).catch(() => {});
+    await sequentialBrowser(async () => { order.push(1); });
 
     assert.deepStrictEqual(order, [1]);
   });

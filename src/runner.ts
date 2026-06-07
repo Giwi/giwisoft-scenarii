@@ -8,13 +8,14 @@ import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics'
 import { storeMetrics, purgeOldData } from './storage';
 import { notifyIfStateChanged } from './notifications/index';
 import { broadcastScenarioRun } from './ws';
+import { getScenarioSettings } from './settings';
 
-// Sequential execution queue — Lightpanda CDP only supports one connection at a time
-let executionQueue: Promise<void> = Promise.resolve();
+// Sequential execution queue for browser scenarios — Lightpanda CDP only supports one connection at a time
+let browserQueue: Promise<void> = Promise.resolve();
 
-export function sequential<T>(fn: () => Promise<T>): Promise<T> {
-  const next = executionQueue.then(fn, fn);
-  executionQueue = next.then(() => {}, () => {});
+export function sequentialBrowser<T>(fn: () => Promise<T>): Promise<T> {
+  const next = browserQueue.then(fn, fn);
+  browserQueue = next.then(() => {}, () => {});
   return next;
 }
 
@@ -80,99 +81,99 @@ async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { w
   throw lastErr || new Error('Could not start Lightpanda');
 }
 
-export async function runScenario(
+async function runScenarioInternal(
   scenario: Scenario,
-  options: RunOptions = {}
+  options: RunOptions
 ): Promise<ScenarioMetrics> {
-  return sequential(async () => {
-    const metrics = createScenarioMetrics(scenario.name);
-    const vars: Record<string, string> = {};
-    let browserContext: BrowserContext | null = null;
-    let page: Page | null = null;
-    let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
-    let browser: Browser | null = null;
+  const metrics = createScenarioMetrics(scenario.name);
+  const vars: Record<string, string> = {};
+  let browserContext: BrowserContext | null = null;
+  let page: Page | null = null;
+  let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
+  let browser: Browser | null = null;
 
-    const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
-    const timeoutMs = options.timeout ?? scenario.timeout ?? 120_000;
-    const ignoreHTTPSErrors = options.ignoreHTTPSErrors ?? scenario.ignoreHTTPSErrors ?? false;
+  const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
+  const scenarioSettings = getScenarioSettings(scenario.name);
+  const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? 120_000;
+  const ignoreHTTPSErrors = options.ignoreHTTPSErrors ?? scenarioSettings.ignoreHTTPSErrors ?? scenario.ignoreHTTPSErrors ?? false;
 
-    const run = async () => {
-      try {
-        if (hasBrowserActions) {
-          const { proc, port } = await startLightpanda(options.lightpandaPort ?? 9222);
-          lightpandaProc = proc;
+  const run = async () => {
+    try {
+      if (hasBrowserActions) {
+        const { proc, port } = await startLightpanda(options.lightpandaPort ?? 9222);
+        lightpandaProc = proc;
 
-          browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
-          browserContext = await browser.newContext({
-            viewport: { width: 1280, height: 720 },
-            ignoreHTTPSErrors,
-          });
-          page = await browserContext.newPage();
-        }
+        browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
+        browserContext = await browser.newContext({
+          viewport: { width: 1280, height: 720 },
+          ignoreHTTPSErrors,
+        });
+        page = await browserContext.newPage();
+      }
 
-        for (const step of scenario.steps) {
-          const stepMetrics = await executeStep(step, page, scenario.base_url, vars);
-          metrics.steps.push(stepMetrics);
-
-          if (!stepMetrics.success) {
-            metrics.success = false;
-          }
-        }
-      } catch (err: unknown) {
-        metrics.success = false;
-        const stepMetrics: StepMetrics = {
-          step_name: 'runtime_error',
-          action: 'unknown',
-          success: false,
-          response_time_ms: 0,
-          error: err instanceof Error ? err.message : String(err),
-          timestamp: new Date(),
-        };
+      for (const step of scenario.steps) {
+        const stepMetrics = await executeStep(step, page, scenario.base_url, vars);
         metrics.steps.push(stepMetrics);
-      } finally {
-        if (browser) {
-          try {
-            await browser.close();
-          } catch (err) {
-            console.warn('Failed to close browser:', err);
-          }
-        } else if (browserContext) {
-          try { await browserContext.close(); } catch (err) { console.warn('Failed to close browser context:', err); }
-        }
-        if (lightpandaProc) {
-          try {
-            lightpandaProc.stdout?.destroy();
-            lightpandaProc.stderr?.destroy();
-            lightpandaProc.kill();
-            await waitForProcessExit(lightpandaProc, 3000);
-          } catch (err) {
-            console.warn('Failed to kill Lightpanda:', err);
-          }
+
+        if (!stepMetrics.success) {
+          metrics.success = false;
         }
       }
-    };
-
-    try {
-      await Promise.race([
-        run(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Scenario "${scenario.name}" timed out after ${timeoutMs}ms`)), timeoutMs)
-        ),
-      ]);
     } catch (err: unknown) {
-      if (metrics.steps.length === 0 || metrics.steps[metrics.steps.length - 1].step_name !== 'runtime_error') {
-        metrics.success = false;
-        const stepMetrics: StepMetrics = {
-          step_name: 'runtime_error',
-          action: 'unknown',
-          success: false,
-          response_time_ms: 0,
-          error: err instanceof Error ? err.message : String(err),
-          timestamp: new Date(),
-        };
-        metrics.steps.push(stepMetrics);
+      metrics.success = false;
+      const stepMetrics: StepMetrics = {
+        step_name: 'runtime_error',
+        action: 'unknown',
+        success: false,
+        response_time_ms: 0,
+        error: err instanceof Error ? err.message : String(err),
+        timestamp: new Date(),
+      };
+      metrics.steps.push(stepMetrics);
+    } finally {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (err) {
+          console.warn('Failed to close browser:', err);
+        }
+      } else if (browserContext) {
+        try { await browserContext.close(); } catch (err) { console.warn('Failed to close browser context:', err); }
+      }
+      if (lightpandaProc) {
+        try {
+          lightpandaProc.stdout?.destroy();
+          lightpandaProc.stderr?.destroy();
+          lightpandaProc.kill();
+          await waitForProcessExit(lightpandaProc, 3000);
+        } catch (err) {
+          console.warn('Failed to kill Lightpanda:', err);
+        }
       }
     }
+  };
+
+  try {
+    await Promise.race([
+      run(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Scenario "${scenario.name}" timed out after ${timeoutMs}ms`)), timeoutMs)
+      ),
+    ]);
+  } catch (err: unknown) {
+    if (metrics.steps.length === 0 || metrics.steps[metrics.steps.length - 1].step_name !== 'runtime_error') {
+      metrics.success = false;
+      const stepMetrics: StepMetrics = {
+        step_name: 'runtime_error',
+        action: 'unknown',
+        success: false,
+        response_time_ms: 0,
+        error: err instanceof Error ? err.message : String(err),
+        timestamp: new Date(),
+      };
+      metrics.steps.push(stepMetrics);
+    }
+  }
 
   metrics.finished_at = new Date();
   metrics.duration_ms = metrics.finished_at.getTime() - metrics.started_at.getTime();
@@ -205,5 +206,33 @@ export async function runScenario(
   });
 
   return metrics;
-  });
+}
+
+export async function runScenario(
+  scenario: Scenario,
+  options: RunOptions = {}
+): Promise<ScenarioMetrics> {
+  const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
+
+  if (hasBrowserActions) {
+    try {
+      require.resolve('@lightpanda/browser');
+    } catch {
+      console.warn('@lightpanda/browser not installed — browser scenarios will fail with a descriptive error');
+    }
+  }
+
+  const execFn = () => runScenarioInternal(scenario, options);
+
+  if (hasBrowserActions) {
+    return sequentialBrowser(execFn);
+  }
+  return execFn();
+}
+
+export function runHttpScenario(
+  scenario: Scenario,
+  options: RunOptions = {}
+): Promise<ScenarioMetrics> {
+  return runScenarioInternal(scenario, options);
 }

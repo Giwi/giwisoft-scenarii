@@ -5,7 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import { loadScenarioFile } from './parser';
 import { runScenario } from './runner';
-import { scheduleScenario, stopAll, listScheduled } from './scheduler';
+import { scheduleScenario, stopAll, listScheduled, scheduleReport } from './scheduler';
+import { sendDailyReport } from './report';
 import { initStorage, closeStorage } from './storage';
 import { loadSettings } from './settings';
 import { createServer } from './server';
@@ -132,6 +133,8 @@ program
           console.error(`Failed to run ${file}:`, err instanceof Error ? err.message : err);
         }
       }
+      sendDailyReport();
+      scheduleReport('0 8 * * *');
     })();
 
     process.on('SIGINT', () => {
@@ -145,6 +148,32 @@ program
       closeStorage();
       process.exit(0);
     });
+  });
+
+program
+  .command('config')
+  .description('Generate a settings.yaml template')
+  .option('-o, --output <path>', 'Output file path', 'settings.yaml')
+  .action((options) => {
+    const template = `# scenarii notification settings
+# Uncomment and configure the channels you want to use.
+
+notifications:
+  telegram:
+    enabled: false
+    # bot_token: your_telegram_bot_token
+    # chat_id: your_chat_id
+  email:
+    enabled: false
+    # to:
+    #   - you@example.com
+    mailgun:
+      # api_key: your_mailgun_api_key
+      # domain: your_mailgun_domain
+      # from: scenarii@your-domain.com
+`;
+    fs.writeFileSync(options.output, template, 'utf-8');
+    console.log(`Settings template written to ${options.output}`);
   });
 
 program.parse(process.argv);

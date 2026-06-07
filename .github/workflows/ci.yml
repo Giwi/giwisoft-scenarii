@@ -66,6 +66,14 @@ jobs:
           docker stop scenarii-test
           docker rm scenarii-test
 
+      - name: Vulnerability scan (non-blocking)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: scenarii:ci-${{ github.sha }}
+          format: table
+          exit-code: 1
+
       - name: Set lowercase image name
         id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT

@@ -24,8 +24,15 @@ export interface NotificationsConfig {
   email: EmailConfig;
 }
 
+export interface ScenarioOverrides {
+  ignoreHTTPSErrors?: boolean;
+  timeout?: number;
+  notifications?: { enabled?: boolean };
+}
+
 export interface Settings {
   notifications?: NotificationsConfig;
+  scenarios?: Record<string, ScenarioOverrides>;
 }
 
 let settings: Settings | undefined;
@@ -86,4 +93,8 @@ function findSettingsFile(): string | null {
 
 export function getSettings(): Settings {
   return settings || {};
+}
+
+export function getScenarioSettings(name: string): ScenarioOverrides {
+  return getSettings().scenarios?.[name] ?? {};
 }

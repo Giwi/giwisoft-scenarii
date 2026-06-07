@@ -3,9 +3,10 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
-import { getScenarioList, getScenarioHistory, getScenarioStepNames } from './storage';
+import { getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioStepNames } from './storage';
 import { initWebSocket } from './ws';
 import { isStorageReady } from './storage';
+import { ScenarioMetrics } from './types';
 
 function escapePrometheusLabel(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -18,13 +19,43 @@ function parseDaysParam(value: string | undefined): number {
   return n;
 }
 
+function escapeCsv(val: string): string {
+  if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+    return '"' + val.replace(/"/g, '""') + '"';
+  }
+  return val;
+}
+
+function toCsv(history: ScenarioMetrics[]): string {
+  const header = 'started_at,finished_at,duration_ms,success,step_name,step_action,step_success,step_response_time_ms,step_error\n';
+  const rows = history.flatMap(r =>
+    r.steps.map(s =>
+      `${r.started_at.toISOString()},${r.finished_at.toISOString()},${r.duration_ms},${r.success},${escapeCsv(s.step_name)},${escapeCsv(s.action)},${s.success},${s.response_time_ms},${escapeCsv(s.error || '')}`
+    )
+  );
+  return header + rows.join('\n');
+}
+
+function parseLimitParam(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const n = parseInt(value);
+  return isNaN(n) ? undefined : n;
+}
+
+function requestIdMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const requestId = Math.random().toString(36).slice(2, 10);
+  res.locals.requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  next();
+}
+
 function sendError(res: express.Response, status: number, err: unknown): void {
-  console.error(`[${status}]`, err instanceof Error ? err.message : err);
+  console.error(`[${res.locals.requestId ?? '-'}] [${status}]`, err instanceof Error ? err.message : err);
   res.status(status).json({ error: 'Internal server error' });
 }
 
-function requestLogger(req: express.Request, _res: express.Response, next: express.NextFunction): void {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+function requestLogger(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  console.log(`${new Date().toISOString()} [${res.locals.requestId}] ${req.method} ${req.url}`);
   next();
 }
 
@@ -33,6 +64,7 @@ export function createApp(): express.Application {
 
   app.use(cors());
   app.use(express.json());
+  app.use(requestIdMiddleware);
   app.use(requestLogger);
 
   app.get('/api/scenarios', (_req, res) => {
@@ -46,26 +78,20 @@ export function createApp(): express.Application {
 
   app.get('/api/scenarios/:name', (req, res) => {
     try {
-      const list = getScenarioList();
-      const scenario = list.find((s) => s.name === req.params.name);
-      if (!scenario) {
-        res.status(404).json({ error: 'Scenario not found' });
-        return;
-      }
+      const days = parseDaysParam(req.query.days as string);
+      const limit = parseLimitParam(req.query.limit as string) ?? 50;
+      const offset = parseLimitParam(req.query.offset as string) ?? 0;
+      const { info: rawInfo, history, stepNames, total } = getScenarioDetail(req.params.name, days, limit, offset);
 
-      const history = getScenarioHistory(req.params.name);
-      const stepNames = getScenarioStepNames(req.params.name);
-
-      const totalRuns = history.length;
       const passedRuns = history.filter(r => r.success).length;
 
       res.json({
         info: {
-          ...scenario,
-          total_runs: totalRuns,
+          ...rawInfo,
+          total_runs: total,
           passed_runs: passedRuns,
-          failed_runs: totalRuns - passedRuns,
-          pass_rate: totalRuns > 0 ? Math.round(passedRuns / totalRuns * 100) : 0,
+          failed_runs: total - passedRuns,
+          pass_rate: total > 0 ? Math.round(passedRuns / total * 100) : 0,
         },
         history,
         stepNames,
@@ -78,9 +104,37 @@ export function createApp(): express.Application {
   app.get('/api/scenarios/:name/history', (req, res) => {
     try {
       const days = parseDaysParam(req.query.days as string);
-      const history = getScenarioHistory(req.params.name, days);
+      const limit = parseLimitParam(req.query.limit as string) ?? 50;
+      const offset = parseLimitParam(req.query.offset as string) ?? 0;
+      const total = getScenarioHistoryCount(req.params.name, days);
+      const history = getScenarioHistory(req.params.name, days, limit, offset);
       const stepNames = getScenarioStepNames(req.params.name);
-      res.json({ history, stepNames });
+      res.json({ history, stepNames, total });
+    } catch (err: unknown) {
+      sendError(res, 500, err);
+    }
+  });
+
+  app.get('/api/scenarios/:name/export/json', (req, res) => {
+    try {
+      const days = parseDaysParam(req.query.days as string);
+      const history = getScenarioHistory(req.params.name, days);
+      const filename = `scenario-${req.params.name}.json`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.json(history);
+    } catch (err: unknown) {
+      sendError(res, 500, err);
+    }
+  });
+
+  app.get('/api/scenarios/:name/export/csv', (req, res) => {
+    try {
+      const days = parseDaysParam(req.query.days as string);
+      const history = getScenarioHistory(req.params.name, days);
+      const filename = `scenario-${req.params.name}.csv`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.type('text/csv');
+      res.send(toCsv(history));
     } catch (err: unknown) {
       sendError(res, 500, err);
     }

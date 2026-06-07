@@ -50,34 +50,39 @@ export async function executeBrowserStep(
   base_url: string | undefined,
   vars: Record<string, string>
 ): Promise<StepMetrics> {
-  const start = Date.now();
-  const stepMetrics: StepMetrics = {
-    step_name: step.name,
-    action: step.action,
-    success: false,
-    response_time_ms: 0,
-    timestamp: new Date(),
-  };
+  const noRetry = step.action === 'browser.evaluate' || step.action === 'browser.screenshot';
+  const maxRetries = noRetry ? 0 : 2;
+  const retryDelays = [1000, 2000];
 
-  try {
-    switch (step.action) {
-      case 'browser.navigate': {
-        if (!step.url) throw new Error('browser.navigate requires a "url" field');
-        const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
-        try {
-          await page.goto(resolvedUrl, { waitUntil: 'load', timeout: 30000 });
-        } catch {
-          await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const start = Date.now();
+    const stepMetrics: StepMetrics = {
+      step_name: step.name,
+      action: step.action,
+      success: false,
+      response_time_ms: 0,
+      timestamp: new Date(),
+    };
+
+    try {
+      switch (step.action) {
+        case 'browser.navigate': {
+          if (!step.url) throw new Error('browser.navigate requires a "url" field');
+          const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
+          try {
+            await page.goto(resolvedUrl, { waitUntil: 'load', timeout: 30000 });
+          } catch {
+            await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          }
+          break;
         }
-        break;
-      }
 
-      case 'browser.fill': {
-        if (!step.selector) throw new Error('browser.fill requires a "selector" field');
-        if (step.value === undefined) throw new Error('browser.fill requires a "value" field');
-        const sel = JSON.stringify(step.selector);
-        const val = JSON.stringify(interpolateVars(step.value, vars));
-        await page.evaluate(`(() => {
+        case 'browser.fill': {
+          if (!step.selector) throw new Error('browser.fill requires a "selector" field');
+          if (step.value === undefined) throw new Error('browser.fill requires a "value" field');
+          const sel = JSON.stringify(step.selector);
+          const val = JSON.stringify(interpolateVars(step.value, vars));
+          await page.evaluate(`(() => {
           const el = document.querySelector(${sel});
           if (!el) throw new Error('Element not found: ' + ${sel});
           const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -85,15 +90,15 @@ export async function executeBrowserStep(
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
-        break;
-      }
+          break;
+        }
 
-      case 'browser.type': {
-        if (!step.selector) throw new Error('browser.type requires a "selector" field');
-        if (step.value === undefined) throw new Error('browser.type requires a "value" field');
-        const typedSel = JSON.stringify(step.selector);
-        const typedVal = JSON.stringify(interpolateVars(step.value, vars));
-        await page.evaluate(`(() => {
+        case 'browser.type': {
+          if (!step.selector) throw new Error('browser.type requires a "selector" field');
+          if (step.value === undefined) throw new Error('browser.type requires a "value" field');
+          const typedSel = JSON.stringify(step.selector);
+          const typedVal = JSON.stringify(interpolateVars(step.value, vars));
+          await page.evaluate(`(() => {
           const el = document.querySelector(${typedSel});
           if (!el) throw new Error('Element not found: ' + ${typedSel});
           el.focus();
@@ -102,67 +107,74 @@ export async function executeBrowserStep(
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
-        break;
+          break;
+        }
+
+        case 'browser.click': {
+          if (!step.selector) throw new Error('browser.click requires a "selector" field');
+          await page.click(step.selector);
+          break;
+        }
+
+        case 'browser.check': {
+          if (!step.selector) throw new Error('browser.check requires a "selector" field');
+          await page.check(step.selector);
+          break;
+        }
+
+        case 'browser.uncheck': {
+          if (!step.selector) throw new Error('browser.uncheck requires a "selector" field');
+          await page.uncheck(step.selector);
+          break;
+        }
+
+        case 'browser.select': {
+          if (!step.selector) throw new Error('browser.select requires a "selector" field');
+          if (step.value === undefined) throw new Error('browser.select requires a "value" field');
+          await page.selectOption(step.selector, interpolateVars(step.value, vars));
+          break;
+        }
+
+        case 'browser.wait_for': {
+          if (!step.selector) throw new Error('browser.wait_for requires a "selector" field');
+          await page.waitForSelector(step.selector, { timeout: step.timeout || 10000 });
+          break;
+        }
+
+        case 'browser.screenshot': {
+          const path = step.value || `screenshot-${Date.now()}.png`;
+          await page.screenshot({ path, fullPage: true });
+          break;
+        }
+
+        case 'browser.evaluate': {
+          if (!step.script) throw new Error('browser.evaluate requires a "script" field');
+          await page.evaluate(step.script);
+          break;
+        }
       }
 
-      case 'browser.click': {
-        if (!step.selector) throw new Error('browser.click requires a "selector" field');
-        await page.click(step.selector);
-        break;
+      stepMetrics.response_time_ms = Date.now() - start;
+
+      const error = await checkBrowserExpectations(page, step, vars);
+      if (error) {
+        stepMetrics.success = false;
+        stepMetrics.error = error;
+      } else {
+        stepMetrics.success = true;
       }
-
-      case 'browser.check': {
-        if (!step.selector) throw new Error('browser.check requires a "selector" field');
-        await page.check(step.selector);
-        break;
-      }
-
-      case 'browser.uncheck': {
-        if (!step.selector) throw new Error('browser.uncheck requires a "selector" field');
-        await page.uncheck(step.selector);
-        break;
-      }
-
-      case 'browser.select': {
-        if (!step.selector) throw new Error('browser.select requires a "selector" field');
-        if (step.value === undefined) throw new Error('browser.select requires a "value" field');
-        await page.selectOption(step.selector, interpolateVars(step.value, vars));
-        break;
-      }
-
-      case 'browser.wait_for': {
-        if (!step.selector) throw new Error('browser.wait_for requires a "selector" field');
-        await page.waitForSelector(step.selector, { timeout: step.timeout || 10000 });
-        break;
-      }
-
-      case 'browser.screenshot': {
-        const path = step.value || `screenshot-${Date.now()}.png`;
-        await page.screenshot({ path, fullPage: true });
-        break;
-      }
-
-      case 'browser.evaluate': {
-        if (!step.script) throw new Error('browser.evaluate requires a "script" field');
-        await page.evaluate(step.script);
-        break;
-      }
-    }
-
-    stepMetrics.response_time_ms = Date.now() - start;
-
-    const error = await checkBrowserExpectations(page, step, vars);
-    if (error) {
+    } catch (err: unknown) {
       stepMetrics.success = false;
-      stepMetrics.error = error;
-    } else {
-      stepMetrics.success = true;
+      stepMetrics.error = err instanceof Error ? err.message : String(err);
+      stepMetrics.response_time_ms = Date.now() - start;
     }
-  } catch (err: unknown) {
-    stepMetrics.success = false;
-    stepMetrics.error = err instanceof Error ? err.message : String(err);
-    stepMetrics.response_time_ms = Date.now() - start;
+
+    if (stepMetrics.success || attempt === maxRetries) {
+      return stepMetrics;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
   }
 
-  return stepMetrics;
+  throw new Error('Retry exhausted');
 }

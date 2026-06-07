@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { Scenario } from './types';
 import { runScenario, RunOptions } from './runner';
+import { sendDailyReport } from './report';
 
 interface ScheduledTask {
   scenario: Scenario;
@@ -45,4 +46,11 @@ export function stopAll(): void {
 
 export function listScheduled(): string[] {
   return scheduledTasks.map((st) => st.scenario.name);
+}
+
+export function scheduleReport(cronExpression: string): cron.ScheduledTask {
+  const task = cron.schedule(cronExpression, async () => {
+    await sendDailyReport();
+  });
+  return task;
 }

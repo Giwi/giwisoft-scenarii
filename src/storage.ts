@@ -123,11 +123,15 @@ export function getScenarioList(): Array<{
 
 export function getScenarioHistory(
   name: string,
-  limitDays: number = 7
+  limitDays: number = 7,
+  limit?: number,
+  offset?: number
 ): ScenarioMetrics[] {
   if (!db) throw new Error('Database not initialized');
 
   const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const queryLimit = limit ?? 50;
+  const queryOffset = offset ?? 0;
 
   const rows = db.prepare(`
     SELECT
@@ -146,11 +150,15 @@ export function getScenarioHistory(
       s.response_time_ms,
       s.error,
       s.timestamp
-    FROM scenario_runs r
+    FROM (
+      SELECT * FROM scenario_runs
+      WHERE scenario_name = ? AND created_at >= ?
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    ) r
     LEFT JOIN step_metrics s ON s.run_id = r.id
-    WHERE r.scenario_name = ? AND r.created_at >= ?
     ORDER BY r.created_at DESC, s.id
-  `).all(name, since) as Array<{
+  `).all(name, since, queryLimit, queryOffset) as Array<{
     run_id: number;
     scenario_name: string;
     started_at: string;
@@ -194,6 +202,32 @@ export function getScenarioHistory(
     }
   }
   return Array.from(runMap.values());
+}
+
+export function getScenarioHistoryCount(name: string, limitDays: number = 7): number {
+  if (!db) throw new Error('Database not initialized');
+  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const row = db.prepare(`
+    SELECT COUNT(*) AS count FROM scenario_runs
+    WHERE scenario_name = ? AND created_at >= ?
+  `).get(name, since) as { count: number };
+  return row.count;
+}
+
+export function getScenarioDetail(
+  name: string,
+  limitDays: number = 7,
+  limit: number = 50,
+  offset: number = 0
+): { info: any; history: ScenarioMetrics[]; stepNames: string[]; total: number } {
+  if (!db) throw new Error('Database not initialized');
+  const list = getScenarioList();
+  const scenario = list.find((s) => s.name === name);
+  if (!scenario) throw new Error(`Scenario "${name}" not found in database`);
+  const total = getScenarioHistoryCount(name, limitDays);
+  const history = getScenarioHistory(name, limitDays, limit, offset);
+  const stepNames = getScenarioStepNames(name);
+  return { info: scenario, history, stepNames, total };
 }
 
 export function getScenarioStepNames(name: string): string[] {
