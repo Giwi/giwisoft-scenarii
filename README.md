@@ -207,7 +207,7 @@ podman run -d \
   -v $(pwd)/scenarios:/scenarios:z \
   -v $(pwd)/db:/app/db:z \
   -v $(pwd)/settings.yaml:/app/settings.yaml:z \
-  ghcr.io/giwi/giwisoft-scenarii:latest
+  giwisoft-scenarii:latest
 ```
 
 The container includes a `HEALTHCHECK` that pings `/api/health` every 30s (10s startup grace period, 3 retries). The server auto-loads all `.yml`/`.yaml` files from `/scenarios`, runs each once on startup, and schedules them by their `schedule` cron field.
