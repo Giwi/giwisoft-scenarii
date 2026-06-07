@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
@@ -7,6 +8,7 @@ import { getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHist
 import { initWebSocket } from './ws';
 import { isStorageReady } from './storage';
 import { ScenarioMetrics } from './types';
+import logger from './logger';
 
 function escapePrometheusLabel(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -50,12 +52,12 @@ function requestIdMiddleware(req: express.Request, res: express.Response, next: 
 }
 
 function sendError(res: express.Response, status: number, err: unknown): void {
-  console.error(`[${res.locals.requestId ?? '-'}] [${status}]`, err instanceof Error ? err.message : err);
+  logger.error({ requestId: res.locals.requestId, status, err: err instanceof Error ? err.message : String(err) }, 'Request failed');
   res.status(status).json({ error: 'Internal server error' });
 }
 
 function requestLogger(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  console.log(`${new Date().toISOString()} [${res.locals.requestId}] ${req.method} ${req.url}`);
+  logger.info({ requestId: res.locals.requestId, method: req.method, url: req.url }, 'Request');
   next();
 }
 
@@ -63,6 +65,7 @@ export function createApp(): express.Application {
   const app = express();
 
   app.use(cors());
+  app.use(helmet());
   app.use(express.json());
   app.use(requestIdMiddleware);
   app.use(requestLogger);
@@ -200,7 +203,7 @@ export function createApp(): express.Application {
             }
           }
         } catch (err) {
-          console.warn(`Failed to fetch history for scenario "${s.name}" metrics:`, err);
+          logger.warn({ scenario: s.name, err }, 'Failed to fetch history for metrics');
         }
       }
 
@@ -219,7 +222,7 @@ export function createApp(): express.Application {
       res.type('text/plain; charset=utf-8');
       res.send(lines.join('\n'));
     } catch (err: unknown) {
-      console.error('Failed to generate metrics:', err);
+      logger.error({ err }, 'Failed to generate metrics');
       res.status(500).type('text/plain').send('# error: Internal server error\n');
     }
   });
@@ -248,7 +251,7 @@ export function createApp(): express.Application {
 export function createServer(port: number = 3000): http.Server {
   const app = createApp();
   const server = app.listen(port, () => {
-    console.log(`Scenarii API server running on http://localhost:${port}`);
+    logger.info({ port }, 'API server running');
   });
   initWebSocket(server);
   return server;

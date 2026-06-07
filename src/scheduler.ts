@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { Scenario } from './types';
 import { runScenario, RunOptions } from './runner';
 import { sendDailyReport } from './report';
+import logger from './logger';
 
 interface ScheduledTask {
   scenario: Scenario;
@@ -16,20 +17,20 @@ export function scheduleScenario(
   options: RunOptions = {}
 ): cron.ScheduledTask | null {
   if (!scenario.schedule) {
-    console.log(`No schedule for scenario "${scenario.name}", running once...`);
+    logger.info({ scenario: scenario.name }, 'No schedule, running once');
     runScenario(scenario, options);
     return null;
   }
 
   if (!cron.validate(scenario.schedule)) {
-    console.error(`Invalid cron expression "${scenario.schedule}" for scenario "${scenario.name}"`);
+    logger.error({ scenario: scenario.name, schedule: scenario.schedule }, 'Invalid cron expression');
     return null;
   }
 
-  console.log(`Scheduling "${scenario.name}" with cron: ${scenario.schedule}`);
+  logger.info({ scenario: scenario.name, schedule: scenario.schedule }, 'Scheduling scenario');
 
   const task = cron.schedule(scenario.schedule, async () => {
-    console.log(`\n[${new Date().toISOString()}] Running scenario: ${scenario.name}`);
+    logger.info({ scenario: scenario.name }, 'Running scenario');
     await runScenario(scenario, options);
   });
 

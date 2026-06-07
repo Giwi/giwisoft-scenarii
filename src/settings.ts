@@ -1,5 +1,6 @@
 import fs from 'fs';
 import yaml from 'js-yaml';
+import logger from './logger';
 
 export interface TelegramConfig {
   enabled: boolean;
@@ -36,6 +37,7 @@ export interface Settings {
 }
 
 let settings: Settings | undefined;
+let settingsPath: string | undefined;
 
 function applyEnvOverrides(s: Settings): void {
   if (!s.notifications) return;
@@ -55,7 +57,7 @@ function applyEnvOverrides(s: Settings): void {
 
 export function loadSettings(path?: string): Settings {
   if (settings !== undefined) {
-    console.log('Settings already loaded, skipping');
+    logger.info('Settings already loaded, skipping');
     return settings;
   }
 
@@ -65,17 +67,41 @@ export function loadSettings(path?: string): Settings {
     return settings;
   }
 
+  settingsPath = resolved;
+
   try {
     const raw = fs.readFileSync(resolved, 'utf-8');
     settings = yaml.load(raw) as Settings;
-    console.log(`Settings loaded from ${resolved}`);
+    logger.info(`Settings loaded from ${resolved}`);
   } catch (err: unknown) {
-    console.error(`Failed to load settings from ${resolved}:`, err instanceof Error ? err.message : err);
+    logger.error({ resolved, err: err instanceof Error ? err.message : String(err) }, 'Failed to load settings');
     settings = {};
   }
 
   applyEnvOverrides(settings);
   return settings;
+}
+
+export function reloadSettings(): Settings {
+  if (!settingsPath) return settings || {};
+  try {
+    const raw = fs.readFileSync(settingsPath, 'utf-8');
+    const newSettings = yaml.load(raw) as Settings;
+    applyEnvOverrides(newSettings);
+    settings = newSettings;
+    logger.info(`Settings reloaded from ${settingsPath}`);
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to reload settings');
+  }
+  return settings!;
+}
+
+export function watchSettings(): void {
+  if (!settingsPath) return;
+  fs.watchFile(settingsPath, { interval: 3000 }, () => {
+    logger.info('Settings file changed, reloading...');
+    reloadSettings();
+  });
 }
 
 function findSettingsFile(): string | null {

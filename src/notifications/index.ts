@@ -3,6 +3,7 @@ import { ScenarioMetrics } from '../types';
 import { getPreviousRunSuccess } from '../storage';
 import { sendTelegram } from './telegram';
 import { sendEmail } from './mailgun';
+import logger from '../logger';
 
 export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<void> {
   const settings = getSettings();
@@ -12,7 +13,7 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
   try {
     prevSuccess = getPreviousRunSuccess(metrics.scenario_name);
   } catch (err) {
-    console.error('Failed to get previous run success:', err);
+    logger.error({ err }, 'Failed to get previous run success');
     return;
   }
 
@@ -37,7 +38,7 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
   const results = await Promise.allSettled(promises);
   for (const result of results) {
     if (result.status === 'rejected') {
-      console.error('Notification delivery failed:', result.reason);
+      logger.error({ err: result.reason }, 'Notification delivery failed');
     }
   }
 }

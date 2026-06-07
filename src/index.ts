@@ -3,13 +3,34 @@
 import { Command } from 'commander';
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 import { loadScenarioFile } from './parser';
-import { runScenario } from './runner';
+import { runScenario, RunOptions } from './runner';
 import { scheduleScenario, stopAll, listScheduled, scheduleReport } from './scheduler';
 import { sendDailyReport } from './report';
-import { initStorage, closeStorage } from './storage';
-import { loadSettings } from './settings';
+import { initStorage, closeStorage, isStorageReady } from './storage';
+import { loadSettings, watchSettings } from './settings';
 import { createServer } from './server';
+import logger from './logger';
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught exception');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason instanceof Error ? reason.message : reason }, 'Unhandled rejection');
+});
+
+function shutdown(server?: http.Server): void {
+  logger.info('Shutting down...');
+  stopAll();
+  if (server) {
+    server.close();
+  }
+  closeStorage();
+  process.exit(0);
+}
 
 const program = new Command();
 
@@ -34,7 +55,7 @@ program
     const runOptions = { headless, json_output: options.json, persist: !!options.db };
 
     const scenarios = files.map((f) => {
-      console.log(`Loading scenario: ${f}`);
+      logger.info({ file: f }, 'Loading scenario');
       return loadScenarioFile(f);
     });
 
@@ -49,27 +70,17 @@ program
       if (scenario.schedule) {
         scheduleScenario(scenario, runOptions);
       } else {
-        console.log(`Scenario "${scenario.name}" has no schedule, running once...`);
+        logger.info({ scenario: scenario.name }, 'No schedule, running once');
         await runScenario(scenario, runOptions);
       }
     }
 
     if (listScheduled().length > 0) {
-      console.log(`\nScheduled scenarios: ${listScheduled().join(', ')}`);
-      console.log('Press Ctrl+C to stop.');
+      logger.info({ scheduled: listScheduled() }, 'Scheduled scenarios');
+      logger.info('Press Ctrl+C to stop.');
 
-      process.on('SIGINT', () => {
-        console.log('\nStopping all scheduled tasks...');
-        stopAll();
-        closeStorage();
-        process.exit(0);
-      });
-
-      process.on('SIGTERM', () => {
-        stopAll();
-        closeStorage();
-        process.exit(0);
-      });
+      process.on('SIGINT', () => shutdown());
+      process.on('SIGTERM', () => shutdown());
     }
   });
 
@@ -79,9 +90,11 @@ program
   .option('-p, --port <number>', 'Port to listen on', '3000')
   .option('--db <path>', 'SQLite database path', 'db/scenarii.db')
   .option('--scenarios-dir <path>', 'Directory containing YAML scenario files', './scenarios')
+  .option('--settings <path>', 'Path to settings.yaml')
   .action(async (options) => {
     initStorage(options.db);
     loadSettings(options.settings);
+    watchSettings();
 
     const scenariosDir = path.resolve(options.scenariosDir);
     let scenarioFiles: string[];
@@ -90,12 +103,12 @@ program
         .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'))
         .map(f => path.join(scenariosDir, f));
     } catch {
-      console.error(`Scenarios directory not found: ${scenariosDir}`);
+      logger.error(`Scenarios directory not found: ${scenariosDir}`);
       process.exit(1);
     }
 
     if (scenarioFiles.length === 0) {
-      console.error(`No .yml or .yaml files found in ${scenariosDir}`);
+      logger.error(`No .yml or .yaml files found in ${scenariosDir}`);
       process.exit(1);
     }
 
@@ -103,8 +116,8 @@ program
 
     // Start the API server immediately so it's available
     const port = parseInt(options.port);
-    console.log(`Initializing scenarii server on port ${port}...`);
-    createServer(port);
+    logger.info({ port }, 'Initializing server');
+    const server = createServer(port);
 
     // Schedule cron jobs first
     for (const file of scenarioFiles) {
@@ -114,12 +127,12 @@ program
           scheduleScenario(scenario, runOptions);
         }
       } catch (err: unknown) {
-        console.error(`Failed to load ${file}:`, err instanceof Error ? err.message : err);
+        logger.error({ file, err: err instanceof Error ? err.message : err }, 'Failed to load scenario');
       }
     }
 
     if (listScheduled().length > 0) {
-      console.log(`\nScheduled scenarios: ${listScheduled().join(', ')}`);
+      logger.info({ scheduled: listScheduled() }, 'Scheduled scenarios');
     }
 
     // Run initial execution in background sequentially (Lightpanda can't handle concurrency)
@@ -127,27 +140,63 @@ program
       for (const file of scenarioFiles) {
         try {
           const scenario = loadScenarioFile(file);
-          console.log(`Running scenario "${scenario.name}"...`);
+          logger.info({ scenario: scenario.name }, 'Running scenario');
           await runScenario(scenario, runOptions);
         } catch (err: unknown) {
-          console.error(`Failed to run ${file}:`, err instanceof Error ? err.message : err);
+          logger.error({ file, err: err instanceof Error ? err.message : err }, 'Failed to run scenario');
         }
       }
       sendDailyReport();
       scheduleReport('0 8 * * *');
     })();
 
-    process.on('SIGINT', () => {
-      console.log('\nShutting down...');
-      stopAll();
-      closeStorage();
-      process.exit(0);
-    });
-    process.on('SIGTERM', () => {
-      stopAll();
-      closeStorage();
-      process.exit(0);
-    });
+    process.on('SIGINT', () => shutdown(server));
+    process.on('SIGTERM', () => shutdown(server));
+  });
+
+program
+  .command('validate')
+  .description('Validate a scenario YAML file without running it')
+  .argument('<file>', 'Path to scenario YAML file')
+  .action((file: string) => {
+    try {
+      const scenario = loadScenarioFile(file);
+      logger.info({ name: scenario.name, steps: scenario.steps.length, schedule: scenario.schedule || 'none' }, 'Scenario is valid');
+    } catch (err: unknown) {
+      logger.error({ err: err instanceof Error ? err.message : err }, 'Scenario validation failed');
+      process.exit(1);
+    }
+  });
+
+program
+  .command('trigger')
+  .description('Run a scenario immediately')
+  .argument('<file>', 'Path to scenario YAML file')
+  .option('--headless <bool>', 'Run browser in headless mode', 'true')
+  .option('--json', 'Output metrics as JSON')
+  .option('--db <path>', 'SQLite database path')
+  .action(async (file: string, options) => {
+    if (options.db) {
+      initStorage(options.db);
+    }
+    const headless = options.headless !== 'false';
+    const runOptions: RunOptions = { headless, json_output: options.json, persist: !!options.db };
+    const scenario = loadScenarioFile(file);
+    logger.info({ scenario: scenario.name }, 'Triggering scenario');
+    await runScenario(scenario, runOptions);
+  });
+
+program
+  .command('status')
+  .description('Show current status of scheduled scenarios')
+  .action(() => {
+    const scheduled = listScheduled();
+    if (scheduled.length > 0) {
+      logger.info({ scheduled }, 'Scheduled scenarios');
+    } else {
+      logger.info('No scheduled scenarios');
+    }
+    logger.info({ storageReady: isStorageReady() }, 'Storage status');
   });
 
 program
@@ -173,7 +222,7 @@ notifications:
       # from: scenarii@your-domain.com
 `;
     fs.writeFileSync(options.output, template, 'utf-8');
-    console.log(`Settings template written to ${options.output}`);
+    logger.info(`Settings template written to ${options.output}`);
   });
 
 program.parse(process.argv);

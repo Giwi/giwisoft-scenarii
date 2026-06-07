@@ -9,6 +9,7 @@ import { storeMetrics, purgeOldData } from './storage';
 import { notifyIfStateChanged } from './notifications/index';
 import { broadcastScenarioRun } from './ws';
 import { getScenarioSettings } from './settings';
+import logger from './logger';
 
 // Sequential execution queue for browser scenarios — Lightpanda CDP only supports one connection at a time
 let browserQueue: Promise<void> = Promise.resolve();
@@ -135,10 +136,10 @@ async function runScenarioInternal(
         try {
           await browser.close();
         } catch (err) {
-          console.warn('Failed to close browser:', err);
+          logger.warn({ err }, 'Failed to close browser');
         }
       } else if (browserContext) {
-        try { await browserContext.close(); } catch (err) { console.warn('Failed to close browser context:', err); }
+        try { await browserContext.close(); } catch (err) { logger.warn({ err }, 'Failed to close browser context'); }
       }
       if (lightpandaProc) {
         try {
@@ -147,7 +148,7 @@ async function runScenarioInternal(
           lightpandaProc.kill();
           await waitForProcessExit(lightpandaProc, 3000);
         } catch (err) {
-          console.warn('Failed to kill Lightpanda:', err);
+          logger.warn({ err }, 'Failed to kill Lightpanda');
         }
       }
     }
@@ -183,7 +184,7 @@ async function runScenarioInternal(
       storeMetrics(metrics);
       purgeOldData(7);
     } catch (err) {
-      console.error('Failed to store metrics:', err);
+      logger.error({ err }, 'Failed to store metrics');
     }
   }
 
@@ -195,7 +196,7 @@ async function runScenarioInternal(
 
   if (options.persist) {
     notifyIfStateChanged(metrics).catch((err) => {
-      console.error('Notification failed:', err);
+      logger.error({ err }, 'Notification failed');
     });
   }
 
@@ -218,7 +219,7 @@ export async function runScenario(
     try {
       require.resolve('@lightpanda/browser');
     } catch {
-      console.warn('@lightpanda/browser not installed — browser scenarios will fail with a descriptive error');
+      logger.warn('@lightpanda/browser not installed — browser scenarios will fail with a descriptive error');
     }
   }
 

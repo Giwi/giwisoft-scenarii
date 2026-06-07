@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { ScenarioMetrics, StepMetrics } from './types';
+import logger from './logger';
 
 let db: Database.Database | undefined;
 
@@ -264,7 +265,7 @@ export function closeStorage(): void {
       db.pragma('wal_checkpoint(TRUNCATE)');
       db.close();
     } catch (err) {
-      console.error('Error closing database:', err);
+      logger.error({ err }, 'Error closing database');
     }
     db = undefined;
   }

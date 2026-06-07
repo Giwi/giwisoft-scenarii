@@ -1,5 +1,6 @@
 import { EmailConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
+import logger from '../logger';
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -55,10 +56,10 @@ export async function sendEmail(
 
       if (!res.ok) {
         const err = await res.text();
-        console.error(`Mailgun notification failed for ${recipient}: ${res.status} ${err}`);
+        logger.error({ recipient, status: res.status, err }, 'Mailgun notification failed');
       }
     } catch (err: unknown) {
-      console.error(`Mailgun notification error for ${recipient}:`, err instanceof Error ? err.message : err);
+      logger.error({ recipient, err: err instanceof Error ? err.message : err }, 'Mailgun notification error');
     }
   }
 }

@@ -1,5 +1,6 @@
 import { TelegramConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
+import logger from '../logger';
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -49,6 +50,6 @@ export async function sendTelegram(
 
   if (!res.ok) {
     const err = await res.text();
-    console.error(`Telegram notification failed: ${res.status} ${err}`);
+    logger.error({ status: res.status, err }, 'Telegram notification failed');
   }
 }

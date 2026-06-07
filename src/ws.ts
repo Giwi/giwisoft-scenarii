@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import logger from './logger';
 
 let wss: WebSocketServer | null = null;
 
@@ -8,12 +9,12 @@ export function initWebSocket(server: HttpServer): void {
 
   wss.on('connection', (ws) => {
     ws.on('error', (err) => {
-      console.warn('WebSocket client error:', err);
+      logger.warn({ err }, 'WebSocket client error');
     });
   });
 
   wss.on('error', (err) => {
-    console.error('WebSocket server error:', err);
+    logger.error({ err }, 'WebSocket server error');
   });
 }
 
