@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -57,7 +57,16 @@ jobs:
 
       - name: Smoke test container
         run: |
+          mkdir -p /tmp/scenarios
+          cat > /tmp/scenarios/smoke.yml <<'EOF'
+          name: smoke-test
+          base_url: http://localhost:3000
+          steps:
+            - action: http.get
+              path: /api/health
+          EOF
           docker run -d --name scenarii-test -p 3000:3000 \
+            -v /tmp/scenarios:/scenarios \
             -e TELEGRAM_BOT_TOKEN=test \
             -e MAILGUN_API_KEY=test \
             scenarii:ci-${{ github.sha }}

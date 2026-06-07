@@ -1,4 +1,4 @@
-FROM docker.io/node:22-alpine AS builder
+FROM docker.io/node:26-alpine AS builder
 
 WORKDIR /build
 
@@ -14,7 +14,7 @@ RUN npm run build && \
     npm prune --omit=dev && \
     rm -rf /build/frontend/node_modules
 
-FROM docker.io/node:22-alpine
+FROM docker.io/node:26-alpine
 
 RUN apk add --no-cache libstdc++ dumb-init curl
 
@@ -25,6 +25,8 @@ COPY --from=builder /build/dist/ ./dist/
 COPY --from=builder /build/frontend/dist/ ./frontend/dist/
 
 RUN npm cache clean --force
+
+RUN mkdir -p /app/db && chown node:node /app/db
 
 EXPOSE 3000
 
