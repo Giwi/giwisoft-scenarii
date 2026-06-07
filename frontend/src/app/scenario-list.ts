@@ -1,4 +1,10 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ChangeDetectorRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from './ws';
@@ -15,12 +21,19 @@ interface ScenarioInfo {
   selector: 'app-scenario-list',
   standalone: true,
   imports: [NgFor, NgIf, DatePipe, RouterModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="d-flex align-items-center gap-3 mb-4">
       <h1 class="h4 mb-0">Scenarios</h1>
-      <span class="badge bg-secondary rounded-pill fs-6" *ngIf="scenarios.length">{{ scenarios.length }}</span>
+      <span class="badge bg-secondary rounded-pill fs-6" *ngIf="scenarios.length">{{
+        scenarios.length
+      }}</span>
       <div class="ms-auto">
-        <button class="btn btn-sm btn-outline-primary" (click)="fetchScenarios()" [disabled]="fetching">
+        <button
+          class="btn btn-sm btn-outline-primary"
+          (click)="fetchScenarios()"
+          [disabled]="fetching"
+        >
           <i class="bi bi-arrow-clockwise me-1"></i>Refresh
         </button>
       </div>
@@ -52,7 +65,10 @@ interface ScenarioInfo {
       Loading scenarios...
     </div>
 
-    <div class="card border-0 shadow-sm py-5 text-center text-secondary" *ngIf="!loading && scenarios.length === 0">
+    <div
+      class="card border-0 shadow-sm py-5 text-center text-secondary"
+      *ngIf="!loading && scenarios.length === 0"
+    >
       <i class="bi bi-inbox fs-2 mb-2 d-block"></i>
       No scenarios yet. Background runs will appear here.
     </div>
@@ -74,12 +90,21 @@ interface ScenarioInfo {
             <tr *ngFor="let s of scenarios">
               <td class="fw-semibold">{{ s.name }}</td>
               <td>
-                <span class="badge" [class.bg-success]="s.last_success === 1" [class.bg-danger]="s.last_success === 0" [class.bg-secondary]="s.last_success === null">
+                <span
+                  class="badge"
+                  [class.bg-success]="s.last_success === 1"
+                  [class.bg-danger]="s.last_success === 0"
+                  [class.bg-secondary]="s.last_success === null"
+                >
                   {{ s.last_success === 1 ? 'Pass' : s.last_success === 0 ? 'Fail' : '—' }}
                 </span>
               </td>
-              <td class="text-body-secondary small">{{ s.last_run ? (s.last_run | date:'MMM d, HH:mm') : '—' }}</td>
-              <td class="font-monospace small">{{ s.last_duration_ms ? s.last_duration_ms + 'ms' : '—' }}</td>
+              <td class="text-body-secondary small">
+                {{ s.last_run ? (s.last_run | date: 'MMM d, HH:mm') : '—' }}
+              </td>
+              <td class="font-monospace small">
+                {{ s.last_duration_ms ? s.last_duration_ms + 'ms' : '—' }}
+              </td>
               <td class="font-monospace small">{{ s.total_runs }}</td>
               <td class="text-end">
                 <a [routerLink]="['/scenario', s.name]" class="btn btn-sm btn-outline-primary">
@@ -102,11 +127,11 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
   constructor(private cdr: ChangeDetectorRef) {}
 
   get healthyCount(): number {
-    return this.scenarios.filter(s => s.last_success === 1).length;
+    return this.scenarios.filter((s) => s.last_success === 1).length;
   }
 
   get unhealthyCount(): number {
-    return this.scenarios.filter(s => s.last_success === 0).length;
+    return this.scenarios.filter((s) => s.last_success === 0).length;
   }
 
   async ngOnInit(): Promise<void> {
@@ -123,7 +148,9 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     removeScenarioRunListener(this.wsCallback);
   }
 
-  private wsCallback = () => { if (!this.fetching) this.fetchScenarios(); };
+  private wsCallback = () => {
+    if (!this.fetching) this.fetchScenarios();
+  };
 
   async fetchScenarios(): Promise<void> {
     if (this.fetching) return;

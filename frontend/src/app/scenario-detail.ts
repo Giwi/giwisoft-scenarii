@@ -1,4 +1,10 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  OnDestroy,
+  ChangeDetectorRef,
+  ChangeDetectionStrategy,
+} from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgFor, NgIf, DatePipe } from '@angular/common';
 import Chart from 'chart.js/auto';
@@ -44,6 +50,7 @@ interface ScenarioDetail {
   selector: 'app-scenario-detail',
   standalone: true,
   imports: [NgFor, NgIf, DatePipe, RouterModule],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="d-flex align-items-center gap-2 mb-3">
       <a routerLink="/" class="btn btn-sm btn-outline-secondary">
@@ -79,7 +86,9 @@ interface ScenarioDetail {
         <div class="col-md-6">
           <div class="card border-0 shadow-sm">
             <div class="card-body">
-              <h3 class="card-title small text-secondary text-uppercase">Response Time Trend ({{ limitDays }}d)</h3>
+              <h3 class="card-title small text-secondary text-uppercase">
+                Response Time Trend ({{ limitDays }}d)
+              </h3>
               <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
             </div>
           </div>
@@ -116,25 +125,49 @@ interface ScenarioDetail {
               </thead>
               <tbody>
                 <tr *ngFor="let run of detail.history.slice(0, 50)">
-                  <td class="small">{{ run.started_at | date:'MMM d, HH:mm:ss' }}</td>
+                  <td class="small">{{ run.started_at | date: 'MMM d, HH:mm:ss' }}</td>
                   <td class="font-monospace small">{{ run.duration_ms }}ms</td>
                   <td>
-                    <span class="badge" [class.bg-success]="run.success" [class.bg-danger]="!run.success">
+                    <span
+                      class="badge"
+                      [class.bg-success]="run.success"
+                      [class.bg-danger]="!run.success"
+                    >
                       {{ run.success ? 'Pass' : 'Fail' }}
                     </span>
                   </td>
                   <td>
                     <details>
-                      <summary class="text-primary small" style="cursor:pointer">{{ run.steps.length }} steps</summary>
+                      <summary class="text-primary small" style="cursor:pointer">
+                        {{ run.steps.length }} steps
+                      </summary>
                       <table class="table table-sm mt-2 mb-0" style="font-size: .75rem">
                         <tr *ngFor="let step of run.steps" class="align-top">
                           <td class="py-0 ps-0 pe-2 border-0">{{ step.step_name }}</td>
-                          <td class="font-monospace py-0 px-2 border-0 text-nowrap">{{ step.response_time_ms }}ms</td>
-                          <td class="py-0 px-2 border-0">
-                            <span class="badge bg-success" *ngIf="step.success" style="font-size: .65rem">OK</span>
-                            <span class="badge bg-danger" *ngIf="!step.success" style="font-size: .65rem">ERR</span>
+                          <td class="font-monospace py-0 px-2 border-0 text-nowrap">
+                            {{ step.response_time_ms }}ms
                           </td>
-                          <td class="text-danger py-0 ps-2 pe-0 border-0" *ngIf="step.error" style="font-size: .65rem">{{ step.error }}</td>
+                          <td class="py-0 px-2 border-0">
+                            <span
+                              class="badge bg-success"
+                              *ngIf="step.success"
+                              style="font-size: .65rem"
+                              >OK</span
+                            >
+                            <span
+                              class="badge bg-danger"
+                              *ngIf="!step.success"
+                              style="font-size: .65rem"
+                              >ERR</span
+                            >
+                          </td>
+                          <td
+                            class="text-danger py-0 ps-2 pe-0 border-0"
+                            *ngIf="step.error"
+                            style="font-size: .65rem"
+                          >
+                            {{ step.error }}
+                          </td>
                         </tr>
                       </table>
                     </details>
@@ -155,7 +188,10 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   private charts: Chart[] = [];
   private scenarioName = '';
 
-  constructor(private route: ActivatedRoute, private cdr: ChangeDetectorRef) {}
+  constructor(
+    private route: ActivatedRoute,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   async ngOnInit(): Promise<void> {
     this.scenarioName = this.route.snapshot.paramMap.get('name')!;
@@ -164,12 +200,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.charts.forEach(c => c.destroy());
+    this.charts.forEach((c) => c.destroy());
     removeScenarioRunListener(this.wsCallback);
   }
 
   async refresh(): Promise<void> {
-    this.charts.forEach(c => c.destroy());
+    this.charts.forEach((c) => c.destroy());
     this.charts = [];
     this.loading = true;
     this.cdr.detectChanges();
@@ -212,62 +248,89 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
       const green = isDark ? '#3fb950' : '#10b981';
 
       // Duration trend chart
-      const labels = history.map(r => new Date(r.started_at).toLocaleString()).reverse();
-      const durations = history.map(r => r.duration_ms).reverse();
+      const labels = history.map((r) => new Date(r.started_at).toLocaleString()).reverse();
+      const durations = history.map((r) => r.duration_ms).reverse();
 
-      this.charts.push(new Chart('durationChart', {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Duration (ms)',
-            data: durations,
-            borderColor: accent,
-            backgroundColor: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(99, 102, 241, 0.08)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 3,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
-            y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } }
-          }
-        }
-      }));
+      this.charts.push(
+        new Chart('durationChart', {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Duration (ms)',
+                data: durations,
+                borderColor: accent,
+                backgroundColor: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(99, 102, 241, 0.08)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor },
+                grid: { color: gridColor },
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { font: { size: 10 }, color: textColor },
+                grid: { color: gridColor },
+              },
+            },
+          },
+        }),
+      );
 
       // Success rate chart
-      const successCounts = history.map(r => r.success ? 1 : 0).reverse();
+      const successCounts = history.map((r) => (r.success ? 1 : 0)).reverse();
       const runningAvg = this.runningAverage(successCounts, 5);
 
-      this.charts.push(new Chart('successChart', {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Success',
-            data: runningAvg,
-            borderColor: green,
-            backgroundColor: isDark ? 'rgba(63, 185, 80, 0.1)' : 'rgba(45, 198, 83, 0.1)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 3,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
-            y: { min: 0, max: 1, ticks: { font: { size: 10 }, color: textColor, callback: (v) => (v as number) * 100 + '%' }, grid: { color: gridColor } }
-          }
-        }
-      }));
+      this.charts.push(
+        new Chart('successChart', {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Success',
+                data: runningAvg,
+                borderColor: green,
+                backgroundColor: isDark ? 'rgba(63, 185, 80, 0.1)' : 'rgba(45, 198, 83, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor },
+                grid: { color: gridColor },
+              },
+              y: {
+                min: 0,
+                max: 1,
+                ticks: {
+                  font: { size: 10 },
+                  color: textColor,
+                  callback: (v) => (v as number) * 100 + '%',
+                },
+                grid: { color: gridColor },
+              },
+            },
+          },
+        }),
+      );
 
       // Step response time chart (if multiple steps)
       if (this.detail.stepNames.length > 1) {
@@ -275,10 +338,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           ? ['#00d4ff', '#3fb950', '#f85149', '#d29922', '#bc8cff', '#f778ba']
           : ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#a855f7', '#ec4899'];
         const datasets = this.detail.stepNames.map((stepName, i) => {
-          const data = history.map(run => {
-            const step = run.steps.find(s => s.step_name === stepName);
-            return step ? step.response_time_ms : 0;
-          }).reverse();
+          const data = history
+            .map((run) => {
+              const step = run.steps.find((s) => s.step_name === stepName);
+              return step ? step.response_time_ms : 0;
+            })
+            .reverse();
           return {
             label: stepName,
             data,
@@ -288,19 +353,30 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
           };
         });
 
-        this.charts.push(new Chart('stepChart', {
-          type: 'line',
-          data: { labels, datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, color: textColor } } },
-            scales: {
-              x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
-              y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } }
-            }
-          }
-        }));
+        this.charts.push(
+          new Chart('stepChart', {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 10 }, color: textColor } },
+              },
+              scales: {
+                x: {
+                  ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor },
+                  grid: { color: gridColor },
+                },
+                y: {
+                  beginAtZero: true,
+                  ticks: { font: { size: 10 }, color: textColor },
+                  grid: { color: gridColor },
+                },
+              },
+            },
+          }),
+        );
       }
     } catch (err) {
       console.error('Failed to render charts', err);
