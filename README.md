@@ -58,6 +58,7 @@ base_url: https://example.com
 schedule: "*/5 * * * *"   # optional cron expression
 timeout: 120000           # per-scenario timeout override (default 120s)
 ignoreHTTPSErrors: false  # per-scenario SSL override
+tags: [critical, auth]    # optional tags for dashboard filtering
 
 steps:
   - name: Homepage
@@ -114,8 +115,10 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 
 The dashboard provides:
 
-- **Scenario list** — overview of all scenarios with pass/fail status, auto-refreshes via WebSocket
-- **Scenario detail** — response time trend chart, success rate over time, step breakdown, paginated run history, **JSON/CSV export** buttons
+- **Scenario list** — overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, auto-refreshes via WebSocket
+- **Scenario detail** — response time trend chart, success rate over time, step breakdown, paginated run history, **JSON/CSV export**, **date range selector** (1d/7d/14d/30d/90d)
+- **Run Now** — trigger an immediate ad-hoc run from the list or detail page
+- **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** — toggle in the navbar, preference saved to localStorage
 - **Manual refresh** — refresh button on both list and detail pages
 
@@ -147,9 +150,12 @@ node dist/index.js server
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/scenarios` | List all scenarios with last run status |
-| `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=`) |
-| `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=`) |
+| `GET /api/scenarios` | List all scenarios with last run status (`?tag=critical`) |
+| `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |
+| `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=&days=`) |
+| `POST /api/scenarios/:name/run` | Trigger an immediate ad-hoc run |
+| `POST /api/scenarios/:name/pause` | Pause a scheduled scenario |
+| `POST /api/scenarios/:name/resume` | Resume a paused scenario |
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
 | `GET /api/health` | Health check (200 = ready, 503 = initializing) |
@@ -187,6 +193,14 @@ The dashboard uses this for instant UI updates.
 Get alerted when a scenario fails and when it recovers. Create a `settings.yaml` file:
 
 ```yaml
+api:
+  auth:
+    enabled: true
+    api_key: "YOUR_API_KEY"      # protects /api/metrics
+
+storage:
+  retentionDays: 30              # data retention period (default 7)
+
 notifications:
   telegram:
     enabled: true
@@ -200,6 +214,15 @@ notifications:
       from: "scenarii <notifications@YOUR_DOMAIN>"
     to:
       - "admin@example.com"
+  slack:
+    enabled: true
+    webhook_url: "https://hooks.slack.com/services/..."
+  discord:
+    enabled: true
+    webhook_url: "https://discord.com/api/webhooks/..."
+  webhook:
+    enabled: true
+    url: "https://your-endpoint/hook"
 ```
 
 Secrets can be overridden via environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`.
@@ -291,8 +314,8 @@ Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests 
 - **Browser** — Lightpanda headless browser via Playwright CDP (with retry)
 - **Database** — SQLite (better-sqlite3, WAL mode)
 - **Scheduling** — node-cron
-- **Notifications** — Telegram Bot API, Mailgun API (with retry)
+- **Notifications** — Telegram, Slack, Discord, Generic Webhook, Mailgun (all with retry)
 - **Logging** — pino (structured JSON, ISO timestamps)
-- **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.)
+- **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.), optional Bearer token auth
 - **Frontend** — Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
 - **Container** — Alpine + multi-stage build, non-root user
