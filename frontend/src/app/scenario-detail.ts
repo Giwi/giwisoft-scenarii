@@ -46,8 +46,6 @@ interface ScenarioDetail {
   stepNames: string[];
 }
 
-const DAY_OPTIONS = [1, 7, 14, 30, 90] as const;
-
 @Component({
   selector: 'app-scenario-detail',
   standalone: true,
@@ -87,15 +85,6 @@ const DAY_OPTIONS = [1, 7, 14, 30, 90] as const;
       </span>
     </div>
 
-    <div class="btn-group btn-group-sm mb-4" role="group">
-      <button
-        *ngFor="let d of dayOptions"
-        class="btn btn-outline-secondary"
-        [class.active]="limitDays === d"
-        (click)="setDays(d)"
-      >{{ d }}d</button>
-    </div>
-
     <div class="text-center py-5 text-secondary" *ngIf="loading">
       <i class="bi bi-hourglass-split fs-2 mb-2 d-block"></i>
       Loading...
@@ -112,7 +101,7 @@ const DAY_OPTIONS = [1, 7, 14, 30, 90] as const;
           <div class="card border-0 shadow-sm">
             <div class="card-body">
               <h3 class="card-title small text-secondary text-uppercase">
-                Response Time Trend ({{ limitDays }}d)
+                Response Time Trend
               </h3>
               <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
             </div>
@@ -210,8 +199,6 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   detail: ScenarioDetail | null = null;
   loading = true;
   running = false;
-  limitDays = 7;
-  readonly dayOptions = DAY_OPTIONS;
   private charts: Chart[] = [];
   private scenarioName = '';
 
@@ -237,12 +224,6 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.cdr.detectChanges();
     await this.loadDetail();
-  }
-
-  async setDays(days: number): Promise<void> {
-    if (days === this.limitDays) return;
-    this.limitDays = days;
-    await this.refresh();
   }
 
   private wsCallback = (event: import('./ws').ScenarioRunEvent) => {
@@ -271,7 +252,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
     try {
-      const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}?days=${this.limitDays}`);
+      const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7`);
       if (res.ok) {
         this.detail = await res.json();
         this.cdr.detectChanges();
