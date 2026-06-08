@@ -41,8 +41,9 @@ interface ScenarioInfo {
           class="btn btn-sm btn-outline-primary"
           (click)="fetchScenarios()"
           [disabled]="fetching"
+          title="Refresh"
         >
-          <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+          <i class="bi bi-arrow-clockwise"></i>
         </button>
       </div>
     </div>
@@ -133,8 +134,8 @@ interface ScenarioInfo {
                 >
                   <i class="bi" [class.bi-pause-fill]="!s.paused" [class.bi-play-fill]="s.paused"></i>
                 </button>
-                <a [routerLink]="['/scenario', s.name]" class="btn btn-sm btn-outline-primary">
-                  <i class="bi bi-graph-up me-1"></i>Chart
+                <a [routerLink]="['/scenario', s.name]" class="btn btn-sm btn-outline-primary" title="Details">
+                  <i class="bi bi-graph-up"></i>
                 </a>
               </td>
             </tr>
