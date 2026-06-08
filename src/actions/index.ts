@@ -7,14 +7,27 @@ export async function executeStep(
   step: Step,
   page: Page | null,
   base_url: string | undefined,
-  vars: Record<string, string>
+  vars: Record<string, string>,
+  stepTimeout?: number,
 ): Promise<StepMetrics> {
-  if (step.action.startsWith('http.')) {
-    return executeHttpStep(step as import('../types').HttpStep, base_url, vars);
-  }
-  if (step.action.startsWith('browser.')) {
-    if (!page) throw new Error('Browser not initialized for browser action');
-    return executeBrowserStep(step as import('../types').BrowserStep, page, base_url, vars);
-  }
-  throw new Error(`Unknown action: ${step.action}`);
+  const runner = async (): Promise<StepMetrics> => {
+    if (step.action.startsWith('http.')) {
+      return executeHttpStep(step as import('../types').HttpStep, base_url, vars);
+    }
+    if (step.action.startsWith('browser.')) {
+      if (!page) throw new Error('Browser not initialized for browser action');
+      return executeBrowserStep(step as import('../types').BrowserStep, page, base_url, vars);
+    }
+    throw new Error(`Unknown action: ${step.action}`);
+  };
+
+  const timeout = stepTimeout ?? step.timeout;
+  if (!timeout) return runner();
+
+  return Promise.race([
+    runner(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Step "${step.name}" timed out after ${timeout}ms`)), timeout)
+    ),
+  ]);
 }

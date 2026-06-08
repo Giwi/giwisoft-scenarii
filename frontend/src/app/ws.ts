@@ -6,17 +6,40 @@ export interface ScenarioRunEvent {
   timestamp: string;
 }
 
+export interface StepProgressEvent {
+  type: 'step_progress';
+  scenario_name: string;
+  step_name: string;
+  action: string;
+  status: 'running' | 'done' | 'error';
+  response_time_ms?: number;
+  error?: string;
+  timestamp: string;
+}
+
+type WsMessage = ScenarioRunEvent | StepProgressEvent;
+
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let listeners: Array<(event: ScenarioRunEvent) => void> = [];
+let runListeners: Array<(event: ScenarioRunEvent) => void> = [];
+let stepListeners: Array<(event: StepProgressEvent) => void> = [];
 
 export function onScenarioRun(listener: (event: ScenarioRunEvent) => void): void {
-  listeners.push(listener);
+  runListeners.push(listener);
   ensureConnected();
 }
 
 export function removeScenarioRunListener(listener: (event: ScenarioRunEvent) => void): void {
-  listeners = listeners.filter(l => l !== listener);
+  runListeners = runListeners.filter(l => l !== listener);
+}
+
+export function onStepProgress(listener: (event: StepProgressEvent) => void): void {
+  stepListeners.push(listener);
+  ensureConnected();
+}
+
+export function removeStepProgressListener(listener: (event: StepProgressEvent) => void): void {
+  stepListeners = stepListeners.filter(l => l !== listener);
 }
 
 function ensureConnected(): void {
@@ -29,16 +52,18 @@ function ensureConnected(): void {
 
     ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(event.data) as WsMessage;
         if (data.type === 'scenario_run') {
-          listeners.forEach(l => l(data as ScenarioRunEvent));
+          runListeners.forEach(l => l(data as ScenarioRunEvent));
+        } else if (data.type === 'step_progress') {
+          stepListeners.forEach(l => l(data as StepProgressEvent));
         }
       } catch { /* ignore malformed messages */ }
     };
 
     ws.onclose = () => {
       ws = null;
-      if (listeners.length > 0 && !reconnectTimer) {
+      if ((runListeners.length > 0 || stepListeners.length > 0) && !reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           ensureConnected();

@@ -281,6 +281,31 @@ export function purgeOldData(days: number = 7): number {
   return result.changes;
 }
 
+let notificationSuccessCount = 0;
+let notificationFailureCount = 0;
+
+export function recordNotificationDelivery(success: boolean): void {
+  if (success) notificationSuccessCount++;
+  else notificationFailureCount++;
+}
+
+export function getNotificationMetrics(): { success: number; failure: number } {
+  return { success: notificationSuccessCount, failure: notificationFailureCount };
+}
+
+export function getDistinctTags(): string[] {
+  if (!db) throw new Error('Database not initialized');
+  const rows = db.prepare(`SELECT DISTINCT tags FROM scenario_tags`).all() as { tags: string }[];
+  const tagSet = new Set<string>();
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.tags);
+      for (const t of parsed) tagSet.add(t);
+    } catch { /* skip malformed */ }
+  }
+  return [...tagSet].sort();
+}
+
 export function closeStorage(): void {
   if (db) {
     try {

@@ -7,7 +7,7 @@ import { executeStep } from './actions/index';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
 import { storeMetrics, purgeOldData, upsertScenarioTags } from './storage';
 import { notifyIfStateChanged } from './notifications/index';
-import { broadcastScenarioRun } from './ws';
+import { broadcastScenarioRun, broadcastStepProgress } from './ws';
 import { getScenarioSettings, getSettings } from './settings';
 import logger from './logger';
 import {
@@ -125,14 +125,41 @@ async function runScenarioInternal(
         page = await browserContext.newPage();
       }
 
+      const stepResults: Map<string, boolean> = new Map();
       for (const step of scenario.steps) {
-        const stepMetrics = await executeStep(step, page, scenario.base_url, vars);
+        broadcastStepProgress({
+          scenario_name: scenario.name,
+          step_name: step.name,
+          action: step.action,
+          status: 'running',
+        });
+
+        if (step.condition) {
+          const prevSuccess = stepResults.get(step.condition.if_step);
+          if (step.condition.if_success !== undefined && prevSuccess !== step.condition.if_success) {
+            logger.info({ scenario: scenario.name, step: step.name, condition: step.condition }, 'Step condition not met, skipping');
+            continue;
+          }
+        }
+
+        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout);
         metrics.steps.push(stepMetrics);
+        stepResults.set(step.name, stepMetrics.success);
+
+        broadcastStepProgress({
+          scenario_name: scenario.name,
+          step_name: step.name,
+          action: step.action,
+          status: stepMetrics.success ? 'done' : 'error',
+          response_time_ms: stepMetrics.response_time_ms,
+          error: stepMetrics.error,
+        });
 
         if (!stepMetrics.success) {
           metrics.success = false;
         }
       }
+      metrics.consecutive_failures = stepResults.size > 0 ? (metrics.success ? 0 : (metrics.consecutive_failures ?? 0) + 1) : 0;
     } catch (err: unknown) {
       metrics.success = false;
       const stepMetrics: StepMetrics = {

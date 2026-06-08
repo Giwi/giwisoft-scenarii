@@ -16,3 +16,5 @@ export const PORT_RANGE = 1000;
 export const DEFAULT_LIMIT = 50;
 export const MIN_DAYS = 1;
 export const MAX_DAYS = 365;
+export const SCREENSHOT_COMPARE_THRESHOLD = 0.01;
+export const DEFAULT_ALERT_CONSECUTIVE_FAILURES = 3;

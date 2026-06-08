@@ -1,8 +1,9 @@
+import fs from 'fs';
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
 import { resolveUrl, interpolateVars } from '../helpers';
 import { BROWSER_RETRIES, RETRY_DELAYS } from '../retry';
-import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT } from '../constants';
+import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../constants';
 
 async function checkBrowserExpectations(
   page: Page,
@@ -52,7 +53,7 @@ export async function executeBrowserStep(
   base_url: string | undefined,
   vars: Record<string, string>
 ): Promise<StepMetrics> {
-  const noRetry = step.action === 'browser.evaluate' || step.action === 'browser.screenshot';
+  const noRetry = step.action === 'browser.evaluate' || step.action === 'browser.screenshot' || step.action === 'browser.screenshot_compare';
   const maxRetries = noRetry ? 0 : BROWSER_RETRIES;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -145,6 +146,27 @@ export async function executeBrowserStep(
         case 'browser.screenshot': {
           const path = step.value || `screenshot-${Date.now()}.png`;
           await page.screenshot({ path, fullPage: true });
+          break;
+        }
+
+        case 'browser.screenshot_compare': {
+          const basePath = step.value || `baseline-${step.name}.png`;
+          const currentPath = `current-${step.name}-${Date.now()}.png`;
+          await page.screenshot({ path: currentPath, fullPage: true });
+          if (!fs.existsSync(basePath)) {
+            fs.renameSync(currentPath, basePath);
+            stepMetrics.error = `Baseline created at ${basePath}`;
+            throw new Error('Baseline created — no comparison performed');
+          }
+          const baseBuf = fs.readFileSync(basePath);
+          const curBuf = fs.readFileSync(currentPath);
+          fs.unlinkSync(currentPath);
+          if (baseBuf.length !== curBuf.length) {
+            const diff = Math.abs(baseBuf.length - curBuf.length) / Math.max(baseBuf.length, curBuf.length);
+            if (diff > SCREENSHOT_COMPARE_THRESHOLD) {
+              throw new Error(`Screenshot differs from baseline (size diff ${(diff * 100).toFixed(1)}%)`);
+            }
+          }
           break;
         }
 

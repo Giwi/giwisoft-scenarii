@@ -43,6 +43,26 @@ function checkExpectations(step: HttpStep, response: FetchResponse, body: string
     }
   }
 
+  if (expect.header_contains) {
+    const [h, v] = expect.header_contains.split(':').map(s => s.trim());
+    const val = response.headers[h.toLowerCase()];
+    if (!val || !val.includes(v)) {
+      return `Header "${h}" does not contain "${v}" (got "${val || 'undefined'}")`;
+    }
+  }
+
+  if (expect.header_matches) {
+    const [h, p] = expect.header_matches.split(':').map(s => s.trim());
+    const val = response.headers[h.toLowerCase()];
+    if (!val) {
+      return `Header "${h}" not found in response`;
+    }
+    const re = new RegExp(p);
+    if (!re.test(val)) {
+      return `Header "${h}" value "${val}" does not match regex "${p}"`;
+    }
+  }
+
   if (expect.json_path) {
     try {
       const parsed = JSON.parse(body);

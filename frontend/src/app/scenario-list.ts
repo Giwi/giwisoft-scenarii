@@ -150,18 +150,9 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
   loading = true;
   running = '';
   tagFilter = '';
+  allTags: string[] = [];
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   fetching = false;
-
-  get allTags(): string[] {
-    const tags = new Set<string>();
-    for (const s of this.scenarios) {
-      for (const t of (s.tags || [])) {
-        tags.add(t);
-      }
-    }
-    return [...tags].sort();
-  }
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -200,9 +191,15 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     this.fetching = true;
     try {
       const url = this.tagFilter ? `/api/scenarios?tag=${encodeURIComponent(this.tagFilter)}` : '/api/scenarios';
-      const res = await fetch(url);
-      if (res.ok) {
-        this.scenarios = await res.json();
+      const [scenariosRes, tagsRes] = await Promise.all([
+        fetch(url),
+        fetch('/api/tags'),
+      ]);
+      if (scenariosRes.ok) {
+        this.scenarios = await scenariosRes.json();
+      }
+      if (tagsRes.ok) {
+        this.allTags = await tagsRes.json();
       }
     } catch {
       // Server not ready yet — will retry on next poll

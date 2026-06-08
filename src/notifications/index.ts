@@ -1,6 +1,6 @@
 import { getSettings } from '../settings';
 import { ScenarioMetrics } from '../types';
-import { getPreviousRunSuccess } from '../storage';
+import { getPreviousRunSuccess, recordNotificationDelivery } from '../storage';
 import { sendTelegram } from './telegram';
 import { sendEmail } from './mailgun';
 import { sendSlack } from './slack';
@@ -53,7 +53,10 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
   const results = await Promise.allSettled(promises);
   for (const result of results) {
     if (result.status === 'rejected') {
+      recordNotificationDelivery(false);
       logger.error({ err: result.reason }, 'Notification delivery failed');
+    } else {
+      recordNotificationDelivery(true);
     }
   }
 }

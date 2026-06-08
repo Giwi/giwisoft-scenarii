@@ -37,3 +37,26 @@ export function broadcastScenarioRun(data: {
     }
   });
 }
+
+export function broadcastStepProgress(data: {
+  scenario_name: string;
+  step_name: string;
+  action: string;
+  status: 'running' | 'done' | 'error';
+  response_time_ms?: number;
+  error?: string;
+}): void {
+  if (!wss) return;
+
+  const message = JSON.stringify({
+    type: 'step_progress',
+    ...data,
+    timestamp: new Date().toISOString(),
+  });
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+}

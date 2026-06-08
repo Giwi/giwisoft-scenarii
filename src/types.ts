@@ -5,6 +5,8 @@ export interface HttpExpect {
   status_in?: number[];
   body_contains?: string;
   body_matches?: string;
+  header_contains?: string;
+  header_matches?: string;
   json_path?: string;
   json_value?: unknown;
   response_time_under?: number;
@@ -16,6 +18,8 @@ export interface HttpStep {
   url: string;
   headers?: Record<string, string>;
   body?: unknown;
+  timeout?: number;
+  condition?: StepCondition;
   expect?: HttpExpect;
   variables?: Record<string, string>;
 }
@@ -35,6 +39,7 @@ export interface BrowserStep {
     | 'browser.click'
     | 'browser.wait_for'
     | 'browser.screenshot'
+    | 'browser.screenshot_compare'
     | 'browser.select'
     | 'browser.evaluate'
     | 'browser.type'
@@ -46,6 +51,13 @@ export interface BrowserStep {
   timeout?: number;
   script?: string;
   expect?: BrowserExpect;
+  condition?: StepCondition;
+}
+
+export interface StepCondition {
+  if_step: string;
+  if_status?: number;
+  if_success?: boolean;
 }
 
 export type Step = HttpStep | BrowserStep;
@@ -60,6 +72,11 @@ export interface Scenario {
   timeout?: number;
   tags?: string[];
   steps: Step[];
+  alert?: AlertConfig;
+}
+
+export interface AlertConfig {
+  consecutive_failures?: number;
 }
 
 export interface StepMetrics {
@@ -79,6 +96,16 @@ export interface ScenarioMetrics {
   duration_ms: number;
   success: boolean;
   steps: StepMetrics[];
+  consecutive_failures?: number;
+}
+
+export interface StepProgress {
+  scenario_name: string;
+  step_name: string;
+  action: string;
+  status: 'running' | 'done' | 'error';
+  response_time_ms?: number;
+  error?: string;
 }
 
 export type Reporter = (metrics: ScenarioMetrics) => void;

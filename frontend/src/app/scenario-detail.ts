@@ -8,7 +8,7 @@ import {
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgFor, NgIf, DatePipe } from '@angular/common';
 import Chart from 'chart.js/auto';
-import { onScenarioRun, removeScenarioRunListener } from './ws';
+import { onScenarioRun, removeScenarioRunListener, onStepProgress, removeStepProgressListener } from './ws';
 
 interface ScenarioInfo {
   name: string;
@@ -70,6 +70,7 @@ interface ScenarioDetail {
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" [href]="exportUrl('json')" target="_blank"><i class="bi bi-filetype-json me-2"></i>JSON</a></li>
             <li><a class="dropdown-item" [href]="exportUrl('csv')" target="_blank"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+            <li><a class="dropdown-item" [href]="configUrl()" target="_blank"><i class="bi bi-filetype-yml me-2"></i>YAML</a></li>
           </ul>
         </div>
       </div>
@@ -93,6 +94,25 @@ interface ScenarioDetail {
     <div class="text-center py-5 text-secondary" *ngIf="!loading && !detail">
       <i class="bi bi-search fs-2 mb-2 d-block"></i>
       Scenario not found.
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4" *ngIf="logs.length">
+      <div class="card-body py-2" style="max-height:200px;overflow-y:auto">
+        <div *ngFor="let log of logs" class="small">
+          <span class="text-secondary me-2">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+          <i class="bi me-1"
+            [class.bi-play-circle-fill]="log.status==='running'"
+            [class.bi-check-circle-fill]="log.status==='done'"
+            [class.bi-x-circle-fill]="log.status==='error'"
+            [class.text-primary]="log.status==='running'"
+            [class.text-success]="log.status==='done'"
+            [class.text-danger]="log.status==='error'"
+          ></i>
+          <span>{{ log.step_name }}</span>
+          <span class="text-secondary ms-1">{{ log.response_time_ms ? log.response_time_ms + 'ms' : '' }}</span>
+          <span class="text-danger ms-1" *ngIf="log.error">{{ log.error }}</span>
+        </div>
+      </div>
     </div>
 
     <ng-container *ngIf="detail">
@@ -199,6 +219,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   detail: ScenarioDetail | null = null;
   loading = true;
   running = false;
+  logs: Array<{ step_name: string; status: string; response_time_ms?: number; error?: string; timestamp: Date }> = [];
   private charts: Chart[] = [];
   private scenarioName = '';
 
@@ -211,16 +232,19 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.scenarioName = this.route.snapshot.paramMap.get('name')!;
     await this.loadDetail();
     onScenarioRun(this.wsCallback);
+    onStepProgress(this.stepLogCallback);
   }
 
   ngOnDestroy(): void {
     this.charts.forEach((c) => c.destroy());
     removeScenarioRunListener(this.wsCallback);
+    removeStepProgressListener(this.stepLogCallback);
   }
 
   async refresh(): Promise<void> {
     this.charts.forEach((c) => c.destroy());
     this.charts = [];
+    this.logs = [];
     this.loading = true;
     this.cdr.detectChanges();
     await this.loadDetail();
@@ -232,8 +256,35 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     }
   };
 
+  private stepLogCallback = (event: import('./ws').StepProgressEvent) => {
+    if (event.scenario_name !== this.scenarioName) return;
+    if (event.status === 'running') {
+      this.logs.push({ step_name: event.step_name, status: 'running', timestamp: new Date() });
+    } else {
+      let found = false;
+      for (let i = this.logs.length - 1; i >= 0; i--) {
+        if (this.logs[i].step_name === event.step_name && this.logs[i].status === 'running') {
+          this.logs[i].status = event.status;
+          this.logs[i].response_time_ms = event.response_time_ms;
+          this.logs[i].error = event.error;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        this.logs.push({ step_name: event.step_name, status: event.status, response_time_ms: event.response_time_ms, error: event.error, timestamp: new Date() });
+      }
+    }
+    if (this.logs.length > 100) this.logs = this.logs.slice(-100);
+    this.cdr.detectChanges();
+  };
+
   exportUrl(format: string): string {
     return `/api/scenarios/${encodeURIComponent(this.scenarioName)}/export/${format}`;
+  }
+
+  configUrl(): string {
+    return `/api/scenarios/${encodeURIComponent(this.scenarioName)}/config`;
   }
 
   async runNow(): Promise<void> {

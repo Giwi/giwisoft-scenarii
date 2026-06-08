@@ -1,9 +1,11 @@
 import cron from 'node-cron';
-import { Scenario } from './types';
+import { Scenario, AlertConfig } from './types';
 import { runScenario, RunOptions } from './runner';
 import { sendDailyReport } from './report';
-import { upsertScenarioTags } from './storage';
+import { upsertScenarioTags, getPreviousRunSuccess } from './storage';
+import { getSettings } from './settings';
 import logger from './logger';
+import { DEFAULT_ALERT_CONSECUTIVE_FAILURES } from './constants';
 
 interface ScheduledTask {
   scenario: Scenario;
@@ -38,7 +40,21 @@ export function scheduleScenario(
       return;
     }
     logger.info({ scenario: scenario.name }, 'Running scenario');
-    await runScenario(scenario, options);
+    const metrics = await runScenario(scenario, options);
+
+    const alertConfig: AlertConfig = scenario.alert || {};
+    const threshold = alertConfig.consecutive_failures ?? DEFAULT_ALERT_CONSECUTIVE_FAILURES;
+    if (!metrics.success && threshold > 0) {
+      let consecutive = 1;
+      for (let i = 0; i < threshold; i++) {
+        const prev = getPreviousRunSuccess(scenario.name);
+        if (prev === false) consecutive++;
+        else break;
+      }
+      if (consecutive >= threshold) {
+        logger.warn({ scenario: scenario.name, consecutive_failures: consecutive, threshold }, 'Alert: consecutive failures threshold reached');
+      }
+    }
   });
 
   if (scenario.tags && scenario.tags.length > 0) {

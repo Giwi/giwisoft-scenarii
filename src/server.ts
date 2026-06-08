@@ -4,11 +4,11 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
-import { getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioStepNames } from './storage';
+import { getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioStepNames, getDistinctTags, getNotificationMetrics } from './storage';
 import { initWebSocket } from './ws';
 import { isStorageReady } from './storage';
 import { getSettings } from './settings';
-import { loadScenarioFile } from './parser';
+import { loadScenarioFile, parseScenario, serializeScenario } from './parser';
 import { runScenario } from './runner';
 import { pauseScenario, resumeScenario, isPaused, isScheduled } from './scheduler';
 import { ScenarioMetrics } from './types';
@@ -74,6 +74,105 @@ function handleResume(req: express.Request, res: express.Response): void {
     res.json({ status: 'resumed', scenario: name });
   } else {
     res.status(404).json({ error: 'Scenario not found or not scheduled' });
+  }
+}
+
+function handleConfigExport(req: express.Request, res: express.Response): void {
+  const name = req.params.name as string;
+  if (!_scenariosDir) {
+    res.status(400).json({ error: 'Server not configured for config export' });
+    return;
+  }
+  try {
+    const files = fs.readdirSync(_scenariosDir)
+      .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+    for (const file of files) {
+      const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+      if (scenario.name === name) {
+        const yaml = serializeScenario(scenario);
+        res.setHeader('Content-Type', 'text/yaml');
+        res.setHeader('Content-Disposition', `attachment; filename="${name}.yaml"`);
+        res.send(yaml);
+        return;
+      }
+    }
+    res.status(404).json({ error: 'Scenario not found' });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+function handleConfigSave(req: express.Request, res: express.Response): void {
+  if (!_scenariosDir) {
+    res.status(400).json({ error: 'Server not configured for config save' });
+    return;
+  }
+  try {
+    const name = req.params.name as string;
+    const body = req.body as { yaml?: string };
+    if (!body.yaml) {
+      res.status(400).json({ error: 'YAML content required' });
+      return;
+    }
+    const scenario = parseScenario(body.yaml);
+    if (scenario.name !== name) {
+      res.status(400).json({ error: 'Scenario name in YAML does not match URL' });
+      return;
+    }
+    const filePath = path.join(_scenariosDir, `${name}.yaml`);
+    fs.writeFileSync(filePath, body.yaml, 'utf-8');
+    res.json({ status: 'saved', scenario: name, path: filePath });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+function handleConfigDelete(req: express.Request, res: express.Response): void {
+  if (!_scenariosDir) {
+    res.status(400).json({ error: 'Server not configured for config delete' });
+    return;
+  }
+  try {
+    const name = req.params.name as string;
+    const files = fs.readdirSync(_scenariosDir)
+      .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+    for (const file of files) {
+      const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+      if (scenario.name === name) {
+        fs.unlinkSync(path.join(_scenariosDir, file));
+        res.json({ status: 'deleted', scenario: name });
+        return;
+      }
+    }
+    res.status(404).json({ error: 'Scenario not found' });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+function handleTags(_req: express.Request, res: express.Response): void {
+  try {
+    const tags = getDistinctTags();
+    res.json(tags);
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+function handleStatus(_req: express.Request, res: express.Response): void {
+  try {
+    const list = getScenarioList();
+    const info = {
+      scenarios: list.length,
+      healthy: list.filter(s => s.last_success === 1).length,
+      unhealthy: list.filter(s => s.last_success === 0).length,
+      unknown: list.filter(s => s.last_success === null).length,
+      storage_ready: isStorageReady(),
+      tags: getDistinctTags(),
+    };
+    res.json(info);
+  } catch (err: unknown) {
+    sendError(res, 500, err);
   }
 }
 
@@ -276,6 +375,13 @@ function handleMetrics(_req: express.Request, res: express.Response): void {
       lines.push(...stepLines);
     }
 
+    const notifMetrics = getNotificationMetrics();
+    lines.push('');
+    lines.push('# HELP scenarii_notification_delivery_total Total notifications sent');
+    lines.push('# TYPE scenarii_notification_delivery_total counter');
+    lines.push(`scenarii_notification_delivery_total{status="success"} ${notifMetrics.success}`);
+    lines.push(`scenarii_notification_delivery_total{status="failure"} ${notifMetrics.failure}`);
+
     lines.push('');
     lines.push('# EOF');
     res.type('text/plain; charset=utf-8');
@@ -301,8 +407,13 @@ export function createApp(): express.Application {
   app.post('/api/scenarios/:name/run', handleRunNow);
   app.post('/api/scenarios/:name/pause', handlePause);
   app.post('/api/scenarios/:name/resume', handleResume);
+  app.get('/api/scenarios/:name/config', handleConfigExport);
+  app.put('/api/scenarios/:name/config', handleConfigSave);
+  app.delete('/api/scenarios/:name/config', handleConfigDelete);
   app.get('/api/scenarios/:name/export/json', handleExportJson);
   app.get('/api/scenarios/:name/export/csv', handleExportCsv);
+  app.get('/api/tags', handleTags);
+  app.get('/api/status', handleStatus);
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
 
