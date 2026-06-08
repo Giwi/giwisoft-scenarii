@@ -20,7 +20,7 @@ async function doFetch(url: string, method: string, headers: Record<string, stri
   };
 }
 
-function checkExpectations(step: HttpStep, response: FetchResponse, body: string, elapsed_ms: number): string | null {
+export function checkExpectations(step: HttpStep, response: FetchResponse, body: string, elapsed_ms: number): string | null {
   const expect = step.expect;
   if (!expect) return null;
 

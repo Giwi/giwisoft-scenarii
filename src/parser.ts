@@ -60,7 +60,10 @@ export function parseScenario(content: string): Scenario {
   if (raw.schedule) scenario.schedule = raw.schedule as string;
   if (raw.base_url) scenario.base_url = raw.base_url as string;
   if (raw.headless !== undefined) scenario.headless = raw.headless as boolean;
+  if (raw.timeout !== undefined) scenario.timeout = raw.timeout as number;
+  if (raw.ignoreHTTPSErrors !== undefined) scenario.ignoreHTTPSErrors = raw.ignoreHTTPSErrors as boolean;
   if (raw.tags && Array.isArray(raw.tags)) scenario.tags = raw.tags as string[];
+  if (raw.alert && typeof raw.alert === 'object') scenario.alert = raw.alert as Scenario['alert'];
 
   return scenario;
 }

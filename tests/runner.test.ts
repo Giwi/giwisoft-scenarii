@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 // Test the sequential queue logic using the actual exported function
-import { sequentialBrowser } from './runner';
+import { sequentialBrowser } from '../src/runner';
 
 describe('sequential queue', () => {
   it('runs tasks in order', async () => {
@@ -28,7 +28,7 @@ describe('sequential queue', () => {
 // Test notification state detection logic by testing the actual storage function
 describe('getPreviousRunSuccess', () => {
   it('returns null when no history exists', async () => {
-    const { getPreviousRunSuccess } = await import('./storage');
+    const { getPreviousRunSuccess } = await import('../src/storage');
     // Can't easily test without a DB — verify the function exists and has correct signature
     assert.strictEqual(typeof getPreviousRunSuccess, 'function');
   });
