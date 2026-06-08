@@ -120,8 +120,8 @@ interface ScenarioInfo {
               </td>
               <td class="font-monospace small">{{ s.total_runs }}</td>
               <td class="text-end">
-                <button class="btn btn-sm btn-outline-success me-1" (click)="runNow(s.name)" [disabled]="running === s.name">
-                  <i class="bi bi-play-fill me-1"></i>{{ running === s.name ? '...' : 'Run' }}
+                <button class="btn btn-sm btn-outline-success me-1" (click)="runNow(s.name)" [disabled]="running === s.name" title="Run now">
+                  <i class="bi bi-play-fill me-1"></i>{{ running === s.name ? '...' : '' }}
                 </button>
                 <button
                   class="btn btn-sm me-1"
@@ -129,9 +129,9 @@ interface ScenarioInfo {
                   [class.btn-outline-success]="s.paused"
                   (click)="togglePause(s)"
                   *ngIf="s.scheduled"
+                  [title]="s.paused ? 'Resume' : 'Pause'"
                 >
                   <i class="bi" [class.bi-pause-fill]="!s.paused" [class.bi-play-fill]="s.paused"></i>
-                  {{ s.paused ? 'Resume' : 'Pause' }}
                 </button>
                 <a [routerLink]="['/scenario', s.name]" class="btn btn-sm btn-outline-primary">
                   <i class="bi bi-graph-up me-1"></i>Chart
