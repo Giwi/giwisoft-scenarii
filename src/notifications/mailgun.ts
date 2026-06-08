@@ -1,15 +1,7 @@
 import { EmailConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
 import logger from '../logger';
-
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const res = await fetch(url, options);
-    if (res.ok || attempt === retries) return res;
-    await new Promise(r => setTimeout(r, attempt * 1000));
-  }
-  throw new Error('Unreachable');
-}
+import { sendMailgunEmail } from '../email';
 
 export async function sendEmail(
   config: EmailConfig,
@@ -34,32 +26,9 @@ export async function sendEmail(
     }
   }
 
-  for (const recipient of config.to) {
-    const form = new URLSearchParams();
-    form.set('from', mailgun.from);
-    form.set('to', recipient);
-    form.set('subject', subject);
-    form.set('text', body);
-
-    const auth = btoa(`api:${mailgun.api_key}`);
-    const url = `https://api.mailgun.net/v3/${mailgun.domain}/messages`;
-
-    try {
-      const res = await fetchWithRetry(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: form,
-      });
-
-      if (!res.ok) {
-        const err = await res.text();
-        logger.error({ recipient, status: res.status, err }, 'Mailgun notification failed');
-      }
-    } catch (err: unknown) {
-      logger.error({ recipient, err: err instanceof Error ? err.message : err }, 'Mailgun notification error');
-    }
+  try {
+    await sendMailgunEmail(mailgun.api_key, mailgun.domain, mailgun.from, config.to, subject, body);
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : err }, 'Mailgun notification error');
   }
 }

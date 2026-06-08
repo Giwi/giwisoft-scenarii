@@ -58,6 +58,7 @@ export interface Scenario {
   headless?: boolean;
   ignoreHTTPSErrors?: boolean;
   timeout?: number;
+  tags?: string[];
   steps: Step[];
 }
 

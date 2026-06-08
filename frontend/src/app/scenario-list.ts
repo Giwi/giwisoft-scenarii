@@ -6,6 +6,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from './ws';
 
@@ -15,12 +16,14 @@ interface ScenarioInfo {
   last_success: number | null;
   last_duration_ms: number | null;
   total_runs: number;
+  paused?: boolean;
+  tags?: string[];
 }
 
 @Component({
   selector: 'app-scenario-list',
   standalone: true,
-  imports: [NgFor, NgIf, DatePipe, RouterModule],
+  imports: [NgFor, NgIf, FormsModule, DatePipe, RouterModule],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div class="d-flex align-items-center gap-3 mb-4">
@@ -28,7 +31,11 @@ interface ScenarioInfo {
       <span class="badge bg-secondary rounded-pill fs-6" *ngIf="scenarios.length">{{
         scenarios.length
       }}</span>
-      <div class="ms-auto">
+      <div class="ms-auto d-flex gap-2">
+        <select class="form-select form-select-sm" style="width:auto" [(ngModel)]="tagFilter" (ngModelChange)="onTagFilterChange()" *ngIf="allTags.length">
+          <option value="">All tags</option>
+          <option *ngFor="let t of allTags" [value]="t">{{ t }}</option>
+        </select>
         <button
           class="btn btn-sm btn-outline-primary"
           (click)="fetchScenarios()"
@@ -79,6 +86,7 @@ interface ScenarioInfo {
           <thead class="table-light">
             <tr>
               <th>Scenario</th>
+              <th>Tags</th>
               <th>Status</th>
               <th>Last run</th>
               <th>Duration</th>
@@ -89,6 +97,10 @@ interface ScenarioInfo {
           <tbody>
             <tr *ngFor="let s of scenarios">
               <td class="fw-semibold">{{ s.name }}</td>
+              <td>
+                <span class="badge bg-info me-1" *ngFor="let tag of (s.tags || [])" style="font-size:.7rem">{{ tag }}</span>
+                <span class="text-secondary small" *ngIf="!s.tags?.length">—</span>
+              </td>
               <td>
                 <span
                   class="badge"
@@ -107,8 +119,21 @@ interface ScenarioInfo {
               </td>
               <td class="font-monospace small">{{ s.total_runs }}</td>
               <td class="text-end">
+                <button class="btn btn-sm btn-outline-success me-1" (click)="runNow(s.name)" [disabled]="running === s.name">
+                  <i class="bi bi-play-fill me-1"></i>{{ running === s.name ? '...' : 'Run' }}
+                </button>
+                <button
+                  class="btn btn-sm me-1"
+                  [class.btn-outline-warning]="!s.paused"
+                  [class.btn-outline-success]="s.paused"
+                  (click)="togglePause(s)"
+                  *ngIf="s.paused !== undefined"
+                >
+                  <i class="bi" [class.bi-pause-fill]="!s.paused" [class.bi-play-fill]="s.paused"></i>
+                  {{ s.paused ? 'Resume' : 'Pause' }}
+                </button>
                 <a [routerLink]="['/scenario', s.name]" class="btn btn-sm btn-outline-primary">
-                  <i class="bi bi-graph-up me-1"></i>Details
+                  <i class="bi bi-graph-up me-1"></i>Chart
                 </a>
               </td>
             </tr>
@@ -121,8 +146,20 @@ interface ScenarioInfo {
 export class ScenarioListComponent implements OnInit, OnDestroy {
   scenarios: ScenarioInfo[] = [];
   loading = true;
+  running = '';
+  tagFilter = '';
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   fetching = false;
+
+  get allTags(): string[] {
+    const tags = new Set<string>();
+    for (const s of this.scenarios) {
+      for (const t of (s.tags || [])) {
+        tags.add(t);
+      }
+    }
+    return [...tags].sort();
+  }
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -152,11 +189,16 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     if (!this.fetching) this.fetchScenarios();
   };
 
+  onTagFilterChange(): void {
+    this.fetchScenarios();
+  }
+
   async fetchScenarios(): Promise<void> {
     if (this.fetching) return;
     this.fetching = true;
     try {
-      const res = await fetch('/api/scenarios');
+      const url = this.tagFilter ? `/api/scenarios?tag=${encodeURIComponent(this.tagFilter)}` : '/api/scenarios';
+      const res = await fetch(url);
       if (res.ok) {
         this.scenarios = await res.json();
       }
@@ -166,6 +208,32 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
       this.fetching = false;
       this.loading = false;
       this.cdr.detectChanges();
+    }
+  }
+
+  async runNow(name: string): Promise<void> {
+    this.running = name;
+    this.cdr.detectChanges();
+    try {
+      await fetch(`/api/scenarios/${encodeURIComponent(name)}/run`, { method: 'POST' });
+    } catch {
+      // Ignore — the run will proceed server-side
+    } finally {
+      this.running = '';
+      this.cdr.detectChanges();
+    }
+  }
+
+  async togglePause(s: ScenarioInfo): Promise<void> {
+    const action = s.paused ? 'resume' : 'pause';
+    try {
+      const res = await fetch(`/api/scenarios/${encodeURIComponent(s.name)}/${action}`, { method: 'POST' });
+      if (res.ok) {
+        s.paused = !s.paused;
+        this.cdr.detectChanges();
+      }
+    } catch {
+      // Ignore
     }
   }
 }

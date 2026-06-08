@@ -1,15 +1,7 @@
 import { TelegramConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
 import logger from '../logger';
-
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const res = await fetch(url, options);
-    if (res.ok || attempt === retries) return res;
-    await new Promise(r => setTimeout(r, attempt * 1000));
-  }
-  throw new Error('Unreachable');
-}
+import { fetchWithRetry } from '../retry';
 
 export async function sendTelegram(
   config: TelegramConfig,

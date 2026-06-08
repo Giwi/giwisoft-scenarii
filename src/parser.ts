@@ -60,6 +60,7 @@ export function parseScenario(content: string): Scenario {
   if (raw.schedule) scenario.schedule = raw.schedule as string;
   if (raw.base_url) scenario.base_url = raw.base_url as string;
   if (raw.headless !== undefined) scenario.headless = raw.headless as boolean;
+  if (raw.tags && Array.isArray(raw.tags)) scenario.tags = raw.tags as string[];
 
   return scenario;
 }

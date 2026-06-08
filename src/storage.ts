@@ -1,7 +1,16 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
-import { ScenarioMetrics, StepMetrics } from './types';
+import { ScenarioMetrics } from './types';
+
+interface ScenarioInfo {
+  name: string;
+  last_run: string | null;
+  last_success: number | null;
+  last_duration_ms: number | null;
+  total_runs: number;
+  tags?: string[];
+}
 import logger from './logger';
 
 let db: Database.Database | undefined;
@@ -37,6 +46,11 @@ export function initStorage(dbPath?: string): void {
       error TEXT,
       timestamp TEXT NOT NULL,
       FOREIGN KEY (run_id) REFERENCES scenario_runs(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS scenario_tags (
+      scenario_name TEXT PRIMARY KEY,
+      tags TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_runs_name ON scenario_runs(scenario_name);
@@ -87,15 +101,17 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
   transaction();
 }
 
-export function getScenarioList(): Array<{
-  name: string;
-  last_run: string | null;
-  last_success: number | null;
-  last_duration_ms: number | null;
-  total_runs: number;
-}> {
+export function upsertScenarioTags(name: string, tags: string[]): void {
   if (!db) throw new Error('Database not initialized');
-  return db.prepare(`
+  db.prepare(`
+    INSERT INTO scenario_tags (scenario_name, tags) VALUES (?, ?)
+    ON CONFLICT(scenario_name) DO UPDATE SET tags = excluded.tags
+  `).run(name, JSON.stringify(tags));
+}
+
+export function getScenarioList(tagFilter?: string): ScenarioInfo[] {
+  if (!db) throw new Error('Database not initialized');
+  const rows = db.prepare(`
     SELECT
       r.scenario_name AS name,
       MAX(r.created_at) AS last_run,
@@ -109,17 +125,23 @@ export function getScenarioList(): Array<{
         WHERE scenario_name = r.scenario_name
         ORDER BY created_at DESC LIMIT 1
       ) AS last_duration_ms,
-      COUNT(*) AS total_runs
+      COUNT(*) AS total_runs,
+      t.tags
     FROM scenario_runs r
+    LEFT JOIN scenario_tags t ON t.scenario_name = r.scenario_name
+    ${tagFilter ? 'WHERE t.tags LIKE ?' : ''}
     GROUP BY r.scenario_name
     ORDER BY r.scenario_name
-  `).all() as Array<{
-    name: string;
-    last_run: string | null;
-    last_success: number | null;
-    last_duration_ms: number | null;
-    total_runs: number;
-  }>;
+  `).all(...(tagFilter ? [`%"${tagFilter}"%`] : [])) as Array<ScenarioInfo & { tags: string | null }>;
+
+  return rows.map(r => ({
+    name: r.name,
+    last_run: r.last_run,
+    last_success: r.last_success,
+    last_duration_ms: r.last_duration_ms,
+    total_runs: r.total_runs,
+    tags: r.tags ? JSON.parse(r.tags) : undefined,
+  }));
 }
 
 export function getScenarioHistory(
@@ -220,7 +242,7 @@ export function getScenarioDetail(
   limitDays: number = 7,
   limit: number = 50,
   offset: number = 0
-): { info: any; history: ScenarioMetrics[]; stepNames: string[]; total: number } {
+): { info: ScenarioInfo; history: ScenarioMetrics[]; stepNames: string[]; total: number } {
   if (!db) throw new Error('Database not initialized');
   const list = getScenarioList();
   const scenario = list.find((s) => s.name === name);
@@ -264,8 +286,8 @@ export function closeStorage(): void {
     try {
       db.pragma('wal_checkpoint(TRUNCATE)');
       db.close();
-    } catch (err) {
-      logger.error({ err }, 'Error closing database');
+    } catch (err: unknown) {
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Error closing database');
     }
     db = undefined;
   }

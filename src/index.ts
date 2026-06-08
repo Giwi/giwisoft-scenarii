@@ -12,6 +12,7 @@ import { initStorage, closeStorage, isStorageReady } from './storage';
 import { loadSettings, watchSettings } from './settings';
 import { createServer } from './server';
 import logger from './logger';
+import { DAILY_REPORT_CRON } from './constants';
 
 process.on('uncaughtException', (err) => {
   logger.fatal({ err }, 'Uncaught exception');
@@ -117,7 +118,7 @@ program
     // Start the API server immediately so it's available
     const port = parseInt(options.port);
     logger.info({ port }, 'Initializing server');
-    const server = createServer(port);
+    const server = createServer(port, scenariosDir, runOptions);
 
     // Schedule cron jobs first
     for (const file of scenarioFiles) {
@@ -147,7 +148,7 @@ program
         }
       }
       sendDailyReport();
-      scheduleReport('0 8 * * *');
+      scheduleReport(DAILY_REPORT_CRON);
     })();
 
     process.on('SIGINT', () => shutdown(server));
@@ -204,8 +205,18 @@ program
   .description('Generate a settings.yaml template')
   .option('-o, --output <path>', 'Output file path', 'settings.yaml')
   .action((options) => {
-    const template = `# scenarii notification settings
+    const template = `# scenarii notification and API settings
 # Uncomment and configure the channels you want to use.
+
+# API authentication (optional)
+# api:
+#   auth:
+#     enabled: true
+#     api_key: your-secret-api-key
+
+# Storage retention (optional, defaults to 7 days)
+# storage:
+#   retentionDays: 30
 
 notifications:
   telegram:
@@ -220,6 +231,18 @@ notifications:
       # api_key: your_mailgun_api_key
       # domain: your_mailgun_domain
       # from: scenarii@your-domain.com
+  # Slack webhook notifications
+  # slack:
+  #   enabled: true
+  #   webhook_url: https://hooks.slack.com/services/...
+  # Discord webhook notifications
+  # discord:
+  #   enabled: true
+  #   webhook_url: https://discord.com/api/webhooks/...
+  # Generic webhook notifications
+  # webhook:
+  #   enabled: true
+  #   url: https://your-webhook-endpoint.example.com/hook
 `;
     fs.writeFileSync(options.output, template, 'utf-8');
     logger.info(`Settings template written to ${options.output}`);

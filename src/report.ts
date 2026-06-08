@@ -1,6 +1,6 @@
 import { getScenarioList, getScenarioHistory } from './storage';
 import { getSettings } from './settings';
-import { sendEmail } from './notifications/mailgun';
+import { sendMailgunEmail } from './email';
 
 export async function sendDailyReport(): Promise<void> {
   const settings = getSettings();
@@ -22,17 +22,5 @@ export async function sendDailyReport(): Promise<void> {
   }
 
   const { mailgun, to } = settings.notifications.email;
-  for (const recipient of to) {
-    const form = new URLSearchParams();
-    form.set('from', mailgun.from);
-    form.set('to', recipient);
-    form.set('subject', 'Daily Scenario Report');
-    form.set('text', lines.join('\n'));
-    const auth = btoa(`api:${mailgun.api_key}`);
-    await fetch(`https://api.mailgun.net/v3/${mailgun.domain}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form,
-    });
-  }
+  await sendMailgunEmail(mailgun.api_key, mailgun.domain, mailgun.from, to, 'Daily Scenario Report', lines.join('\n'));
 }

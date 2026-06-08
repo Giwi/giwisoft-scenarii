@@ -20,9 +20,38 @@ export interface EmailConfig {
   to: string[];
 }
 
+export interface SlackConfig {
+  enabled: boolean;
+  webhook_url: string;
+}
+
+export interface DiscordConfig {
+  enabled: boolean;
+  webhook_url: string;
+}
+
+export interface WebhookConfig {
+  enabled: boolean;
+  url: string;
+}
+
 export interface NotificationsConfig {
   telegram: TelegramConfig;
   email: EmailConfig;
+  slack?: SlackConfig;
+  discord?: DiscordConfig;
+  webhook?: WebhookConfig;
+}
+
+export interface ApiConfig {
+  auth?: {
+    enabled?: boolean;
+    api_key: string;
+  };
+}
+
+export interface StorageConfig {
+  retentionDays?: number;
 }
 
 export interface ScenarioOverrides {
@@ -32,6 +61,8 @@ export interface ScenarioOverrides {
 }
 
 export interface Settings {
+  api?: ApiConfig;
+  storage?: StorageConfig;
   notifications?: NotificationsConfig;
   scenarios?: Record<string, ScenarioOverrides>;
 }

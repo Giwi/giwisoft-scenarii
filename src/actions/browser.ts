@@ -1,6 +1,8 @@
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
 import { resolveUrl, interpolateVars } from '../helpers';
+import { BROWSER_RETRIES, RETRY_DELAYS } from '../retry';
+import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT } from '../constants';
 
 async function checkBrowserExpectations(
   page: Page,
@@ -51,8 +53,7 @@ export async function executeBrowserStep(
   vars: Record<string, string>
 ): Promise<StepMetrics> {
   const noRetry = step.action === 'browser.evaluate' || step.action === 'browser.screenshot';
-  const maxRetries = noRetry ? 0 : 2;
-  const retryDelays = [1000, 2000];
+  const maxRetries = noRetry ? 0 : BROWSER_RETRIES;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const start = Date.now();
@@ -70,9 +71,9 @@ export async function executeBrowserStep(
           if (!step.url) throw new Error('browser.navigate requires a "url" field');
           const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
           try {
-            await page.goto(resolvedUrl, { waitUntil: 'load', timeout: 30000 });
+            await page.goto(resolvedUrl, { waitUntil: 'load', timeout: DEFAULT_PAGE_TIMEOUT });
           } catch {
-            await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: DEFAULT_PAGE_TIMEOUT });
           }
           break;
         }
@@ -137,7 +138,7 @@ export async function executeBrowserStep(
 
         case 'browser.wait_for': {
           if (!step.selector) throw new Error('browser.wait_for requires a "selector" field');
-          await page.waitForSelector(step.selector, { timeout: step.timeout || 10000 });
+          await page.waitForSelector(step.selector, { timeout: step.timeout || DEFAULT_SELECTOR_TIMEOUT });
           break;
         }
 
@@ -173,7 +174,7 @@ export async function executeBrowserStep(
       return stepMetrics;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]));
   }
 
   throw new Error('Retry exhausted');

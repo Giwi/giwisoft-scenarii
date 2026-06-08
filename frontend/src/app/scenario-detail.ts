@@ -46,6 +46,8 @@ interface ScenarioDetail {
   stepNames: string[];
 }
 
+const DAY_OPTIONS = [1, 7, 14, 30, 90] as const;
+
 @Component({
   selector: 'app-scenario-detail',
   standalone: true,
@@ -58,6 +60,9 @@ interface ScenarioDetail {
       </a>
       <button class="btn btn-sm btn-outline-primary" (click)="refresh()" [disabled]="loading">
         <i class="bi bi-arrow-clockwise"></i>
+      </button>
+      <button class="btn btn-sm btn-outline-success" (click)="runNow()" [disabled]="running">
+        <i class="bi bi-play-fill me-1"></i>{{ running ? 'Running...' : 'Run Now' }}
       </button>
       <div class="ms-auto" *ngIf="detail">
         <div class="dropdown">
@@ -80,6 +85,15 @@ interface ScenarioDetail {
         <span class="text-danger fw-semibold">{{ detail.info.failed_runs }}</span> failed ·
         <span class="fw-semibold">{{ detail.info.pass_rate }}%</span>
       </span>
+    </div>
+
+    <div class="btn-group btn-group-sm mb-4" role="group">
+      <button
+        *ngFor="let d of dayOptions"
+        class="btn btn-outline-secondary"
+        [class.active]="limitDays === d"
+        (click)="setDays(d)"
+      >{{ d }}d</button>
     </div>
 
     <div class="text-center py-5 text-secondary" *ngIf="loading">
@@ -195,7 +209,9 @@ interface ScenarioDetail {
 export class ScenarioDetailComponent implements OnInit, OnDestroy {
   detail: ScenarioDetail | null = null;
   loading = true;
+  running = false;
   limitDays = 7;
+  readonly dayOptions = DAY_OPTIONS;
   private charts: Chart[] = [];
   private scenarioName = '';
 
@@ -223,6 +239,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     await this.loadDetail();
   }
 
+  async setDays(days: number): Promise<void> {
+    if (days === this.limitDays) return;
+    this.limitDays = days;
+    await this.refresh();
+  }
+
   private wsCallback = (event: import('./ws').ScenarioRunEvent) => {
     if (event.scenario_name === this.scenarioName && !this.loading) {
       this.refresh();
@@ -233,10 +255,23 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     return `/api/scenarios/${encodeURIComponent(this.scenarioName)}/export/${format}`;
   }
 
+  async runNow(): Promise<void> {
+    this.running = true;
+    this.cdr.detectChanges();
+    try {
+      await fetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/run`, { method: 'POST' });
+    } catch {
+      // Ignore
+    } finally {
+      this.running = false;
+      this.cdr.detectChanges();
+    }
+  }
+
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
     try {
-      const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}`);
+      const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}?days=${this.limitDays}`);
       if (res.ok) {
         this.detail = await res.json();
         this.cdr.detectChanges();

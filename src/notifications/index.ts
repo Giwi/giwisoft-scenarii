@@ -3,6 +3,9 @@ import { ScenarioMetrics } from '../types';
 import { getPreviousRunSuccess } from '../storage';
 import { sendTelegram } from './telegram';
 import { sendEmail } from './mailgun';
+import { sendSlack } from './slack';
+import { sendDiscord } from './discord';
+import { sendWebhook } from './webhook';
 import logger from '../logger';
 
 export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<void> {
@@ -12,8 +15,8 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
   let prevSuccess: boolean | null;
   try {
     prevSuccess = getPreviousRunSuccess(metrics.scenario_name);
-  } catch (err) {
-    logger.error({ err }, 'Failed to get previous run success');
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to get previous run success');
     return;
   }
 
@@ -31,6 +34,18 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
 
   if (settings.notifications.email?.enabled) {
     promises.push(sendEmail(settings.notifications.email, metrics, event));
+  }
+
+  if (settings.notifications.slack?.enabled) {
+    promises.push(sendSlack(settings.notifications.slack, metrics, event));
+  }
+
+  if (settings.notifications.discord?.enabled) {
+    promises.push(sendDiscord(settings.notifications.discord, metrics, event));
+  }
+
+  if (settings.notifications.webhook?.enabled) {
+    promises.push(sendWebhook(settings.notifications.webhook, metrics, event));
   }
 
   if (promises.length === 0) return;

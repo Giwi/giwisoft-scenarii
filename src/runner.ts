@@ -5,11 +5,16 @@ import { ChildProcess } from 'child_process';
 import { Scenario, ScenarioMetrics, StepMetrics } from './types';
 import { executeStep } from './actions/index';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
-import { storeMetrics, purgeOldData } from './storage';
+import { storeMetrics, purgeOldData, upsertScenarioTags } from './storage';
 import { notifyIfStateChanged } from './notifications/index';
 import { broadcastScenarioRun } from './ws';
-import { getScenarioSettings } from './settings';
+import { getScenarioSettings, getSettings } from './settings';
 import logger from './logger';
+import {
+  DEFAULT_LIGHTPANDA_PORT, DEFAULT_BROWSER_VIEWPORT, DEFAULT_SCENARIO_TIMEOUT,
+  DEFAULT_PURGE_DAYS, PORT_WAIT_TIMEOUT, SOCKET_TIMEOUT, SOCKET_RETRY_INTERVAL,
+  PROCESS_EXIT_TIMEOUT, LIGHTPANDA_START_RETRIES, MIN_PORT, PORT_RANGE,
+} from './constants';
 
 // Sequential execution queue for browser scenarios — Lightpanda CDP only supports one connection at a time
 let browserQueue: Promise<void> = Promise.resolve();
@@ -38,7 +43,7 @@ export interface RunOptions {
 }
 
 function getRandomPort(): number {
-  return 9000 + Math.floor(Math.random() * 1000);
+  return MIN_PORT + Math.floor(Math.random() * PORT_RANGE);
 }
 
 function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
@@ -50,10 +55,10 @@ function waitForPort(host: string, port: number, timeoutMs: number): Promise<voi
         return;
       }
       const sock = new net.Socket();
-      sock.setTimeout(1000);
+      sock.setTimeout(SOCKET_TIMEOUT);
       sock.once('connect', () => { sock.destroy(); resolve(); });
-      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, 200); });
-      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, 200); });
+      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
+      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
       sock.connect(port, host);
     }
     tryConnect();
@@ -62,11 +67,11 @@ function waitForPort(host: string, port: number, timeoutMs: number): Promise<voi
 
 async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { wsEndpoint?: string }; port: number }> {
   let lastErr: Error | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < LIGHTPANDA_START_RETRIES; attempt++) {
     const p = attempt === 0 ? port : getRandomPort();
     try {
       const proc = await lightpanda.serve({ host: '127.0.0.1', port: p });
-      await waitForPort('127.0.0.1', p, 5000);
+      await waitForPort('127.0.0.1', p, PORT_WAIT_TIMEOUT);
       return { proc, port: p };
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -95,18 +100,26 @@ async function runScenarioInternal(
 
   const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
   const scenarioSettings = getScenarioSettings(scenario.name);
-  const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? 120_000;
+  const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? DEFAULT_SCENARIO_TIMEOUT;
+
+  if (scenario.tags && scenario.tags.length > 0) {
+    try {
+      upsertScenarioTags(scenario.name, scenario.tags);
+    } catch (err: unknown) {
+      logger.warn({ scenario: scenario.name, err: err instanceof Error ? err.message : err }, 'Failed to store scenario tags');
+    }
+  }
   const ignoreHTTPSErrors = options.ignoreHTTPSErrors ?? scenarioSettings.ignoreHTTPSErrors ?? scenario.ignoreHTTPSErrors ?? false;
 
   const run = async () => {
     try {
       if (hasBrowserActions) {
-        const { proc, port } = await startLightpanda(options.lightpandaPort ?? 9222);
+        const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
         lightpandaProc = proc;
 
         browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
         browserContext = await browser.newContext({
-          viewport: { width: 1280, height: 720 },
+          viewport: DEFAULT_BROWSER_VIEWPORT,
           ignoreHTTPSErrors,
         });
         page = await browserContext.newPage();
@@ -135,20 +148,20 @@ async function runScenarioInternal(
       if (browser) {
         try {
           await browser.close();
-        } catch (err) {
-          logger.warn({ err }, 'Failed to close browser');
+        } catch (err: unknown) {
+          logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to close browser');
         }
       } else if (browserContext) {
-        try { await browserContext.close(); } catch (err) { logger.warn({ err }, 'Failed to close browser context'); }
+        try { await browserContext.close(); } catch (err: unknown) { logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to close browser context'); }
       }
       if (lightpandaProc) {
         try {
           lightpandaProc.stdout?.destroy();
           lightpandaProc.stderr?.destroy();
           lightpandaProc.kill();
-          await waitForProcessExit(lightpandaProc, 3000);
-        } catch (err) {
-          logger.warn({ err }, 'Failed to kill Lightpanda');
+          await waitForProcessExit(lightpandaProc, PROCESS_EXIT_TIMEOUT);
+        } catch (err: unknown) {
+          logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to kill Lightpanda');
         }
       }
     }
@@ -182,9 +195,9 @@ async function runScenarioInternal(
   if (options.persist) {
     try {
       storeMetrics(metrics);
-      purgeOldData(7);
-    } catch (err) {
-      logger.error({ err }, 'Failed to store metrics');
+      purgeOldData(getSettings().storage?.retentionDays ?? DEFAULT_PURGE_DAYS);
+    } catch (err: unknown) {
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to store metrics');
     }
   }
 
