@@ -59,6 +59,8 @@ schedule: "*/5 * * * *"   # optional cron expression
 timeout: 120000           # per-scenario timeout override (default 120s)
 ignoreHTTPSErrors: false  # per-scenario SSL override
 tags: [critical, auth]    # optional tags for dashboard filtering
+alert:                    # optional alert rules
+  consecutive_failures: 3 # warn after N consecutive failures
 
 steps:
   - name: Homepage
@@ -89,7 +91,7 @@ HTTP-only scenarios use the native `fetch` API — no Playwright or browser need
 |--------|--------|
 | `http.get` / `http.post` / `http.put` / `http.patch` / `http.delete` | `url`, `headers`, `body`, `expect` |
 
-**Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `json_path`, `json_value`, `response_time_under`
+**Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `header_contains` (format `"HeaderName: value"`), `header_matches` (format `"HeaderName: regex"`), `json_path`, `json_value`, `response_time_under`
 
 ### Browser actions
 
@@ -104,6 +106,7 @@ HTTP-only scenarios use the native `fetch` API — no Playwright or browser need
 | `browser.evaluate` | `script` (JavaScript to run in the page) |
 | `browser.check` / `browser.uncheck` | `selector` |
 | `browser.screenshot` | `value` (output path) |
+| `browser.screenshot_compare` | `value` (baseline path — creates baseline on first run, compares on subsequent) |
 
 Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.
 
@@ -116,11 +119,12 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 The dashboard provides:
 
 - **Scenario list** — overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, auto-refreshes via WebSocket
-- **Scenario detail** — response time trend chart, success rate over time, step breakdown, paginated run history, **JSON/CSV export**, **date range selector** (1d/7d/14d/30d/90d)
+- **Scenario detail** — response time trend chart, success rate over time, step breakdown, paginated run history, **JSON/CSV/YAML export**, **live step log panel**
 - **Run Now** — trigger an immediate ad-hoc run from the list or detail page
 - **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** — toggle in the navbar, preference saved to localStorage
 - **Manual refresh** — refresh button on both list and detail pages
+- **Status page** — `GET /api/status` returns healthy/unhealthy counts and tags
 
 <p align="center">
   <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
@@ -156,8 +160,13 @@ node dist/index.js server
 | `POST /api/scenarios/:name/run` | Trigger an immediate ad-hoc run |
 | `POST /api/scenarios/:name/pause` | Pause a scheduled scenario |
 | `POST /api/scenarios/:name/resume` | Resume a paused scenario |
+| `GET /api/scenarios/:name/config` | Download scenario YAML configuration |
+| `PUT /api/scenarios/:name/config` | Save/update scenario YAML (`{"yaml":"..."}`) |
+| `DELETE /api/scenarios/:name/config` | Delete a scenario file |
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
+| `GET /api/tags` | List all distinct tags |
+| `GET /api/status` | Public status summary (healthy/unhealthy counts) |
 | `GET /api/health` | Health check (200 = ready, 503 = initializing) |
 | `GET /api/metrics` | Prometheus/OpenMetrics format (see below) |
 
@@ -171,6 +180,7 @@ Prometheus can scrape `http://localhost:3000/api/metrics` for:
 - `scenarii_scenario_last_run_seconds{scenario}` — last run timestamp
 - `scenarii_step_duration_ms{scenario,step,action}` — per-step duration
 - `scenarii_step_success{scenario,step,action}` — per-step success
+- `scenarii_notification_delivery_total{status}` — notification delivery success/failure count
 
 ## Real-time updates
 
@@ -186,7 +196,20 @@ The server exposes a WebSocket endpoint at `/ws`. After each scenario run, a JSO
 }
 ```
 
-The dashboard uses this for instant UI updates.
+During a run, **step progress** messages are streamed in real-time:
+
+```json
+{
+  "type": "step_progress",
+  "scenario_name": "Example",
+  "step_name": "Homepage",
+  "action": "http.get",
+  "status": "running",
+  "timestamp": "2026-06-06T12:00:00.000Z"
+}
+```
+
+The dashboard shows a live log panel while steps are executing.
 
 ## Notifications
 
