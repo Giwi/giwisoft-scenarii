@@ -50,7 +50,7 @@ node dist/index.js config --init
 
 ## Writing scenarios
 
-Scenarios are YAML files. HTTP-only steps run in parallel using native fetch; browser steps are serialised (Lightpanda CDP supports one connection at a time).
+Scenarios are YAML files. HTTP-only steps run in parallel using native fetch; browser steps are serialised (Lightpanda CDP supports one connection at a time). Steps can optionally declare a `timeout` (ms) and a `condition` for conditional execution based on previous step results.
 
 ```yaml
 name: Example
@@ -81,6 +81,22 @@ steps:
     action: browser.wait_for
     selector: ".result"
     timeout: 5000
+
+  - name: Login API
+    action: http.post
+    url: /api/login
+    timeout: 10000            # per-step timeout override
+    expect:
+      status: 200
+
+  - name: Dashboard check
+    action: http.get
+    url: /api/dashboard
+    condition:                # skip if Login API failed
+      if_step: "Login API"
+      if_success: true
+    expect:
+      status: 200
 ```
 
 ### HTTP actions
@@ -124,7 +140,7 @@ The dashboard provides:
 - **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** — toggle in the navbar, preference saved to localStorage
 - **Manual refresh** — refresh button on both list and detail pages
-- **Status page** — `GET /api/status` returns healthy/unhealthy counts and tags
+- **Public status** — `GET /api/status` returns healthy/unhealthy counts, tags, and storage readiness
 
 <p align="center">
   <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
