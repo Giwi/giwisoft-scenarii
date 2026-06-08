@@ -122,7 +122,7 @@ interface ScenarioInfo {
               <td class="font-monospace small">{{ s.total_runs }}</td>
               <td class="text-end">
                 <button class="btn btn-sm btn-outline-success me-1" (click)="runNow(s.name)" [disabled]="running === s.name" title="Run now">
-                  <i class="bi bi-play-fill me-1"></i>{{ running === s.name ? '...' : '' }}
+                  <i class="bi bi-send-fill"></i>{{ running === s.name ? '...' : '' }}
                 </button>
                 <button
                   class="btn btn-sm me-1"

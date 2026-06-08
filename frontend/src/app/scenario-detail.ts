@@ -62,7 +62,7 @@ const DAY_OPTIONS = [1, 7, 14, 30, 90] as const;
         <i class="bi bi-arrow-clockwise"></i>
       </button>
       <button class="btn btn-sm btn-outline-success" (click)="runNow()" [disabled]="running" title="Run now">
-        <i class="bi bi-play-fill me-1"></i>{{ running ? '...' : '' }}
+        <i class="bi bi-send-fill"></i>{{ running ? '...' : '' }}
       </button>
       <div class="ms-auto" *ngIf="detail">
         <div class="dropdown">
