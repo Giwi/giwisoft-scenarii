@@ -17,6 +17,7 @@ interface ScenarioInfo {
   last_duration_ms: number | null;
   total_runs: number;
   paused?: boolean;
+  scheduled?: boolean;
   tags?: string[];
 }
 
@@ -127,7 +128,7 @@ interface ScenarioInfo {
                   [class.btn-outline-warning]="!s.paused"
                   [class.btn-outline-success]="s.paused"
                   (click)="togglePause(s)"
-                  *ngIf="s.paused !== undefined"
+                  *ngIf="s.scheduled"
                 >
                   <i class="bi" [class.bi-pause-fill]="!s.paused" [class.bi-play-fill]="s.paused"></i>
                   {{ s.paused ? 'Resume' : 'Pause' }}

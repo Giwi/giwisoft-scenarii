@@ -10,7 +10,7 @@ import { isStorageReady } from './storage';
 import { getSettings } from './settings';
 import { loadScenarioFile } from './parser';
 import { runScenario } from './runner';
-import { pauseScenario, resumeScenario, isPaused } from './scheduler';
+import { pauseScenario, resumeScenario, isPaused, isScheduled } from './scheduler';
 import { ScenarioMetrics } from './types';
 import logger from './logger';
 import { DEFAULT_LIMIT, MIN_DAYS, MAX_DAYS, DEFAULT_HISTORY_DAYS } from './constants';
@@ -116,6 +116,7 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
     const list = getScenarioList(tag || undefined).map(s => ({
       ...s,
       paused: isPaused(s.name),
+      scheduled: isScheduled(s.name),
     }));
     res.json(list);
   } catch (err: unknown) {

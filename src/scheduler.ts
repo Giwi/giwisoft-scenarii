@@ -73,6 +73,10 @@ export function isPaused(name: string): boolean {
   return scheduledTasks.some(st => st.scenario.name === name && st.paused);
 }
 
+export function isScheduled(name: string): boolean {
+  return scheduledTasks.some(st => st.scenario.name === name);
+}
+
 export function stopAll(): void {
   for (const st of scheduledTasks) {
     st.task.stop();
