@@ -78,8 +78,9 @@ const SESSION_COOKIE = 'scenarii-session';
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const config = getSettings().auth;
   if (!config?.enabled) return next();
+  if (!req.path.startsWith('/api/')) return next();
   const authPath = '/api/auth/';
-  if (req.path.startsWith(authPath) || req.path === '/api/health') return next();
+  if (req.path.startsWith(authPath) || req.path === '/api/health' || req.path === '/api/status') return next();
   const cookies = parseCookies(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE];
   if (!sessionId || !sessions.has(sessionId)) {
@@ -183,13 +184,17 @@ async function handleOidcCallback(req: express.Request, res: express.Response): 
 
 function handleAuthMe(req: express.Request, res: express.Response): void {
   const config = getSettings().auth;
-  if (!config?.enabled) {
-    res.json({ authenticated: false });
+  const configured = !!(config?.enabled && config?.oidc);
+  if (!configured) {
+    res.json({ authenticated: false, configured: false });
     return;
   }
   const cookies = parseCookies(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE];
-  res.json({ authenticated: !!sessionId && sessions.has(sessionId) });
+  res.json({
+    authenticated: !!sessionId && sessions.has(sessionId),
+    configured: true,
+  });
 }
 
 function handleLogout(req: express.Request, res: express.Response): void {
