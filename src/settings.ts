@@ -56,9 +56,17 @@ export interface BackupConfig {
   directory?: string;
 }
 
+export interface OidcConfig {
+  issuer_url: string;
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
+  scopes?: string;
+}
+
 export interface AuthConfig {
   enabled: boolean;
-  password: string;
+  oidc?: OidcConfig;
 }
 
 export interface StorageConfig {

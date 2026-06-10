@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
+import crypto from 'crypto';
 import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount,
   getScenarioStepNames, getDistinctTags, getNotificationMetrics,
@@ -54,42 +55,149 @@ function parseLimitParam(value: string | undefined): number | undefined {
 
 const sessions = new Map<string, { createdAt: number }>();
 
-function generateToken(): string {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+function generateSessionId(): string {
+  return crypto.randomBytes(32).toString('hex');
 }
+
+function parseCookies(header: string | undefined): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!header) return cookies;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx !== -1) {
+      const key = part.slice(0, idx).trim();
+      const val = part.slice(idx + 1).trim();
+      if (key) cookies[key] = val;
+    }
+  }
+  return cookies;
+}
+
+const SESSION_COOKIE = 'scenarii-session';
 
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const config = getSettings().auth;
   if (!config?.enabled) return next();
   const authPath = '/api/auth/';
   if (req.path.startsWith(authPath) || req.path === '/api/health') return next();
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = cookies[SESSION_COOKIE];
+  if (!sessionId || !sessions.has(sessionId)) {
     res.status(401).json({ error: 'Authentication required' });
-    return;
-  }
-  const token = header.slice(7);
-  if (!sessions.has(token)) {
-    res.status(401).json({ error: 'Invalid or expired token' });
     return;
   }
   next();
 }
 
-function handleLogin(req: express.Request, res: express.Response): void {
+async function fetchOidcDiscovery(issuerUrl: string): Promise<{ authorization_endpoint: string; token_endpoint: string }> {
+  const discoveryUrl = `${issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`;
+  const res = await fetch(discoveryUrl);
+  if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status}`);
+  const data = await res.json() as { authorization_endpoint: string; token_endpoint: string };
+  return {
+    authorization_endpoint: data.authorization_endpoint,
+    token_endpoint: data.token_endpoint,
+  };
+}
+
+const oidcStates = new Map<string, { createdAt: number }>();
+const STATE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function cleanOidcStates(): void {
+  const now = Date.now();
+  for (const [key, val] of oidcStates) {
+    if (now - val.createdAt > STATE_TTL) oidcStates.delete(key);
+  }
+}
+
+function handleOidcLogin(req: express.Request, res: express.Response): void {
+  const config = getSettings().auth;
+  if (!config?.enabled || !config.oidc) {
+    res.status(400).json({ error: 'OIDC not configured' });
+    return;
+  }
+  const oidc = config.oidc;
+  cleanOidcStates();
+
+  const state = crypto.randomBytes(16).toString('hex');
+  oidcStates.set(state, { createdAt: Date.now() });
+
+  const scopes = encodeURIComponent(oidc.scopes || 'openid profile email');
+  const authUrl = `${oidc.issuer_url.replace(/\/$/, '')}/authorize?response_type=code&client_id=${encodeURIComponent(oidc.client_id)}&redirect_uri=${encodeURIComponent(oidc.redirect_uri)}&scope=${scopes}&state=${state}`;
+
+  res.redirect(authUrl);
+}
+
+async function handleOidcCallback(req: express.Request, res: express.Response): Promise<void> {
+  const config = getSettings().auth;
+  if (!config?.enabled || !config.oidc) {
+    res.status(400).json({ error: 'OIDC not configured' });
+    return;
+  }
+  const oidc = config.oidc;
+  const { code, state } = req.query as { code?: string; state?: string };
+
+  if (!code || !state) {
+    res.status(400).json({ error: 'Missing code or state parameter' });
+    return;
+  }
+
+  cleanOidcStates();
+  if (!oidcStates.has(state)) {
+    res.status(400).json({ error: 'Invalid or expired state parameter' });
+    return;
+  }
+  oidcStates.delete(state);
+
+  try {
+    const discovery = await fetchOidcDiscovery(oidc.issuer_url);
+    const tokenRes = await fetch(discovery.token_endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: oidc.redirect_uri,
+        client_id: oidc.client_id,
+        client_secret: oidc.client_secret,
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text();
+      logger.error({ status: tokenRes.status, body: errText }, 'OIDC token exchange failed');
+      res.status(500).json({ error: 'Token exchange failed' });
+      return;
+    }
+
+    const sessionId = generateSessionId();
+    sessions.set(sessionId, { createdAt: Date.now() });
+
+    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${sessionId}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
+    res.redirect('/');
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'OIDC callback failed');
+    res.status(500).json({ error: 'OIDC authentication failed' });
+  }
+}
+
+function handleAuthMe(req: express.Request, res: express.Response): void {
   const config = getSettings().auth;
   if (!config?.enabled) {
-    res.status(400).json({ error: 'Authentication not configured' });
+    res.json({ authenticated: false });
     return;
   }
-  const { password } = req.body as { password?: string };
-  if (!password || password !== config.password) {
-    res.status(401).json({ error: 'Invalid password' });
-    return;
-  }
-  const token = generateToken();
-  sessions.set(token, { createdAt: Date.now() });
-  res.json({ token });
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = cookies[SESSION_COOKIE];
+  res.json({ authenticated: !!sessionId && sessions.has(sessionId) });
+}
+
+function handleLogout(req: express.Request, res: express.Response): void {
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = cookies[SESSION_COOKIE];
+  if (sessionId) sessions.delete(sessionId);
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+  res.json({ status: 'logged_out' });
 }
 
 function requestIdMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
@@ -501,7 +609,10 @@ export function createApp(): express.Application {
   app.use(requestIdMiddleware);
   app.use(requestLogger);
 
-  app.post('/api/auth/login', handleLogin);
+  app.get('/api/auth/login', handleOidcLogin);
+  app.get('/api/auth/callback', handleOidcCallback);
+  app.get('/api/auth/me', handleAuthMe);
+  app.post('/api/auth/logout', handleLogout);
   app.use(authMiddleware);
 
   app.get('/api/scenarios', handleScenarioList);

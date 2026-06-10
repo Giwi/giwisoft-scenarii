@@ -140,7 +140,7 @@ The dashboard provides:
 - **Run Now / Cancel** — trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** — toggle in the navbar, preference saved to localStorage
-- **Dashboard auth** — optional password-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/login` require a bearer token
+- **Dashboard auth** — optional OIDC-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/*` require a session cookie
 - **Manual refresh** — refresh button on both list and detail pages
 - **Public status** — `GET /api/status` returns healthy/unhealthy counts, tags, and storage readiness
 
@@ -185,7 +185,10 @@ node dist/index.js server
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
 | `GET /api/scenarios/:name/sla` | SLA calculation (`?days=7`) — returns `{ sla, total_runs, passed_runs, failed_runs }` |
-| `POST /api/auth/login` | Authenticate with password, returns bearer token (requires `auth.enabled` in settings) |
+| `GET /api/auth/login` | Redirect to OIDC provider (requires `auth.oidc` in settings) |
+| `GET /api/auth/callback` | OIDC callback — exchanges code for session cookie |
+| `GET /api/auth/me` | Return `{ authenticated: boolean }` |
+| `POST /api/auth/logout` | Clear session cookie |
 | `POST /api/backup` | Trigger a manual database backup |
 | `GET /api/tags` | List all distinct tags |
 | `GET /api/status` | Public status summary (healthy/unhealthy counts) |
@@ -244,8 +247,13 @@ api:
     api_key: "YOUR_API_KEY"      # protects /api/metrics
 
 auth:
-  enabled: true                  # optional dashboard login
-  password: "CHANGE_ME"         # password shared by all users
+  enabled: true                  # optional dashboard authentication
+  oidc:                          # OIDC provider configuration
+    issuer_url: "https://accounts.google.com"
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR_CLIENT_SECRET"
+    redirect_uri: "http://localhost:3000/api/auth/callback"
+    scopes: "openid profile email"
 
 storage:
   retentionDays: 30              # data retention period (default 7)
