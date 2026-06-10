@@ -59,6 +59,7 @@ schedule: "*/5 * * * *"   # optional cron expression
 timeout: 120000           # per-scenario timeout override (default 120s)
 ignoreHTTPSErrors: false  # per-scenario SSL override
 tags: [critical, auth]    # optional tags for dashboard filtering
+depends_on: "Health check" # optional — skip this scenario if dependency last run failed
 alert:                    # optional alert rules
   consecutive_failures: 3 # warn after N consecutive failures
 
@@ -134,11 +135,12 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 
 The dashboard provides:
 
-- **Scenario list** — overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, auto-refreshes via WebSocket
-- **Scenario detail** — response time trend chart, success rate over time, step breakdown, paginated run history, **JSON/CSV/YAML export**, **live step log panel**
-- **Run Now** — trigger an immediate ad-hoc run from the list or detail page
+- **Scenario list** — overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, depends-on column, auto-refreshes via WebSocket
+- **Scenario detail** — response time trend chart, success rate over time, step breakdown, **SLA gauge** (7-day window), paginated run history, **JSON/CSV/YAML export**, **live step log panel**
+- **Run Now / Cancel** — trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** — toggle in the navbar, preference saved to localStorage
+- **Dashboard auth** — optional password-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/login` require a bearer token
 - **Manual refresh** — refresh button on both list and detail pages
 - **Public status** — `GET /api/status` returns healthy/unhealthy counts, tags, and storage readiness
 
@@ -174,6 +176,7 @@ node dist/index.js server
 | `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |
 | `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=&days=`) |
 | `POST /api/scenarios/:name/run` | Trigger an immediate ad-hoc run |
+| `POST /api/scenarios/:name/cancel` | Abort a running scenario |
 | `POST /api/scenarios/:name/pause` | Pause a scheduled scenario |
 | `POST /api/scenarios/:name/resume` | Resume a paused scenario |
 | `GET /api/scenarios/:name/config` | Download scenario YAML configuration |
@@ -181,6 +184,9 @@ node dist/index.js server
 | `DELETE /api/scenarios/:name/config` | Delete a scenario file |
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
+| `GET /api/scenarios/:name/sla` | SLA calculation (`?days=7`) — returns `{ sla, total_runs, passed_runs, failed_runs }` |
+| `POST /api/auth/login` | Authenticate with password, returns bearer token (requires `auth.enabled` in settings) |
+| `POST /api/backup` | Trigger a manual database backup |
 | `GET /api/tags` | List all distinct tags |
 | `GET /api/status` | Public status summary (healthy/unhealthy counts) |
 | `GET /api/health` | Health check (200 = ready, 503 = initializing) |
@@ -237,8 +243,16 @@ api:
     enabled: true
     api_key: "YOUR_API_KEY"      # protects /api/metrics
 
+auth:
+  enabled: true                  # optional dashboard login
+  password: "CHANGE_ME"         # password shared by all users
+
 storage:
   retentionDays: 30              # data retention period (default 7)
+  backup:                        # optional automated backups
+    enabled: true
+    cron: "0 4 * * *"           # default: daily at 4am
+    directory: "./backups"      # default: ./backups
 
 notifications:
   telegram:
@@ -343,7 +357,7 @@ The workflow is in `.github/workflows/ci.yml`. Dependabot is configured for week
 npm test
 ```
 
-Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests cover the sequential execution queue, notification state machine, and settings schema validation.
+Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests cover the sequential execution queue, notification state machine, settings schema validation, URL resolution, variable interpolation, JSON path extraction, YAML parse/serialize, HTTP expectations, and retry logic. Test files live in `tests/` and are compiled via `tests/tsconfig.json` to `dist-test/`.
 
 ## Tech stack
 
