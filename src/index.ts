@@ -7,7 +7,6 @@ import http from 'http';
 import { loadScenarioFile } from './parser';
 import { runScenario, RunOptions } from './runner';
 import { scheduleScenario, stopAll, listScheduled, scheduleReport } from './scheduler';
-import { sendDailyReport } from './report';
 import { initStorage, closeStorage, isStorageReady } from './storage';
 import { loadSettings, watchSettings } from './settings';
 import { createServer } from './server';
@@ -135,20 +134,7 @@ program
       logger.info({ scheduled: listScheduled() }, 'Scheduled scenarios');
     }
 
-    // Run initial execution in background sequentially (Lightpanda can't handle concurrency)
-    (async () => {
-      for (const file of scenarioFiles) {
-        try {
-          const scenario = loadScenarioFile(file);
-          logger.info({ scenario: scenario.name }, 'Running scenario');
-          await runScenario(scenario, runOptions);
-        } catch (err: unknown) {
-          logger.error({ file, err: err instanceof Error ? err.message : err }, 'Failed to run scenario');
-        }
-      }
-      sendDailyReport();
-      scheduleReport(DAILY_REPORT_CRON);
-    })();
+    scheduleReport(DAILY_REPORT_CRON);
 
     process.on('SIGINT', () => shutdown(server));
     process.on('SIGTERM', () => shutdown(server));
