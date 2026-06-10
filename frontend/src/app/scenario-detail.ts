@@ -83,17 +83,19 @@ interface ScenarioDetail {
         <span class="text-danger" *ngIf="tickerError">({{ tickerError }})</span>
       </span>
 
-      <div class="ms-auto" *ngIf="detail">
-        <div class="dropdown">
-          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-            <i class="bi bi-download me-1"></i>Export
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" [href]="exportUrl('json')" target="_blank"><i class="bi bi-filetype-json me-2"></i>JSON</a></li>
-            <li><a class="dropdown-item" [href]="exportUrl('csv')" target="_blank"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
-            <li><a class="dropdown-item" [href]="configUrl()" target="_blank"><i class="bi bi-filetype-yml me-2"></i>YAML</a></li>
-          </ul>
-        </div>
+      <button *ngIf="detail" class="btn btn-sm btn-outline-secondary border-0 position-relative ms-auto" (click)="copyPublicLink()" title="Copy public status link">
+        <i class="bi bi-share"></i>
+        <span *ngIf="copied" class="position-absolute small bg-success text-white rounded px-1" style="top:-8px;right:-8px;font-size:.6rem;line-height:1.2">Copied!</span>
+      </button>
+      <div class="dropdown" *ngIf="detail">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="bi bi-download me-1"></i>Export
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" [href]="exportUrl('json')" target="_blank"><i class="bi bi-filetype-json me-2"></i>JSON</a></li>
+          <li><a class="dropdown-item" [href]="exportUrl('csv')" target="_blank"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+          <li><a class="dropdown-item" [href]="configUrl()" target="_blank"><i class="bi bi-filetype-yml me-2"></i>YAML</a></li>
+        </ul>
       </div>
     </div>
 
@@ -254,6 +256,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   tickerResponseTime: number | null = null;
   tickerError: string | null = null;
   tickerStatus: 'idle' | 'running' | 'done' | 'error' = 'idle';
+  copied = false;
+  private copyTimer: ReturnType<typeof setTimeout> | null = null;
   private charts: Chart[] = [];
   private scenarioName = '';
 
@@ -335,6 +339,26 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     } catch {
       // Ignore
     }
+    this.cdr.detectChanges();
+  }
+
+  async copyPublicLink(): Promise<void> {
+    const url = window.location.origin + '/public/status/' + encodeURIComponent(this.scenarioName);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    this.copied = true;
+    if (this.copyTimer) clearTimeout(this.copyTimer);
+    this.copyTimer = setTimeout(() => { this.copied = false; this.cdr.detectChanges(); }, 2000);
     this.cdr.detectChanges();
   }
 
