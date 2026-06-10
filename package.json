@@ -18,7 +18,7 @@
     "dev:once": "ts-node src/index.ts --once scenarios/lusk.yml",
     "dev:scenario": "npx chokidar 'scenarios/**/*.yml' -c 'npx ts-node src/index.ts --once {path}'",
     "lint": "tsc --noEmit",
-    "test": "npm run build:backend && tsc -p tests/tsconfig.json && node --test 'dist-test/tests/**/*.test.js'",
+    "test": "npm run build:backend && tsc -p tests/tsconfig.json && node --experimental-test-module-mocks --test 'dist-test/tests/**/*.test.js'",
     "screenshots": "ts-node take-screenshots.ts",
     "package": "npm run build && sh build-container.sh"
   },

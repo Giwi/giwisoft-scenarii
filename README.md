@@ -349,6 +349,28 @@ docker run -d \
 
 The container includes a `HEALTHCHECK` that pings `/api/health` every 30s, runs as non-root (`USER node`), and uses `dumb-init` for proper signal handling.
 
+### Multi-arch (linux/amd64 + linux/arm64)
+
+Pre-built images support both `amd64` and `arm64`. To build for a specific architecture:
+
+```bash
+PLATFORM=linux/arm64 ./build-container.sh
+```
+
+To build a multi-arch manifest (requires `docker buildx`):
+
+```bash
+PLATFORM=multi ./build-container.sh
+```
+
+Or using `make`:
+
+```bash
+make build        # linux/amd64 (default)
+make build-arm64  # linux/arm64
+make build-multi  # multi-arch manifest
+```
+
 ## CI/CD
 
 On push to `main`, GitHub Actions:
@@ -356,8 +378,8 @@ On push to `main`, GitHub Actions:
 1. Installs dependencies and runs `tsc --noEmit`
 2. Executes unit tests (`npm test`)
 3. Builds the frontend and backend
-4. Builds the Docker image with a smoke test and vulnerability scan
-5. Publishes the Docker image to **GitHub Container Registry** (tagged `latest` + git SHA)
+4. Builds the Docker image (`linux/amd64`, `linux/arm64`) with a smoke test and vulnerability scan
+5. Publishes the multi-arch Docker image to **GitHub Container Registry** (tagged `latest` + git SHA)
 
 The workflow is in `.github/workflows/ci.yml`. Dependabot is configured for weekly npm and GitHub Actions updates.
 

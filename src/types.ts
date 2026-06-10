@@ -109,4 +109,13 @@ export interface StepProgress {
   error?: string;
 }
 
+export interface RunOptions {
+  headless?: boolean;
+  json_output?: boolean;
+  persist?: boolean;
+  lightpandaPort?: number;
+  timeout?: number;
+  ignoreHTTPSErrors?: boolean;
+}
+
 export type Reporter = (metrics: ScenarioMetrics) => void;

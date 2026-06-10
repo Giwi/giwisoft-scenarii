@@ -1,4 +1,6 @@
-FROM docker.io/node:26-alpine AS builder
+ARG TARGETPLATFORM=linux/amd64
+
+FROM --platform=$TARGETPLATFORM docker.io/node:26-alpine AS builder
 
 WORKDIR /build
 
@@ -14,7 +16,7 @@ RUN npm run build && \
     npm prune --omit=dev && \
     rm -rf /build/frontend/node_modules
 
-FROM docker.io/node:26-alpine
+FROM --platform=$TARGETPLATFORM docker.io/node:26-alpine
 
 RUN apk add --no-cache libstdc++ dumb-init curl
 
