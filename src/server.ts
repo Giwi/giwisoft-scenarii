@@ -347,17 +347,15 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
     const passed = history.filter(r => r.success).length;
     const sla = total > 0 ? Math.round((passed / total) * 1000) / 10 : 100;
 
-    const runRows = history.slice(0, 20).map(r => `
-      <tr>
-        <td class="muted">${new Date(r.started_at).toLocaleString()}</td>
-        <td class="mono">${r.duration_ms}ms</td>
-        <td>${r.success ? '<span class="badge badge-ok">Pass</span>' : '<span class="badge badge-fail">Fail</span>'}</td>
-        <td>${r.steps.length} steps</td>
-      </tr>`).join('');
+    const labelsJson = JSON.stringify(history.map(r => new Date(r.started_at).toLocaleString()).reverse());
+    const durationsJson = JSON.stringify(history.map(r => r.duration_ms).reverse());
+    const successJson = JSON.stringify(history.map(r => (r.success ? 1 : 0)).reverse());
 
     const tagHtml = scenario.tags?.length
       ? scenario.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')
       : '';
+
+    const hasData = history.length > 0;
 
     res.type('html').send(`<!DOCTYPE html>
 <html lang="en">
@@ -365,10 +363,11 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(scenario.name)} — Scenarii Status</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0e14; color: #e6edf3; display: flex; flex-direction: column; min-height: 100vh; }
-  .container { max-width: 800px; margin: 0 auto; padding: 2rem 1rem; width: 100%; }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1rem; width: 100%; }
   h1 { font-size: 1.3rem; font-weight: 600; margin-bottom: .25rem; display: flex; align-items: center; gap: .5rem; }
   .subtitle { font-size: .85rem; color: #8b949e; margin-bottom: 1.5rem; }
   .stats { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
@@ -378,24 +377,17 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
   .ok { color: #3fb950; }
   .fail { color: #f85149; }
   .muted { color: #8b949e; }
-  .mono { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: .85rem; }
-  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-  th { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #30363d; color: #8b949e; font-weight: 500; font-size: .75rem; text-transform: uppercase; }
-  td { padding: .6rem .75rem; border-bottom: 1px solid #21262d; }
-  .badge { display: inline-block; padding: .15em .55em; border-radius: 999px; font-size: .75rem; font-weight: 500; }
-  .badge-ok { background: rgba(63,185,80,.15); color: #3fb950; }
-  .badge-fail { background: rgba(248,81,73,.15); color: #f85149; }
+  .chart-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; height: 280px; }
+  .chart-box h3 { font-size: .75rem; text-transform: uppercase; color: #8b949e; margin-bottom: .75rem; }
+  .chart-box canvas { width: 100% !important; height: calc(100% - 1.5rem) !important; }
   .tag { display: inline-block; padding: .1em .5em; border-radius: 999px; font-size: .7rem; background: rgba(88,166,255,.12); color: #58a6ff; margin-right: .25rem; }
   .footer { margin-top: auto; text-align: center; padding: 1.5rem; color: #484f58; font-size: .8rem; border-top: 1px solid #21262d; }
-  .refresh-note { font-size: .8rem; color: #484f58; margin-bottom: 1rem; }
+  .no-data { text-align: center; padding: 3rem; color: #484f58; }
   @media (prefers-color-scheme: light) {
     body { background: #fff; color: #1f2328; }
     .stat { background: #f6f8fa; border-color: #d0d7de; }
-    th { color: #656d76; border-color: #d0d7de; }
-    td { border-color: #f0f2f5; }
-    .muted { color: #656d76; }
+    .chart-box { background: #f6f8fa; border-color: #d0d7de; }
     .footer { border-color: #d0d7de; color: #656d76; }
-    .refresh-note { color: #656d76; }
   }
 </style>
 </head>
@@ -413,11 +405,44 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
     <div class="stat"><div class="stat-value ok">${passed}</div><div class="stat-label">Passed</div></div>
     <div class="stat"><div class="stat-value fail">${total - passed}</div><div class="stat-label">Failed</div></div>
   </div>
-  <h2 style="font-size:.85rem;font-weight:600;margin-bottom:.75rem;color:#8b949e;text-transform:uppercase">Last 20 Runs</h2>
-  <table>
-    <thead><tr><th>Time</th><th>Duration</th><th>Status</th><th>Steps</th></tr></thead>
-    <tbody>${runRows || '<tr><td colspan="4" class="muted" style="text-align:center">No runs yet</td></tr>'}</tbody>
-  </table>
+  ${hasData ? `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem">
+    <div class="chart-box"><h3>Response Time Trend</h3><canvas id="durationChart"></canvas></div>
+    <div class="chart-box"><h3>Success Rate Over Time</h3><canvas id="successChart"></canvas></div>
+  </div>
+  <script>
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDark ? '#4a5568' : '#d0d7de';
+    const textColor = isDark ? '#8b949e' : '#656d76';
+    const accent = isDark ? '#00d4ff' : '#6366f1';
+    const green = isDark ? '#3fb950' : '#10b981';
+
+    function runningAverage(data, window) {
+      return data.map(function(v, i) {
+        var start = Math.max(0, i - window + 1);
+        var slice = data.slice(start, i + 1);
+        return slice.reduce(function(a,b) { return a + b; }, 0) / slice.length;
+      });
+    }
+
+    new Chart('durationChart', {
+      type: 'line',
+      data: {
+        labels: ${labelsJson},
+        datasets: [{ label: 'Duration (ms)', data: ${durationsJson}, borderColor: accent, backgroundColor: isDark ? 'rgba(0,212,255,0.1)' : 'rgba(99,102,241,0.08)', fill: true, tension: 0.3, pointRadius: 3 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } }, y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } } } }
+    });
+
+    new Chart('successChart', {
+      type: 'line',
+      data: {
+        labels: ${labelsJson},
+        datasets: [{ label: 'Success', data: runningAverage(${successJson}, 5), borderColor: green, backgroundColor: isDark ? 'rgba(63,185,80,0.1)' : 'rgba(45,198,83,0.1)', fill: true, tension: 0.3, pointRadius: 3 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } }, y: { min: 0, max: 1, ticks: { font: { size: 10 }, color: textColor, callback: function(v) { return v * 100 + '%'; } }, grid: { color: gridColor } } } }
+    });
+  </script>` : '<div class="no-data">No runs yet</div>'}
 </div>
 <div class="footer">Scenarii — <a href="https://giwi.fr" style="color:#58a6ff">GiwiSoft</a></div>
 <script>setTimeout(function(){ location.reload(); }, 30000);</script>

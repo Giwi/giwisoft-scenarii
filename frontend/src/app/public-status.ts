@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { NgIf, NgFor, DatePipe } from '@angular/common';
+import { NgIf, NgFor } from '@angular/common';
+import Chart from 'chart.js/auto';
 
 interface HistoryEntry {
   started_at: string;
@@ -26,7 +27,7 @@ interface ScenarioStatus {
 @Component({
   standalone: true,
   selector: 'app-public-status',
-  imports: [NgIf, NgFor, DatePipe, RouterModule],
+  imports: [NgIf, NgFor, RouterModule],
   changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div *ngIf="error" class="text-center py-5 text-secondary">
@@ -91,35 +92,21 @@ interface ScenarioStatus {
         </div>
       </div>
 
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <h3 class="card-title small text-secondary text-uppercase mb-3">Last 20 Runs</h3>
-          <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Time</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                  <th>Steps</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let run of scenario.history">
-                  <td class="small">{{ run.started_at | date:'MMM d, HH:mm:ss' }}</td>
-                  <td class="font-monospace small">{{ run.duration_ms }}ms</td>
-                  <td>
-                    <span class="badge" [class.bg-success]="run.success" [class.bg-danger]="!run.success">
-                      {{ run.success ? 'Pass' : 'Fail' }}
-                    </span>
-                  </td>
-                  <td class="small">{{ run.steps.length }} steps</td>
-                </tr>
-                <tr *ngIf="!scenario.history.length">
-                  <td colspan="4" class="text-center text-secondary small">No runs yet</td>
-                </tr>
-              </tbody>
-            </table>
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title small text-secondary text-uppercase">Response Time Trend</h3>
+              <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h3 class="card-title small text-secondary text-uppercase">Success Rate Over Time</h3>
+              <div class="chart-wrapper"><canvas id="successChart"></canvas></div>
+            </div>
           </div>
         </div>
       </div>
@@ -129,6 +116,7 @@ interface ScenarioStatus {
 export class PublicStatusComponent implements OnInit, OnDestroy {
   scenario: ScenarioStatus | null = null;
   error = false;
+  private charts: Chart[] = [];
   private scenarioName = '';
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -144,6 +132,7 @@ export class PublicStatusComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.charts.forEach(c => c.destroy());
     if (this.pollTimer) clearInterval(this.pollTimer);
   }
 
@@ -153,12 +142,95 @@ export class PublicStatusComponent implements OnInit, OnDestroy {
       if (res.ok) {
         this.scenario = await res.json();
         this.error = false;
+        this.cdr.detectChanges();
+        setTimeout(() => this.renderCharts(), 50);
       } else {
         this.error = true;
+        this.cdr.detectChanges();
       }
     } catch {
       this.error = true;
+      this.cdr.detectChanges();
     }
-    this.cdr.detectChanges();
+  }
+
+  private renderCharts(): void {
+    this.charts.forEach(c => c.destroy());
+    this.charts = [];
+    if (!this.scenario || this.scenario.history.length === 0) return;
+
+    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    const gridColor = isDark ? '#4a5568' : '#e0e0e0';
+    const textColor = isDark ? '#8b949e' : '#666';
+    const accent = isDark ? '#00d4ff' : '#6366f1';
+    const green = isDark ? '#3fb950' : '#10b981';
+
+    const labels = this.scenario.history.map(r => new Date(r.started_at).toLocaleString()).reverse();
+    const durations = this.scenario.history.map(r => r.duration_ms).reverse();
+
+    this.charts.push(
+      new Chart('durationChart', {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Duration (ms)',
+            data: durations,
+            borderColor: accent,
+            backgroundColor: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(99, 102, 241, 0.08)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
+            y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
+          },
+        },
+      }),
+    );
+
+    const successCounts = this.scenario.history.map(r => (r.success ? 1 : 0)).reverse();
+    const runningAvg = this.runningAverage(successCounts, 5);
+
+    this.charts.push(
+      new Chart('successChart', {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Success',
+            data: runningAvg,
+            borderColor: green,
+            backgroundColor: isDark ? 'rgba(63, 185, 80, 0.1)' : 'rgba(45, 198, 83, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } },
+            y: { min: 0, max: 1, ticks: { font: { size: 10 }, color: textColor, callback: (v) => (v as number) * 100 + '%' }, grid: { color: gridColor } },
+          },
+        },
+      }),
+    );
+  }
+
+  private runningAverage(data: number[], window: number): number[] {
+    return data.map((_, i) => {
+      const start = Math.max(0, i - window + 1);
+      const slice = data.slice(start, i + 1);
+      return slice.reduce((a, b) => a + b, 0) / slice.length;
+    });
   }
 }
