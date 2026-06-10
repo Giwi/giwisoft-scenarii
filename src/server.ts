@@ -332,6 +332,94 @@ function handleStatus(_req: express.Request, res: express.Response): void {
   }
 }
 
+function handlePublicStatus(_req: express.Request, res: express.Response): void {
+  try {
+    const list = getScenarioList();
+    const healthy = list.filter(s => s.last_success === 1).length;
+    const unhealthy = list.filter(s => s.last_success === 0).length;
+    const unknown = list.filter(s => s.last_success === null).length;
+    const tags = getDistinctTags();
+    const rows = list.map(s => `
+      <tr>
+        <td class="fw-semibold">${escapeHtml(s.name)}</td>
+        <td>${s.tags?.length ? s.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('') : '<span class="muted">—</span>'}</td>
+        <td>${s.last_success === 1 ? '<span class="badge badge-ok">Pass</span>' : s.last_success === 0 ? '<span class="badge badge-fail">Fail</span>' : '<span class="badge badge-unknown">—</span>'}</td>
+        <td class="muted">${s.last_run ? new Date(s.last_run).toLocaleString() : '—'}</td>
+        <td class="mono">${s.last_duration_ms !== null ? s.last_duration_ms + 'ms' : '—'}</td>
+        <td class="mono">${s.total_runs}</td>
+      </tr>`).join('');
+
+    res.type('html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scenarii — Public Status</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0e14; color: #e6edf3; display: flex; flex-direction: column; min-height: 100vh; }
+  .container { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; width: 100%; }
+  h1 { font-size: 1.3rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: .5rem; }
+  h1 i { font-size: 1.4rem; }
+  .stats { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .stat { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem 1.5rem; text-align: center; flex: 1; min-width: 100px; }
+  .stat-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+  .stat-label { font-size: .75rem; text-transform: uppercase; color: #8b949e; margin-top: .25rem; }
+  .ok { color: #3fb950; }
+  .fail { color: #f85149; }
+  .muted { color: #8b949e; }
+  .mono { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: .85rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #30363d; color: #8b949e; font-weight: 500; font-size: .75rem; text-transform: uppercase; }
+  td { padding: .6rem .75rem; border-bottom: 1px solid #21262d; }
+  .badge { display: inline-block; padding: .15em .55em; border-radius: 999px; font-size: .75rem; font-weight: 500; }
+  .badge-ok { background: rgba(63,185,80,.15); color: #3fb950; }
+  .badge-fail { background: rgba(248,81,73,.15); color: #f85149; }
+  .badge-unknown { background: rgba(139,148,158,.15); color: #8b949e; }
+  .tag { display: inline-block; padding: .1em .5em; border-radius: 999px; font-size: .7rem; background: rgba(88,166,255,.12); color: #58a6ff; margin-right: .25rem; }
+  .footer { margin-top: auto; text-align: center; padding: 1.5rem; color: #484f58; font-size: .8rem; border-top: 1px solid #21262d; }
+  .refresh-note { font-size: .8rem; color: #484f58; margin-bottom: 1rem; }
+  @media (prefers-color-scheme: light) {
+    body { background: #fff; color: #1f2328; }
+    .stat { background: #f6f8fa; border-color: #d0d7de; }
+    th { color: #656d76; border-color: #d0d7de; }
+    td { border-color: #f0f2f5; }
+    .muted { color: #656d76; }
+    .badge-unknown { background: rgba(101,109,118,.12); color: #656d76; }
+    .footer { border-color: #d0d7de; color: #656d76; }
+    .refresh-note { color: #656d76; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Scenarii — Public Status</h1>
+  <div class="stats">
+    <div class="stat"><div class="stat-value">${list.length}</div><div class="stat-label">Scenarios</div></div>
+    <div class="stat"><div class="stat-value ok">${healthy}</div><div class="stat-label">Healthy</div></div>
+    <div class="stat"><div class="stat-value fail">${unhealthy}</div><div class="stat-label">Unhealthy</div></div>
+    <div class="stat"><div class="stat-value muted">${unknown}</div><div class="stat-label">Unknown</div></div>
+  </div>
+  <div class="refresh-note">Auto-refreshes every 30 seconds · <a href="/api/status" style="color:#58a6ff">JSON</a></div>
+  <table>
+    <thead><tr><th>Scenario</th><th>Tags</th><th>Status</th><th>Last Run</th><th>Duration</th><th>Runs</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>
+<div class="footer">Scenarii — <a href="https://giwi.fr" style="color:#58a6ff">GiwiSoft</a></div>
+<script>setTimeout(function(){ location.reload(); }, 30000);</script>
+</body>
+</html>`);
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to render public status page');
+    res.status(500).type('text').send('Internal server error');
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function handleRunNow(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (!_scenariosDir) {
@@ -638,6 +726,8 @@ export function createApp(): express.Application {
   app.post('/api/backup', handleBackup);
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
+
+  app.get('/public/status', handlePublicStatus);
 
   // Serve Angular frontend in production (only if built)
   const frontendDir = path.join(__dirname, '../frontend/dist/frontend/browser');

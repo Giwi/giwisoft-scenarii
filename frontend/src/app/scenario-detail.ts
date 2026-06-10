@@ -64,9 +64,25 @@ interface ScenarioDetail {
       <button class="btn btn-sm btn-outline-success" (click)="runNow()" [disabled]="running" title="Run now">
         <i class="bi bi-send-fill"></i>{{ running ? '...' : '' }}
       </button>
-      <button class="btn btn-sm btn-outline-danger" (click)="cancelRun()" *ngIf="cancelling" disabled title="Cancelling...">
+      <button class="btn btn-sm btn-outline-danger" (click)="cancelRun()" *ngIf="isRunning" title="Cancel">
         <i class="bi bi-stop-fill"></i>
       </button>
+
+      <span *ngIf="isRunning" class="small text-nowrap ms-1 d-flex align-items-center gap-1">
+        <i class="bi"
+          [class.bi-arrow-repeat]="tickerStatus==='running'"
+          [class.bi-check-circle-fill]="tickerStatus==='done'"
+          [class.bi-x-circle-fill]="tickerStatus==='error'"
+          [class.text-primary]="tickerStatus==='running'"
+          [class.text-success]="tickerStatus==='done'"
+          [class.text-danger]="tickerStatus==='error'"
+          [class.spin]="tickerStatus==='running'"
+        ></i>
+        <span>{{ tickerStep }}</span>
+        <span class="text-secondary" *ngIf="tickerResponseTime !== null">{{ tickerResponseTime }}ms</span>
+        <span class="text-danger" *ngIf="tickerError">({{ tickerError }})</span>
+      </span>
+
       <div class="ms-auto" *ngIf="detail">
         <div class="dropdown">
           <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
@@ -100,25 +116,6 @@ interface ScenarioDetail {
     <div class="text-center py-5 text-secondary" *ngIf="!loading && !detail">
       <i class="bi bi-search fs-2 mb-2 d-block"></i>
       Scenario not found.
-    </div>
-
-    <div class="card border-0 shadow-sm mb-4" *ngIf="logs.length">
-      <div class="card-body py-2" style="max-height:200px;overflow-y:auto">
-        <div *ngFor="let log of logs" class="small">
-          <span class="text-secondary me-2">{{ log.timestamp | date:'HH:mm:ss' }}</span>
-          <i class="bi me-1"
-            [class.bi-play-circle-fill]="log.status==='running'"
-            [class.bi-check-circle-fill]="log.status==='done'"
-            [class.bi-x-circle-fill]="log.status==='error'"
-            [class.text-primary]="log.status==='running'"
-            [class.text-success]="log.status==='done'"
-            [class.text-danger]="log.status==='error'"
-          ></i>
-          <span>{{ log.step_name }}</span>
-          <span class="text-secondary ms-1">{{ log.response_time_ms ? log.response_time_ms + 'ms' : '' }}</span>
-          <span class="text-danger ms-1" *ngIf="log.error">{{ log.error }}</span>
-        </div>
-      </div>
     </div>
 
     <ng-container *ngIf="detail">
@@ -251,9 +248,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   detail: ScenarioDetail | null = null;
   loading = true;
   running = false;
-  cancelling = false;
   sla = 100;
-  logs: Array<{ step_name: string; status: string; response_time_ms?: number; error?: string; timestamp: Date }> = [];
+  isRunning = false;
+  tickerStep = '';
+  tickerResponseTime: number | null = null;
+  tickerError: string | null = null;
+  tickerStatus: 'idle' | 'running' | 'done' | 'error' = 'idle';
   private charts: Chart[] = [];
   private scenarioName = '';
 
@@ -278,13 +278,14 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   async refresh(): Promise<void> {
     this.charts.forEach((c) => c.destroy());
     this.charts = [];
-    this.logs = [];
     this.loading = true;
     this.cdr.detectChanges();
     await this.loadDetail();
   }
 
   private wsCallback = (event: import('./ws').ScenarioRunEvent) => {
+    this.isRunning = false;
+    this.tickerStatus = 'idle';
     if (event.scenario_name === this.scenarioName && !this.loading) {
       this.refresh();
     }
@@ -292,24 +293,18 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
 
   private stepLogCallback = (event: import('./ws').StepProgressEvent) => {
     if (event.scenario_name !== this.scenarioName) return;
+    this.isRunning = true;
     if (event.status === 'running') {
-      this.logs.push({ step_name: event.step_name, status: 'running', timestamp: new Date() });
+      this.tickerStep = event.step_name;
+      this.tickerStatus = 'running';
+      this.tickerResponseTime = null;
+      this.tickerError = null;
     } else {
-      let found = false;
-      for (let i = this.logs.length - 1; i >= 0; i--) {
-        if (this.logs[i].step_name === event.step_name && this.logs[i].status === 'running') {
-          this.logs[i].status = event.status;
-          this.logs[i].response_time_ms = event.response_time_ms;
-          this.logs[i].error = event.error;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        this.logs.push({ step_name: event.step_name, status: event.status, response_time_ms: event.response_time_ms, error: event.error, timestamp: new Date() });
-      }
+      this.tickerStep = event.step_name;
+      this.tickerStatus = event.status === 'done' ? 'done' : 'error';
+      this.tickerResponseTime = event.response_time_ms ?? null;
+      this.tickerError = event.error ?? null;
     }
-    if (this.logs.length > 100) this.logs = this.logs.slice(-100);
     this.cdr.detectChanges();
   };
 
@@ -335,16 +330,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   }
 
   async cancelRun(): Promise<void> {
-    this.cancelling = true;
-    this.cdr.detectChanges();
     try {
       await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/cancel`, { method: 'POST' });
     } catch {
       // Ignore
-    } finally {
-      this.cancelling = false;
-      this.cdr.detectChanges();
     }
+    this.cdr.detectChanges();
   }
 
   private async loadDetail(): Promise<void> {

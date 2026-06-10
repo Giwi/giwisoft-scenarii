@@ -30,6 +30,15 @@ import { NgIf } from '@angular/common';
             <i class="bi bi-box-arrow-right"></i>
           </button>
           <button
+            class="btn btn-sm btn-outline-secondary border-0 position-relative"
+            (click)="copyStatusLink()"
+            title="Copy public status link"
+            aria-label="Copy public status link"
+          >
+            <i class="bi bi-share"></i>
+            <span *ngIf="copied" class="position-absolute small bg-success text-white rounded px-1 py-0" style="top:-8px;right:-8px;font-size:.6rem;line-height:1.2">Copied!</span>
+          </button>
+          <button
             class="btn btn-sm btn-outline-secondary border-0"
             (click)="toggleTheme()"
             aria-label="Toggle theme"
@@ -82,6 +91,8 @@ export class App implements OnInit {
   theme = 'light';
   authenticated = false;
   authConfigured = false;
+  copied = false;
+  private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -106,6 +117,27 @@ export class App implements OnInit {
     this.theme = this.theme === 'light' ? 'dark' : 'light';
     localStorage.setItem('scenarii-theme', this.theme);
     document.documentElement.setAttribute('data-bs-theme', this.theme);
+  }
+
+  async copyStatusLink(): Promise<void> {
+    const url = window.location.origin + '/public/status';
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    this.copied = true;
+    if (this.copyTimer) clearTimeout(this.copyTimer);
+    this.copyTimer = setTimeout(() => { this.copied = false; this.cdr.detectChanges(); }, 2000);
+    this.cdr.detectChanges();
   }
 
   login(): void {
