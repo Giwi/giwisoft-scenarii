@@ -15,7 +15,7 @@ node dist/index.js server
 node dist/index.js --once scenarios/lusk.yml
 ```
 
-Open http://localhost:3000 to see the dashboard.
+Open http://localhost:3000 to see the dashboard. Each scenario also has a shareable public status page at `/public/status/:name` (no auth required).
 
 ## Requirements
 
@@ -136,13 +136,14 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 The dashboard provides:
 
 - **Scenario list** — overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, depends-on column, auto-refreshes via WebSocket
-- **Scenario detail** — response time trend chart, success rate over time, step breakdown, **SLA gauge** (7-day window), paginated run history, **JSON/CSV/YAML export**, **live step log panel**
+- **Scenario detail** — response time trend chart, success rate over time, step breakdown, **SLA gauge** (7-day window), paginated run history, **JSON/CSV/YAML export**, **live ticker** (inline step progress in the toolbar), **copy public permalink**
 - **Run Now / Cancel** — trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** — toggle in the navbar, preference saved to localStorage
 - **Dashboard auth** — optional OIDC-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/*` require a session cookie
 - **Manual refresh** — refresh button on both list and detail pages
-- **Public status** — `GET /api/status` returns healthy/unhealthy counts, tags, and storage readiness
+- **Public status** — per-scenario pages at `/public/status/:name` with stat cards and response time / success rate charts; no auth required
+- **Public API** — `GET /api/status` (summary) and `GET /api/public/scenario/:name` (per-scenario detail) — both accessible without auth
 
 <p align="center">
   <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
@@ -191,7 +192,8 @@ node dist/index.js server
 | `POST /api/auth/logout` | Clear session cookie |
 | `POST /api/backup` | Trigger a manual database backup |
 | `GET /api/tags` | List all distinct tags |
-| `GET /api/status` | Public status summary (healthy/unhealthy counts) |
+| `GET /api/public/scenario/:name` | Public per-scenario JSON detail (no auth required) |
+| `GET /api/status` | Public status summary (healthy/unhealthy counts, no auth) |
 | `GET /api/health` | Health check (200 = ready, 503 = initializing) |
 | `GET /api/metrics` | Prometheus/OpenMetrics format (see below) |
 
@@ -234,7 +236,7 @@ During a run, **step progress** messages are streamed in real-time:
 }
 ```
 
-The dashboard shows a live log panel while steps are executing.
+The dashboard shows a live ticker in the detail toolbar while steps are executing, displaying the current step name, response time, and status icon.
 
 ## Notifications
 
@@ -377,6 +379,6 @@ Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests 
 - **Scheduling** — node-cron
 - **Notifications** — Telegram, Slack, Discord, Generic Webhook, Mailgun (all with retry)
 - **Logging** — pino (structured JSON, ISO timestamps)
-- **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.), optional Bearer token auth
+- **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.), optional OIDC-based dashboard auth with HTTP-only session cookies
 - **Frontend** — Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
 - **Container** — Alpine + multi-stage build, non-root user
