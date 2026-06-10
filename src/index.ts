@@ -92,7 +92,12 @@ program
   .option('--scenarios-dir <path>', 'Directory containing YAML scenario files', './scenarios')
   .option('--settings <path>', 'Path to settings.yaml')
   .action(async (options) => {
-    initStorage(options.db);
+    try {
+      initStorage(options.db);
+    } catch (err: unknown) {
+      logger.error({ path: options.db, err: err instanceof Error ? err.message : String(err) }, 'Failed to initialize database');
+      process.exit(1);
+    }
     loadSettings(options.settings);
     watchSettings();
 
