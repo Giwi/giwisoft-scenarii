@@ -349,6 +349,18 @@ docker run -d \
 
 The container includes a `HEALTHCHECK` that pings `/api/health` every 30s, runs as non-root (`USER node`), and uses `dumb-init` for proper signal handling.
 
+> **Rootless podman** — if using rootless podman, mount volumes may be owned by the host user but inaccessible to the container's `node` user. Add `--userns=keep-id` to map the container user to your host UID:
+> ```bash
+> podman run -d \
+>   --name scenarii \
+>   --userns=keep-id \
+>   -p 3000:3000 \
+>   -v $(pwd)/scenarios:/scenarios \
+>   -v $(pwd)/db:/app/db \
+>   -v $(pwd)/settings.yaml:/app/settings.yaml:ro \
+>   ghcr.io/giwi/giwisoft-scenarii:latest
+> ```
+
 ### Multi-arch (linux/amd64 + linux/arm64)
 
 Pre-built images support both `amd64` and `arm64`. To build for a specific architecture:
