@@ -765,7 +765,23 @@ export function createApp(): express.Application {
   const app = express();
 
   app.use(cors());
-  app.use(helmet());
+  app.use(helmet({
+    hsts: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        fontSrc: ["'self'", 'https:', 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        scriptSrc: ["'self'"],
+        scriptSrcAttr: ["'none'"],
+        styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+      },
+    },
+  }));
   app.use(express.json());
   app.use(requestIdMiddleware);
   app.use(requestLogger);

@@ -189,7 +189,7 @@ interface ScenarioDetail {
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let run of detail.history.slice(0, 50)">
+                 <tr *ngFor="let run of detail.history">
                   <td class="small">{{ run.started_at | date: 'MMM d, HH:mm:ss' }}</td>
                   <td class="font-monospace small">{{ run.duration_ms }}ms</td>
                   <td>
@@ -241,6 +241,20 @@ interface ScenarioDetail {
               </tbody>
             </table>
           </div>
+          <div class="d-flex justify-content-center mt-3" *ngIf="detail.history.length > 0">
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item" [class.disabled]="currentPage === 1">
+                <a class="page-link" (click)="goToPage(currentPage - 1)">Prev</a>
+              </li>
+              <li class="page-item" *ngFor="let p of pageNumbers" [class.active]="p === currentPage" [class.disabled]="p === -1">
+                <a class="page-link" (click)="goToPage(p)" *ngIf="p !== -1">{{ p }}</a>
+                <span class="page-link" *ngIf="p === -1">&hellip;</span>
+              </li>
+              <li class="page-item" [class.disabled]="currentPage === totalPages">
+                <a class="page-link" (click)="goToPage(currentPage + 1)">Next</a>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </ng-container>
@@ -260,6 +274,27 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
   private charts: Chart[] = [];
   private scenarioName = '';
+  pageSize = 15;
+  currentPage = 1;
+
+  get totalPages(): number {
+    return Math.max(1, Math.ceil((this.detail?.info.total_runs ?? 0) / this.pageSize));
+  }
+
+  get pageNumbers(): number[] {
+    const total = this.totalPages;
+    const current = this.currentPage;
+    const maxVisible = 7;
+    if (total <= maxVisible) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: number[] = [];
+    let start = Math.max(1, current - Math.floor(maxVisible / 2));
+    let end = start + maxVisible - 1;
+    if (end > total) { end = total; start = Math.max(1, end - maxVisible + 1); }
+    if (start > 1) { pages.push(1); if (start > 2) pages.push(-1); }
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < total) { if (end < total - 1) pages.push(-1); pages.push(total); }
+    return pages;
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -362,11 +397,18 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  async goToPage(page: number): Promise<void> {
+    if (page < 1 || page > this.totalPages || page === this.currentPage) return;
+    this.currentPage = page;
+    this.refresh();
+  }
+
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
     try {
+      const offset = (this.currentPage - 1) * this.pageSize;
       const [detailRes, slaRes] = await Promise.all([
-        apiFetch(`/api/scenarios/${encodeURIComponent(name)}?days=7`),
+        apiFetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`),
         apiFetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`),
       ]);
       if (detailRes.ok) {

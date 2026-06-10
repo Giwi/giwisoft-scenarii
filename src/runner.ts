@@ -1,5 +1,6 @@
 import { Worker } from 'worker_threads';
 import path from 'path';
+import fs from 'fs';
 import { Scenario, ScenarioMetrics, RunOptions } from './types';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
 import { storeMetrics, purgeOldData, upsertScenarioTags } from './storage';
@@ -82,9 +83,14 @@ export async function runScenario(
   return new Promise<ScenarioMetrics>((resolve) => {
     let resolved = false;
 
-    const worker = new Worker(path.join(__dirname, 'worker.js'), {
-      workerData: { scenario, options },
-    });
+    const workerPath = path.join(__dirname, 'worker.js');
+    const worker = new Worker(
+      fs.existsSync(workerPath) ? workerPath : path.join(__dirname, 'worker.ts'),
+      {
+        workerData: { scenario, options },
+        execArgv: fs.existsSync(workerPath) ? [] : ['-r', 'ts-node/register'],
+      },
+    );
 
     runningWorkers.set(scenario.name, worker);
 
