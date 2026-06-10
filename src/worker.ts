@@ -77,6 +77,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
   const scenarioSettings = getScenarioSettings(scenario.name);
   const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? DEFAULT_SCENARIO_TIMEOUT;
   const ignoreHTTPSErrors = options.ignoreHTTPSErrors ?? scenarioSettings.ignoreHTTPSErrors ?? scenario.ignoreHTTPSErrors ?? false;
+  const abortController = new AbortController();
 
   const run = async () => {
     try {
@@ -94,6 +95,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
 
       const stepResults: Map<string, boolean> = new Map();
       for (const step of scenario.steps) {
+        if (abortController.signal.aborted) break;
         send({ type: 'step_progress', scenario_name: scenario.name, step_name: step.name, action: step.action, status: 'running' });
 
         if (step.condition) {
@@ -146,14 +148,20 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
     }
   };
 
+  const runPromise = run();
   try {
     await Promise.race([
-      run(),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Scenario "${scenario.name}" timed out after ${timeoutMs}ms`)), timeoutMs)
-      ),
+      runPromise,
+      new Promise((_, reject) => {
+        const timer = setTimeout(() => {
+          abortController.abort();
+          reject(new Error(`Scenario "${scenario.name}" timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+        runPromise.finally(() => clearTimeout(timer));
+      }),
     ]);
   } catch (err: unknown) {
+    await runPromise.catch(() => {});
     if (metrics.steps.length === 0 || metrics.steps[metrics.steps.length - 1].step_name !== 'runtime_error') {
       metrics.success = false;
       metrics.steps.push({
