@@ -79,8 +79,8 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   const config = getSettings().auth;
   if (!config?.enabled) return next();
   if (!req.path.startsWith('/api/')) return next();
-  const authPath = '/api/auth/';
-  if (req.path.startsWith(authPath) || req.path === '/api/health' || req.path === '/api/status') return next();
+  const publicPrefixes = ['/api/auth/', '/api/public/'];
+  if (publicPrefixes.some(p => req.path.startsWith(p)) || req.path === '/api/health' || req.path === '/api/status') return next();
   const cookies = parseCookies(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE];
   if (!sessionId || !sessions.has(sessionId)) {
@@ -429,6 +429,36 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
   }
 }
 
+function handlePublicScenarioApi(req: express.Request, res: express.Response): void {
+  try {
+    const list = getScenarioList();
+    const scenario = list.find(s => s.name === req.params.name);
+    if (!scenario) {
+      res.status(404).json({ error: 'Scenario not found' });
+      return;
+    }
+    const days = parseDaysParam(req.query.days as string);
+    const history = getScenarioHistory(scenario.name, days);
+    const total = getScenarioHistoryCount(scenario.name, days);
+    const passed = history.filter(r => r.success).length;
+    const sla = total > 0 ? Math.round((passed / total) * 1000) / 10 : 100;
+    res.json({
+      name: scenario.name,
+      last_run: scenario.last_run,
+      last_success: scenario.last_success,
+      last_duration_ms: scenario.last_duration_ms,
+      total_runs: total,
+      passed_runs: passed,
+      failed_runs: total - passed,
+      sla,
+      tags: scenario.tags || [],
+      history: history.slice(0, 20),
+    });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -740,6 +770,7 @@ export function createApp(): express.Application {
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
 
+  app.get('/api/public/scenario/:name', handlePublicScenarioApi);
   app.get('/public/status/:name', handlePublicScenarioStatus);
 
   // Serve Angular frontend in production (only if built)
