@@ -71,6 +71,7 @@ export interface Scenario {
   ignoreHTTPSErrors?: boolean;
   timeout?: number;
   tags?: string[];
+  depends_on?: string;
   steps: Step[];
   alert?: AlertConfig;
 }

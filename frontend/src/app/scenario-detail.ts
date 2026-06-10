@@ -9,6 +9,7 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgFor, NgIf, DatePipe } from '@angular/common';
 import Chart from 'chart.js/auto';
 import { onScenarioRun, removeScenarioRunListener, onStepProgress, removeStepProgressListener } from './ws';
+import { apiFetch } from './api';
 
 interface ScenarioInfo {
   name: string;
@@ -19,6 +20,7 @@ interface ScenarioInfo {
   passed_runs: number;
   failed_runs: number;
   pass_rate: number;
+  depends_on?: string;
 }
 
 interface StepMetricsData {
@@ -62,6 +64,9 @@ interface ScenarioDetail {
       <button class="btn btn-sm btn-outline-success" (click)="runNow()" [disabled]="running" title="Run now">
         <i class="bi bi-send-fill"></i>{{ running ? '...' : '' }}
       </button>
+      <button class="btn btn-sm btn-outline-danger" (click)="cancelRun()" *ngIf="cancelling" disabled title="Cancelling...">
+        <i class="bi bi-stop-fill"></i>
+      </button>
       <div class="ms-auto" *ngIf="detail">
         <div class="dropdown">
           <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
@@ -83,6 +88,7 @@ interface ScenarioDetail {
         <span class="text-success fw-semibold">{{ detail.info.passed_runs }}</span> passed ·
         <span class="text-danger fw-semibold">{{ detail.info.failed_runs }}</span> failed ·
         <span class="fw-semibold">{{ detail.info.pass_rate }}%</span>
+        <span class="ms-2" *ngIf="detail.info.depends_on">· depends on <span class="fw-semibold">{{ detail.info.depends_on }}</span></span>
       </span>
     </div>
 
@@ -116,6 +122,32 @@ interface ScenarioDetail {
     </div>
 
     <ng-container *ngIf="detail">
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fs-2 fw-bold" [class.text-success]="sla >= 99" [class.text-warning]="sla >= 90 && sla < 99" [class.text-danger]="sla < 90">{{ sla }}%</div>
+            <div class="small text-secondary text-uppercase">SLA (7 days)</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fs-2 fw-bold">{{ detail.info.pass_rate }}%</div>
+            <div class="small text-secondary text-uppercase">Pass Rate</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fs-2 fw-bold">{{ detail.info.total_runs }}</div>
+            <div class="small text-secondary text-uppercase">Total Runs</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card border-0 shadow-sm text-center p-3">
+            <div class="fs-2 fw-bold" [class.text-danger]="detail.info.failed_runs > 0">{{ detail.info.failed_runs }}</div>
+            <div class="small text-secondary text-uppercase">Failed Runs</div>
+          </div>
+        </div>
+      </div>
       <div class="row g-3 mb-4">
         <div class="col-md-6">
           <div class="card border-0 shadow-sm">
@@ -219,6 +251,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   detail: ScenarioDetail | null = null;
   loading = true;
   running = false;
+  cancelling = false;
+  sla = 100;
   logs: Array<{ step_name: string; status: string; response_time_ms?: number; error?: string; timestamp: Date }> = [];
   private charts: Chart[] = [];
   private scenarioName = '';
@@ -291,7 +325,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.running = true;
     this.cdr.detectChanges();
     try {
-      await fetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/run`, { method: 'POST' });
+      await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/run`, { method: 'POST' });
     } catch {
       // Ignore
     } finally {
@@ -300,12 +334,34 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  async cancelRun(): Promise<void> {
+    this.cancelling = true;
+    this.cdr.detectChanges();
+    try {
+      await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/cancel`, { method: 'POST' });
+    } catch {
+      // Ignore
+    } finally {
+      this.cancelling = false;
+      this.cdr.detectChanges();
+    }
+  }
+
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
     try {
-      const res = await fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7`);
-      if (res.ok) {
-        this.detail = await res.json();
+      const [detailRes, slaRes] = await Promise.all([
+        apiFetch(`/api/scenarios/${encodeURIComponent(name)}?days=7`),
+        apiFetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`),
+      ]);
+      if (detailRes.ok) {
+        this.detail = await detailRes.json();
+      }
+      if (slaRes.ok) {
+        const slaData = await slaRes.json();
+        this.sla = slaData.sla;
+      }
+      if (detailRes.ok || slaRes.ok) {
         this.cdr.detectChanges();
         setTimeout(() => this.renderCharts(), 100);
       }

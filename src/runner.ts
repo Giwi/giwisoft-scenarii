@@ -40,6 +40,19 @@ export interface RunOptions {
   lightpandaPort?: number;
   timeout?: number;
   ignoreHTTPSErrors?: boolean;
+  signal?: AbortSignal;
+}
+
+const runningScenarios = new Map<string, AbortController>();
+
+export function cancelScenario(name: string): boolean {
+  const ctrl = runningScenarios.get(name);
+  if (ctrl) {
+    ctrl.abort();
+    runningScenarios.delete(name);
+    return true;
+  }
+  return false;
 }
 
 function getRandomPort(): number {
@@ -87,6 +100,10 @@ async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { w
   throw lastErr || new Error('Could not start Lightpanda');
 }
 
+function checkAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new Error(`Scenario aborted by user`);
+}
+
 async function runScenarioInternal(
   scenario: Scenario,
   options: RunOptions
@@ -113,6 +130,7 @@ async function runScenarioInternal(
 
   const run = async () => {
     try {
+      checkAborted(options.signal);
       if (hasBrowserActions) {
         const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
         lightpandaProc = proc;
@@ -127,6 +145,8 @@ async function runScenarioInternal(
 
       const stepResults: Map<string, boolean> = new Map();
       for (const step of scenario.steps) {
+        checkAborted(options.signal);
+
         broadcastStepProgress({
           scenario_name: scenario.name,
           step_name: step.name,
@@ -142,7 +162,7 @@ async function runScenarioInternal(
           }
         }
 
-        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout);
+        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout, options.signal);
         metrics.steps.push(stepMetrics);
         stepResults.set(step.name, stepMetrics.success);
 
@@ -263,12 +283,23 @@ export async function runScenario(
     }
   }
 
+  const ctrl = new AbortController();
+  if (!options.signal) {
+    runningScenarios.set(scenario.name, ctrl);
+    options = { ...options, signal: ctrl.signal };
+  }
+
   const execFn = () => runScenarioInternal(scenario, options);
 
+  let result: ScenarioMetrics;
   if (hasBrowserActions) {
-    return sequentialBrowser(execFn);
+    result = await sequentialBrowser(execFn);
+  } else {
+    result = await execFn();
   }
-  return execFn();
+
+  runningScenarios.delete(scenario.name);
+  return result;
 }
 
 export function runHttpScenario(

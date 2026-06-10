@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { Scenario, AlertConfig } from './types';
 import { runScenario, RunOptions } from './runner';
 import { sendDailyReport } from './report';
-import { upsertScenarioTags, getPreviousRunSuccess } from './storage';
+import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess } from './storage';
 import { getSettings } from './settings';
 import logger from './logger';
 import { DEFAULT_ALERT_CONSECUTIVE_FAILURES } from './constants';
@@ -31,7 +31,7 @@ export function scheduleScenario(
     return null;
   }
 
-  logger.info({ scenario: scenario.name, schedule: scenario.schedule }, 'Scheduling scenario');
+    logger.info({ scenario: scenario.name, schedule: scenario.schedule }, 'Scheduling scenario');
 
   const task = cron.schedule(scenario.schedule, async () => {
     const entry = scheduledTasks.find(st => st.scenario.name === scenario.name);
@@ -39,6 +39,16 @@ export function scheduleScenario(
       logger.info({ scenario: scenario.name }, 'Scenario is paused, skipping run');
       return;
     }
+
+    if (scenario.depends_on) {
+      const depOk = getLastRunSuccess(scenario.depends_on);
+      if (depOk === false) {
+        logger.warn({ scenario: scenario.name, depends_on: scenario.depends_on }, 'Dependency failed, skipping run');
+        return;
+      }
+      logger.info({ scenario: scenario.name, depends_on: scenario.depends_on, dep_status: depOk }, 'Dependency check passed');
+    }
+
     logger.info({ scenario: scenario.name }, 'Running scenario');
     const metrics = await runScenario(scenario, options);
 

@@ -7,11 +7,12 @@ interface FetchResponse {
   text(): Promise<string>;
 }
 
-async function doFetch(url: string, method: string, headers: Record<string, string> | undefined, body: string | undefined): Promise<FetchResponse> {
+async function doFetch(url: string, method: string, headers: Record<string, string> | undefined, body: string | undefined, signal?: AbortSignal): Promise<FetchResponse> {
   const res = await fetch(url, {
     method,
     headers: headers as Record<string, string> | undefined,
     body,
+    signal,
   });
   return {
     status: res.status,
@@ -103,7 +104,8 @@ function extractVariables(step: HttpStep, body: string, vars: Record<string, str
 export async function executeHttpStep(
   step: HttpStep,
   base_url: string | undefined,
-  vars: Record<string, string>
+  vars: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<StepMetrics> {
   const start = Date.now();
   const stepMetrics: StepMetrics = {
@@ -130,7 +132,7 @@ export async function executeHttpStep(
       body = String(step.body);
     }
 
-    const response = await doFetch(resolvedUrl, method, headers, body);
+    const response = await doFetch(resolvedUrl, method, headers, body, signal);
 
     const elapsed = Date.now() - start;
     const responseBody = await response.text();

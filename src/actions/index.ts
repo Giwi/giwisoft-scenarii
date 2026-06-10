@@ -9,10 +9,12 @@ export async function executeStep(
   base_url: string | undefined,
   vars: Record<string, string>,
   stepTimeout?: number,
+  signal?: AbortSignal,
 ): Promise<StepMetrics> {
   const runner = async (): Promise<StepMetrics> => {
+    if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
     if (step.action.startsWith('http.')) {
-      return executeHttpStep(step as import('../types').HttpStep, base_url, vars);
+      return executeHttpStep(step as import('../types').HttpStep, base_url, vars, signal);
     }
     if (step.action.startsWith('browser.')) {
       if (!page) throw new Error('Browser not initialized for browser action');
@@ -22,10 +24,19 @@ export async function executeStep(
   };
 
   const timeout = stepTimeout ?? step.timeout;
-  if (!timeout) return runner();
+  const cancellableRunner = async (): Promise<StepMetrics> => {
+    return new Promise<StepMetrics>((resolve, reject) => {
+      runner().then(resolve, reject);
+      if (signal) {
+        signal.addEventListener('abort', () => reject(new Error(`Step "${step.name}" aborted by user`)), { once: true });
+      }
+    });
+  };
+
+  if (!timeout) return cancellableRunner();
 
   return Promise.race([
-    runner(),
+    cancellableRunner(),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`Step "${step.name}" timed out after ${timeout}ms`)), timeout)
     ),

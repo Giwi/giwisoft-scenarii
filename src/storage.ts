@@ -306,6 +306,34 @@ export function getDistinctTags(): string[] {
   return [...tagSet].sort();
 }
 
+export function getLastRunSuccess(scenarioName: string): boolean | null {
+  if (!db) throw new Error('Database not initialized');
+  const row = db.prepare(`
+    SELECT success FROM scenario_runs
+    WHERE scenario_name = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(scenarioName) as { success: number } | undefined;
+  return row ? row.success === 1 : null;
+}
+
+export function backupDatabase(directory: string): string {
+  if (!db) throw new Error('Database not initialized');
+  const src = getDbPath();
+  fs.mkdirSync(directory, { recursive: true });
+  db.pragma('wal_checkpoint(TRUNCATE)');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dest = path.join(directory, `scenarii-${timestamp}.db`);
+  fs.copyFileSync(src, dest);
+  return dest;
+}
+
+function getDbPath(): string {
+  if (!db) return '';
+  const name = db.name;
+  return name;
+}
+
 export function closeStorage(): void {
   if (db) {
     try {

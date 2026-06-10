@@ -9,6 +9,7 @@ import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from './ws';
+import { apiFetch } from './api';
 
 interface ScenarioInfo {
   name: string;
@@ -19,6 +20,7 @@ interface ScenarioInfo {
   paused?: boolean;
   scheduled?: boolean;
   tags?: string[];
+  depends_on?: string;
 }
 
 @Component({
@@ -89,6 +91,7 @@ interface ScenarioInfo {
             <tr>
               <th>Scenario</th>
               <th>Tags</th>
+              <th>Depends on</th>
               <th>Status</th>
               <th>Last run</th>
               <th>Duration</th>
@@ -103,6 +106,7 @@ interface ScenarioInfo {
                 <span class="badge bg-info me-1" *ngFor="let tag of (s.tags || [])" style="font-size:.7rem">{{ tag }}</span>
                 <span class="text-secondary small" *ngIf="!s.tags?.length">—</span>
               </td>
+              <td class="small text-secondary">{{ s.depends_on || '—' }}</td>
               <td>
                 <span
                   class="badge"
@@ -123,6 +127,9 @@ interface ScenarioInfo {
               <td class="text-end">
                 <button class="btn btn-sm btn-outline-success me-1" (click)="runNow(s.name)" [disabled]="running === s.name" title="Run now">
                   <i class="bi bi-send-fill"></i>{{ running === s.name ? '...' : '' }}
+                </button>
+                <button class="btn btn-sm btn-outline-danger me-1" (click)="cancelRun(s.name)" *ngIf="cancelling === s.name" disabled title="Cancel">
+                  <i class="bi bi-stop-fill"></i>
                 </button>
                 <button
                   class="btn btn-sm me-1"
@@ -149,6 +156,7 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
   scenarios: ScenarioInfo[] = [];
   loading = true;
   running = '';
+  cancelling = '';
   tagFilter = '';
   allTags: string[] = [];
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -192,8 +200,8 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     try {
       const url = this.tagFilter ? `/api/scenarios?tag=${encodeURIComponent(this.tagFilter)}` : '/api/scenarios';
       const [scenariosRes, tagsRes] = await Promise.all([
-        fetch(url),
-        fetch('/api/tags'),
+        apiFetch(url),
+        apiFetch('/api/tags'),
       ]);
       if (scenariosRes.ok) {
         this.scenarios = await scenariosRes.json();
@@ -214,7 +222,7 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     this.running = name;
     this.cdr.detectChanges();
     try {
-      await fetch(`/api/scenarios/${encodeURIComponent(name)}/run`, { method: 'POST' });
+      await apiFetch(`/api/scenarios/${encodeURIComponent(name)}/run`, { method: 'POST' });
     } catch {
       // Ignore — the run will proceed server-side
     } finally {
@@ -223,10 +231,23 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     }
   }
 
+  async cancelRun(name: string): Promise<void> {
+    this.cancelling = name;
+    this.cdr.detectChanges();
+    try {
+      await apiFetch(`/api/scenarios/${encodeURIComponent(name)}/cancel`, { method: 'POST' });
+    } catch {
+      // Ignore
+    } finally {
+      this.cancelling = '';
+      this.cdr.detectChanges();
+    }
+  }
+
   async togglePause(s: ScenarioInfo): Promise<void> {
     const action = s.paused ? 'resume' : 'pause';
     try {
-      const res = await fetch(`/api/scenarios/${encodeURIComponent(s.name)}/${action}`, { method: 'POST' });
+      const res = await apiFetch(`/api/scenarios/${encodeURIComponent(s.name)}/${action}`, { method: 'POST' });
       if (res.ok) {
         s.paused = !s.paused;
         this.cdr.detectChanges();

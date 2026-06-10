@@ -4,12 +4,15 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
-import { getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioStepNames, getDistinctTags, getNotificationMetrics } from './storage';
+import {
+  getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount,
+  getScenarioStepNames, getDistinctTags, getNotificationMetrics,
+  isStorageReady, backupDatabase, getLastRunSuccess,
+} from './storage';
 import { initWebSocket } from './ws';
-import { isStorageReady } from './storage';
 import { getSettings } from './settings';
 import { loadScenarioFile, parseScenario, serializeScenario } from './parser';
-import { runScenario } from './runner';
+import { runScenario, cancelScenario } from './runner';
 import { pauseScenario, resumeScenario, isPaused, isScheduled } from './scheduler';
 import { ScenarioMetrics } from './types';
 import logger from './logger';
@@ -47,6 +50,46 @@ function parseLimitParam(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const n = parseInt(value);
   return isNaN(n) ? undefined : n;
+}
+
+const sessions = new Map<string, { createdAt: number }>();
+
+function generateToken(): string {
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
+function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const config = getSettings().auth;
+  if (!config?.enabled) return next();
+  const authPath = '/api/auth/';
+  if (req.path.startsWith(authPath) || req.path === '/api/health') return next();
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+  const token = header.slice(7);
+  if (!sessions.has(token)) {
+    res.status(401).json({ error: 'Invalid or expired token' });
+    return;
+  }
+  next();
+}
+
+function handleLogin(req: express.Request, res: express.Response): void {
+  const config = getSettings().auth;
+  if (!config?.enabled) {
+    res.status(400).json({ error: 'Authentication not configured' });
+    return;
+  }
+  const { password } = req.body as { password?: string };
+  if (!password || password !== config.password) {
+    res.status(401).json({ error: 'Invalid password' });
+    return;
+  }
+  const token = generateToken();
+  sessions.set(token, { createdAt: Date.now() });
+  res.json({ token });
 }
 
 function requestIdMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
@@ -216,11 +259,27 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
       ...s,
       paused: isPaused(s.name),
       scheduled: isScheduled(s.name),
+      depends_on: getScenarioDependsOn(s.name),
     }));
     res.json(list);
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
+}
+
+function getScenarioDependsOn(name: string): string | undefined {
+  if (!_scenariosDir) return undefined;
+  try {
+    const files = fs.readdirSync(_scenariosDir)
+      .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+    for (const file of files) {
+      const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+      if (scenario.name === name && scenario.depends_on) {
+        return scenario.depends_on;
+      }
+    }
+  } catch { /* ignore */ }
+  return undefined;
 }
 
 function handleScenarioDetail(req: express.Request, res: express.Response): void {
@@ -240,6 +299,7 @@ function handleScenarioDetail(req: express.Request, res: express.Response): void
         passed_runs: passedRuns,
         failed_runs: total - passedRuns,
         pass_rate: total > 0 ? Math.round(passedRuns / total * 100) : 0,
+        depends_on: getScenarioDependsOn(name),
       },
       history,
       stepNames,
@@ -286,6 +346,46 @@ function handleExportCsv(req: express.Request, res: express.Response): void {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.type('text/csv');
     res.send(toCsv(history));
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+function handleCancel(req: express.Request, res: express.Response): void {
+  const name = req.params.name as string;
+  if (cancelScenario(name)) {
+    res.json({ status: 'cancelled', scenario: name });
+  } else {
+    res.status(404).json({ error: 'Scenario not currently running' });
+  }
+}
+
+function handleSla(req: express.Request, res: express.Response): void {
+  try {
+    const name = req.params.name as string;
+    const days = parseDaysParam(req.query.days as string);
+    const total = getScenarioHistoryCount(name, days);
+    const history = getScenarioHistory(name, days);
+    const passed = history.filter(r => r.success).length;
+    res.json({
+      scenario: name,
+      days,
+      total_runs: total,
+      passed_runs: passed,
+      failed_runs: total - passed,
+      sla: total > 0 ? Math.round((passed / total) * 1000) / 10 : 100,
+    });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+function handleBackup(_req: express.Request, res: express.Response): void {
+  try {
+    const settings = getSettings();
+    const dir = settings.storage?.backup?.directory || './backups';
+    const path = backupDatabase(dir);
+    res.json({ status: 'ok', path });
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -401,10 +501,14 @@ export function createApp(): express.Application {
   app.use(requestIdMiddleware);
   app.use(requestLogger);
 
+  app.post('/api/auth/login', handleLogin);
+  app.use(authMiddleware);
+
   app.get('/api/scenarios', handleScenarioList);
   app.get('/api/scenarios/:name', handleScenarioDetail);
   app.get('/api/scenarios/:name/history', handleScenarioHistory);
   app.post('/api/scenarios/:name/run', handleRunNow);
+  app.post('/api/scenarios/:name/cancel', handleCancel);
   app.post('/api/scenarios/:name/pause', handlePause);
   app.post('/api/scenarios/:name/resume', handleResume);
   app.get('/api/scenarios/:name/config', handleConfigExport);
@@ -412,8 +516,10 @@ export function createApp(): express.Application {
   app.delete('/api/scenarios/:name/config', handleConfigDelete);
   app.get('/api/scenarios/:name/export/json', handleExportJson);
   app.get('/api/scenarios/:name/export/csv', handleExportCsv);
+  app.get('/api/scenarios/:name/sla', handleSla);
   app.get('/api/tags', handleTags);
   app.get('/api/status', handleStatus);
+  app.post('/api/backup', handleBackup);
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
 
@@ -446,5 +552,27 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
     logger.info({ port }, 'API server running');
   });
   initWebSocket(server);
+
+  const s = getSettings();
+  if (s.storage?.backup?.enabled) {
+    try {
+      const backupCron = s.storage.backup.cron || '0 4 * * *';
+      if (require('node-cron').validate(backupCron)) {
+        require('node-cron').schedule(backupCron, () => {
+          try {
+            const dir = s.storage?.backup?.directory || './backups';
+            const path = backupDatabase(dir);
+            logger.info({ path }, 'Automated database backup completed');
+          } catch (err: unknown) {
+            logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Automated backup failed');
+          }
+        });
+        logger.info({ cron: backupCron }, 'Backup scheduled');
+      }
+    } catch (err: unknown) {
+      logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to schedule backup');
+    }
+  }
+
   return server;
 }

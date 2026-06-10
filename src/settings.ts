@@ -50,8 +50,20 @@ export interface ApiConfig {
   };
 }
 
+export interface BackupConfig {
+  enabled: boolean;
+  cron?: string;
+  directory?: string;
+}
+
+export interface AuthConfig {
+  enabled: boolean;
+  password: string;
+}
+
 export interface StorageConfig {
   retentionDays?: number;
+  backup?: BackupConfig;
 }
 
 export interface ScenarioOverrides {
@@ -62,6 +74,7 @@ export interface ScenarioOverrides {
 
 export interface Settings {
   api?: ApiConfig;
+  auth?: AuthConfig;
   storage?: StorageConfig;
   notifications?: NotificationsConfig;
   scenarios?: Record<string, ScenarioOverrides>;
