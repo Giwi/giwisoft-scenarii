@@ -1,3 +1,28 @@
+# API key auth for Prometheus metrics endpoint
+api:
+  auth:
+    enabled: true
+    api_key: "YOUR_API_KEY"
+
+# Dashboard authentication (optional — OIDC)
+auth:
+  enabled: true
+  oidc:
+    issuer_url: "https://accounts.google.com"
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR_CLIENT_SECRET"
+    redirect_uri: "http://localhost:3000/api/auth/callback"
+    scopes: "openid profile email"
+
+# Database storage settings
+storage:
+  retentionDays: 30          # data retention period (default 7)
+  backup:                    # optional automated SQLite backups
+    enabled: true
+    cron: "0 4 * * *"       # default: daily at 4am
+    directory: "./backups"  # default: ./backups
+
+# Alerting channels — fire on state transitions (pass→fail, fail→pass)
 notifications:
   telegram:
     enabled: false
@@ -11,3 +36,20 @@ notifications:
       from: "scenarii <notifications@YOUR_DOMAIN>"
     to:
       - "admin@example.com"
+  slack:
+    enabled: false
+    webhook_url: "https://hooks.slack.com/services/..."
+  discord:
+    enabled: false
+    webhook_url: "https://discord.com/api/webhooks/..."
+  webhook:
+    enabled: false
+    url: "https://your-endpoint/hook"
+
+# Per-scenario overrides (optional)
+scenarios:
+  my-scenario:
+    ignoreHTTPSErrors: true
+    timeout: 60000
+    notifications:
+      enabled: false
