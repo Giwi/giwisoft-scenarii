@@ -109,8 +109,7 @@ program
     }
 
     if (scenarioFiles.length === 0) {
-      logger.error(`No .yml or .yaml files found in ${scenariosDir}`);
-      process.exit(1);
+      logger.warn(`No .yml or .yaml files found in ${scenariosDir} — server will start with no scenarios`);
     }
 
     const runOptions = { headless: true, persist: true };
