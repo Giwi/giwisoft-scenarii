@@ -5,6 +5,10 @@ import path from 'path';
 import fs from 'fs';
 import http from 'http';
 import crypto from 'crypto';
+import { ChildProcess } from 'child_process';
+import { lightpanda } from '@lightpanda/browser';
+import { chromium } from 'playwright-core';
+import net from 'net';
 import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
   getScenarioStepNames, getDistinctTags, getNotificationMetrics,
@@ -213,7 +217,47 @@ function requestIdMiddleware(req: express.Request, res: express.Response, next: 
 }
 
 let _scenariosDir: string | undefined;
-let _runOptions: { headless: boolean; persist: boolean } | undefined;
+let _runOptions: { headless: boolean; persist: boolean; lightpandaUrl?: string } | undefined;
+
+let _lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
+let _lightpandaPort: number | null = null;
+
+const LIGHTPANDA_PORT = 9222;
+const PORT_WAIT_TIMEOUT = 10000;
+
+function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    function tryConnect() {
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error(`Timeout waiting for ${host}:${port}`));
+        return;
+      }
+      const sock = new net.Socket();
+      sock.setTimeout(2000);
+      sock.once('connect', () => { sock.destroy(); resolve(); });
+      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, 200); });
+      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, 200); });
+      sock.connect(port, host);
+    }
+    tryConnect();
+  });
+}
+
+export function getLightpandaUrl(): string | undefined {
+  return _runOptions?.lightpandaUrl;
+}
+
+export function closeLightpanda(): void {
+  if (_lightpandaProc) {
+    try {
+      _lightpandaProc.stdout?.destroy();
+      _lightpandaProc.stderr?.destroy();
+      _lightpandaProc.kill();
+    } catch { /* ignore */ }
+    _lightpandaProc = null;
+  }
+}
 
 function handlePause(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
@@ -854,6 +898,22 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
   _scenariosDir = scenariosDir;
   if (runOptions) _runOptions = runOptions;
   const app = createApp();
+
+  // Start Lightpanda headless browser globally so all workers share it
+  (async () => {
+    try {
+      const proc = await lightpanda.serve({ host: '127.0.0.1', port: LIGHTPANDA_PORT });
+      await waitForPort('127.0.0.1', LIGHTPANDA_PORT, PORT_WAIT_TIMEOUT);
+      _lightpandaProc = proc;
+      _lightpandaPort = LIGHTPANDA_PORT;
+      const url = `ws://127.0.0.1:${LIGHTPANDA_PORT}`;
+      if (_runOptions) _runOptions.lightpandaUrl = url;
+      logger.info({ port: LIGHTPANDA_PORT }, 'Lightpanda headless browser started');
+    } catch (err: unknown) {
+      logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Failed to start global Lightpanda — workers will start per-run');
+    }
+  })();
+
   const server = app.listen(port, () => {
     logger.info({ port }, 'API server running');
   });

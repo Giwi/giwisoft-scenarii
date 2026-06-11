@@ -114,6 +114,7 @@ export interface RunOptions {
   json_output?: boolean;
   persist?: boolean;
   lightpandaPort?: number;
+  lightpandaUrl?: string;
   timeout?: number;
   ignoreHTTPSErrors?: boolean;
 }

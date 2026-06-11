@@ -9,7 +9,7 @@ import { runScenario, RunOptions } from './runner';
 import { scheduleScenario, stopAll, listScheduled, scheduleReport } from './scheduler';
 import { initStorage, closeStorage, isStorageReady } from './storage';
 import { loadSettings, watchSettings } from './settings';
-import { createServer } from './server';
+import { createServer, closeLightpanda } from './server';
 import logger from './logger';
 import { DAILY_REPORT_CRON } from './constants';
 
@@ -25,6 +25,7 @@ process.on('unhandledRejection', (reason) => {
 function shutdown(server?: http.Server): void {
   logger.info('Shutting down...');
   stopAll();
+  closeLightpanda();
   if (server) {
     server.close();
   }

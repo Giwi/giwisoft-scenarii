@@ -82,15 +82,24 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
   const run = async () => {
     try {
       if (hasBrowserActions) {
-        const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
-        lightpandaProc = proc;
+        if (options.lightpandaUrl) {
+          browser = await chromium.connectOverCDP(options.lightpandaUrl);
+          browserContext = await browser.newContext({
+            viewport: DEFAULT_BROWSER_VIEWPORT,
+            ignoreHTTPSErrors,
+          });
+          page = await browserContext.newPage();
+        } else {
+          const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
+          lightpandaProc = proc;
 
-        browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
-        browserContext = await browser.newContext({
-          viewport: DEFAULT_BROWSER_VIEWPORT,
-          ignoreHTTPSErrors,
-        });
-        page = await browserContext.newPage();
+          browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
+          browserContext = await browser.newContext({
+            viewport: DEFAULT_BROWSER_VIEWPORT,
+            ignoreHTTPSErrors,
+          });
+          page = await browserContext.newPage();
+        }
       }
 
       const stepResults: Map<string, boolean> = new Map();
@@ -130,20 +139,26 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
       };
       metrics.steps.push(stepMetrics);
     } finally {
-      if (browser) {
-        try { await browser.close(); } catch {}
-      } else if (browserContext) {
-        try { await browserContext.close(); } catch {}
-      }
-      if (lightpandaProc) {
-        try {
-          lightpandaProc.stdout?.destroy();
-          lightpandaProc.stderr?.destroy();
-          lightpandaProc.kill();
-          const timer = setTimeout(() => {}, PROCESS_EXIT_TIMEOUT);
-          lightpandaProc.once('exit', () => clearTimeout(timer));
-          lightpandaProc.once('error', () => clearTimeout(timer));
-        } catch {}
+      if (options.lightpandaUrl) {
+        if (browserContext) {
+          try { await browserContext.close(); } catch {}
+        }
+      } else {
+        if (browser) {
+          try { await browser.close(); } catch {}
+        } else if (browserContext) {
+          try { await browserContext.close(); } catch {}
+        }
+        if (lightpandaProc) {
+          try {
+            lightpandaProc.stdout?.destroy();
+            lightpandaProc.stderr?.destroy();
+            lightpandaProc.kill();
+            const timer = setTimeout(() => {}, PROCESS_EXIT_TIMEOUT);
+            lightpandaProc.once('exit', () => clearTimeout(timer));
+            lightpandaProc.once('error', () => clearTimeout(timer));
+          } catch {}
+        }
       }
     }
   };
