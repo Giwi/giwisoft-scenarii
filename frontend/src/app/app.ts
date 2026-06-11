@@ -69,8 +69,7 @@ import { NgIf } from '@angular/common';
           href="https://giwi.fr"
           target="_blank"
           rel="noopener"
-          class="text-decoration-none fw-medium"
-          style="color: var(--accent)"
+          class="text-decoration-none fw-medium accent-link"
           >GiwiSoft</a
         >
         2026

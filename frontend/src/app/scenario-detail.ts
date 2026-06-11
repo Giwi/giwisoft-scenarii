@@ -203,10 +203,10 @@ interface ScenarioDetail {
                   </td>
                   <td>
                     <details>
-                      <summary class="text-primary small" style="cursor:pointer">
+                      <summary class="small">
                         {{ run.steps.length }} steps
                       </summary>
-                      <table class="table table-sm mt-2 mb-0" style="font-size: .75rem">
+                      <table class="table table-sm mt-2 mb-0 small">
                         <tr *ngFor="let step of run.steps" class="align-top">
                           <td class="py-0 ps-0 pe-2 border-0">{{ step.step_name }}</td>
                           <td class="font-monospace py-0 px-2 border-0 text-nowrap">
@@ -216,20 +216,17 @@ interface ScenarioDetail {
                             <span
                               class="badge bg-success"
                               *ngIf="step.success"
-                              style="font-size: .65rem"
                               >OK</span
                             >
                             <span
                               class="badge bg-danger"
                               *ngIf="!step.success"
-                              style="font-size: .65rem"
                               >ERR</span
                             >
                           </td>
                           <td
-                            class="text-danger py-0 ps-2 pe-0 border-0"
+                            class="text-danger py-0 ps-2 pe-0 border-0 small"
                             *ngIf="step.error"
-                            style="font-size: .65rem"
                           >
                             {{ step.error }}
                           </td>

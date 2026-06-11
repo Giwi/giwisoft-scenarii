@@ -44,7 +44,7 @@ interface ScenarioStatus {
       <div class="d-flex align-items-center gap-2 mb-2">
         <h1 class="h4 mb-0">{{ scenario.name }}</h1>
         <span class="ms-2" *ngIf="scenario.tags.length">
-          <span class="badge bg-info me-1" style="font-size:.7rem" *ngFor="let tag of scenario.tags">{{ tag }}</span>
+          <span class="badge bg-info me-1" *ngFor="let tag of scenario.tags">{{ tag }}</span>
         </span>
       </div>
       <div class="small text-secondary mb-4">
