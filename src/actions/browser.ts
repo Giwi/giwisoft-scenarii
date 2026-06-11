@@ -51,7 +51,8 @@ export async function executeBrowserStep(
   step: BrowserStep,
   page: Page,
   base_url: string | undefined,
-  vars: Record<string, string>
+  vars: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<StepMetrics> {
   const noRetry = step.action === 'browser.evaluate' || step.action === 'browser.screenshot' || step.action === 'browser.screenshot_compare';
   const maxRetries = noRetry ? 0 : BROWSER_RETRIES;
@@ -67,6 +68,7 @@ export async function executeBrowserStep(
     };
 
     try {
+      if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
       switch (step.action) {
         case 'browser.navigate': {
           if (!step.url) throw new Error('browser.navigate requires a "url" field');
@@ -82,6 +84,7 @@ export async function executeBrowserStep(
         case 'browser.fill': {
           if (!step.selector) throw new Error('browser.fill requires a "selector" field');
           if (step.value === undefined) throw new Error('browser.fill requires a "value" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           const sel = JSON.stringify(step.selector);
           const val = JSON.stringify(interpolateVars(step.value, vars));
           await page.evaluate(`(() => {
@@ -98,6 +101,7 @@ export async function executeBrowserStep(
         case 'browser.type': {
           if (!step.selector) throw new Error('browser.type requires a "selector" field');
           if (step.value === undefined) throw new Error('browser.type requires a "value" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           const typedSel = JSON.stringify(step.selector);
           const typedVal = JSON.stringify(interpolateVars(step.value, vars));
           await page.evaluate(`(() => {
@@ -114,18 +118,21 @@ export async function executeBrowserStep(
 
         case 'browser.click': {
           if (!step.selector) throw new Error('browser.click requires a "selector" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.click(step.selector);
           break;
         }
 
         case 'browser.check': {
           if (!step.selector) throw new Error('browser.check requires a "selector" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.check(step.selector);
           break;
         }
 
         case 'browser.uncheck': {
           if (!step.selector) throw new Error('browser.uncheck requires a "selector" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.uncheck(step.selector);
           break;
         }
@@ -133,23 +140,27 @@ export async function executeBrowserStep(
         case 'browser.select': {
           if (!step.selector) throw new Error('browser.select requires a "selector" field');
           if (step.value === undefined) throw new Error('browser.select requires a "value" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.selectOption(step.selector, interpolateVars(step.value, vars));
           break;
         }
 
         case 'browser.wait_for': {
           if (!step.selector) throw new Error('browser.wait_for requires a "selector" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.waitForSelector(step.selector, { timeout: step.timeout || DEFAULT_SELECTOR_TIMEOUT });
           break;
         }
 
         case 'browser.screenshot': {
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           const path = step.value || `screenshot-${Date.now()}.png`;
           await page.screenshot({ path, fullPage: true });
           break;
         }
 
         case 'browser.screenshot_compare': {
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           const basePath = step.value || `baseline-${step.name}.png`;
           const currentPath = `current-${step.name}-${Date.now()}.png`;
           await page.screenshot({ path: currentPath, fullPage: true });
@@ -172,6 +183,7 @@ export async function executeBrowserStep(
 
         case 'browser.evaluate': {
           if (!step.script) throw new Error('browser.evaluate requires a "script" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.evaluate(step.script);
           break;
         }

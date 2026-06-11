@@ -18,15 +18,16 @@ export async function executeStep(
     }
     if (step.action.startsWith('browser.')) {
       if (!page) throw new Error('Browser not initialized for browser action');
-      return executeBrowserStep(step as import('../types').BrowserStep, page, base_url, vars);
+      return executeBrowserStep(step as import('../types').BrowserStep, page, base_url, vars, signal);
     }
     throw new Error(`Unknown action: ${step.action}`);
   };
 
   const timeout = stepTimeout ?? step.timeout;
   const cancellableRunner = async (): Promise<StepMetrics> => {
+    const runnerPromise = runner().catch(() => undefined as unknown as StepMetrics);
     return new Promise<StepMetrics>((resolve, reject) => {
-      runner().then(resolve, reject);
+      runnerPromise.then(resolve, reject);
       if (signal) {
         signal.addEventListener('abort', () => reject(new Error(`Step "${step.name}" aborted by user`)), { once: true });
       }

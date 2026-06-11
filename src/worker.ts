@@ -106,7 +106,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
           }
         }
 
-        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout);
+        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout, abortController.signal);
         metrics.steps.push(stepMetrics);
         stepResults.set(step.name, stepMetrics.success);
 
