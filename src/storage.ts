@@ -227,6 +227,16 @@ export function getScenarioHistory(
   return Array.from(runMap.values());
 }
 
+export function getScenarioPassedRunCount(name: string, limitDays: number = 7): number {
+  if (!db) throw new Error('Database not initialized');
+  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const row = db.prepare(`
+    SELECT COUNT(*) AS count FROM scenario_runs
+    WHERE scenario_name = ? AND created_at >= ? AND success = 1
+  `).get(name, since) as { count: number };
+  return row.count;
+}
+
 export function getScenarioHistoryCount(name: string, limitDays: number = 7): number {
   if (!db) throw new Error('Database not initialized');
   const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');

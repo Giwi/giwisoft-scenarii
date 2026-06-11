@@ -34,8 +34,8 @@ interface ScenarioInfo {
   total_runs: number;
   passed_runs: number;
   failed_runs: number;
-  pass_rate: number;
   depends_on?: string;
+  tags: string[];
 }
 
 interface StepMetricsData {
@@ -119,8 +119,7 @@ interface ScenarioDetail {
       <span class="small text-secondary" *ngIf="detail">
         <span class="fw-semibold">{{ detail.info.total_runs }}</span> runs ·
         <span class="text-success fw-semibold">{{ detail.info.passed_runs }}</span> passed ·
-        <span class="text-danger fw-semibold">{{ detail.info.failed_runs }}</span> failed ·
-        <span class="fw-semibold">{{ detail.info.pass_rate }}%</span>
+        <span class="text-danger fw-semibold">{{ detail.info.failed_runs }}</span> failed
         <span class="ms-2" *ngIf="detail.info.depends_on">· depends on <span class="fw-semibold">{{ detail.info.depends_on }}</span></span>
       </span>
     </div>
@@ -137,25 +136,19 @@ interface ScenarioDetail {
 
     <ng-container *ngIf="detail">
       <div class="row g-3 mb-4">
-        <div class="col-md-3">
+        <div class="col-sm-4">
           <div class="card border-0 shadow-sm text-center p-3">
             <div class="fs-2 fw-bold" [class.text-success]="sla >= 99" [class.text-warning]="sla >= 90 && sla < 99" [class.text-danger]="sla < 90">{{ sla }}%</div>
             <div class="small text-secondary text-uppercase">SLA (7 days)</div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card border-0 shadow-sm text-center p-3">
-            <div class="fs-2 fw-bold">{{ detail.info.pass_rate }}%</div>
-            <div class="small text-secondary text-uppercase">Pass Rate</div>
-          </div>
-        </div>
-        <div class="col-md-3">
+        <div class="col-sm-4">
           <div class="card border-0 shadow-sm text-center p-3">
             <div class="fs-2 fw-bold">{{ detail.info.total_runs }}</div>
             <div class="small text-secondary text-uppercase">Total Runs</div>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-sm-4">
           <div class="card border-0 shadow-sm text-center p-3">
             <div class="fs-2 fw-bold" [class.text-danger]="detail.info.failed_runs > 0">{{ detail.info.failed_runs }}</div>
             <div class="small text-secondary text-uppercase">Failed Runs</div>

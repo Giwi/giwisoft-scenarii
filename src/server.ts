@@ -6,7 +6,7 @@ import fs from 'fs';
 import http from 'http';
 import crypto from 'crypto';
 import {
-  getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount,
+  getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
   getScenarioStepNames, getDistinctTags, getNotificationMetrics,
   isStorageReady, backupDatabase, getLastRunSuccess,
 } from './storage';
@@ -344,7 +344,7 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
     const days = parseDaysParam(req.query.days as string);
     const history = getScenarioHistory(scenario.name, days);
     const total = getScenarioHistoryCount(scenario.name, days);
-    const passed = history.filter(r => r.success).length;
+    const passed = getScenarioPassedRunCount(scenario.name, days);
     const sla = total > 0 ? Math.round((passed / total) * 1000) / 10 : 100;
 
     const labelsJson = JSON.stringify(history.map(r => new Date(r.started_at).toLocaleString()).reverse());
@@ -483,7 +483,7 @@ function handlePublicScenarioApi(req: express.Request, res: express.Response): v
     const days = parseDaysParam(req.query.days as string);
     const history = getScenarioHistory(scenario.name, days);
     const total = getScenarioHistoryCount(scenario.name, days);
-    const passed = history.filter(r => r.success).length;
+    const passed = getScenarioPassedRunCount(scenario.name, days);
     const sla = total > 0 ? Math.round((passed / total) * 1000) / 10 : 100;
     res.json({
       name: scenario.name,
@@ -576,8 +576,7 @@ function handleScenarioDetail(req: express.Request, res: express.Response): void
     const offset = parseLimitParam(req.query.offset as string) ?? 0;
     const name = req.params.name as string;
     const { info: rawInfo, history, stepNames, total } = getScenarioDetail(name, days, limit, offset);
-
-    const passedRuns = history.filter(r => r.success).length;
+    const passedRuns = getScenarioPassedRunCount(name, days);
 
     res.json({
       info: {
@@ -585,7 +584,6 @@ function handleScenarioDetail(req: express.Request, res: express.Response): void
         total_runs: total,
         passed_runs: passedRuns,
         failed_runs: total - passedRuns,
-        pass_rate: total > 0 ? Math.round(passedRuns / total * 100) : 0,
         depends_on: getScenarioDependsOn(name),
       },
       history,
@@ -652,8 +650,7 @@ function handleSla(req: express.Request, res: express.Response): void {
     const name = req.params.name as string;
     const days = parseDaysParam(req.query.days as string);
     const total = getScenarioHistoryCount(name, days);
-    const history = getScenarioHistory(name, days);
-    const passed = history.filter(r => r.success).length;
+    const passed = getScenarioPassedRunCount(name, days);
     res.json({
       scenario: name,
       days,
