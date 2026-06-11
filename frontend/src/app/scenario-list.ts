@@ -101,7 +101,7 @@ interface ScenarioInfo {
           </thead>
           <tbody>
             <tr *ngFor="let s of scenarios">
-              <td class="fw-semibold">{{ s.name }}</td>
+              <td class="fw-semibold"><a [routerLink]="['/scenario', s.name]" class="text-decoration-none">{{ s.name }}</a></td>
               <td>
                 <span class="badge bg-info me-1" *ngFor="let tag of (s.tags || [])">{{ tag }}</span>
                 <span class="text-secondary small" *ngIf="!s.tags?.length">—</span>
