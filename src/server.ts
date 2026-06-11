@@ -425,11 +425,29 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
       });
     }
 
+    function areaGradient(color, alphaTop, alphaBottom) {
+      alphaTop = alphaTop || 0.25;
+      alphaBottom = alphaBottom || 0.02;
+      return function(ctx) {
+        var chart = ctx.chart;
+        var canvasCtx = chart.ctx;
+        var chartArea = chart.chartArea;
+        if (!chartArea) return null;
+        var grad = canvasCtx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+        var r = parseInt(color.slice(1, 3), 16);
+        var g = parseInt(color.slice(3, 5), 16);
+        var b = parseInt(color.slice(5, 7), 16);
+        grad.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',' + alphaBottom + ')');
+        grad.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',' + alphaTop + ')');
+        return grad;
+      };
+    }
+
     new Chart('durationChart', {
       type: 'line',
       data: {
         labels: ${labelsJson},
-        datasets: [{ label: 'Duration (ms)', data: ${durationsJson}, borderColor: accent, backgroundColor: isDark ? 'rgba(0,212,255,0.1)' : 'rgba(99,102,241,0.08)', fill: true, tension: 0.3, pointRadius: 3 }]
+        datasets: [{ label: 'Duration (ms)', data: ${durationsJson}, borderColor: accent, backgroundColor: areaGradient(accent), fill: true, tension: 0.3, borderWidth: 1.5, pointRadius: 2 }]
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } }, y: { beginAtZero: true, ticks: { font: { size: 10 }, color: textColor }, grid: { color: gridColor } } } }
     });
@@ -438,7 +456,7 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
       type: 'line',
       data: {
         labels: ${labelsJson},
-        datasets: [{ label: 'Success', data: runningAverage(${successJson}, 5), borderColor: green, backgroundColor: isDark ? 'rgba(63,185,80,0.1)' : 'rgba(45,198,83,0.1)', fill: true, tension: 0.3, pointRadius: 3 }]
+        datasets: [{ label: 'Success', data: runningAverage(${successJson}, 5), borderColor: green, backgroundColor: areaGradient(green), fill: true, tension: 0.3, borderWidth: 1.5, pointRadius: 2 }]
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } }, y: { min: 0, max: 1, ticks: { font: { size: 10 }, color: textColor, callback: function(v) { return v * 100 + '%'; } }, grid: { color: gridColor } } } }
     });

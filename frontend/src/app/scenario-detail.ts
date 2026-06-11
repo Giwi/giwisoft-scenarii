@@ -11,6 +11,21 @@ import Chart from 'chart.js/auto';
 import { onScenarioRun, removeScenarioRunListener, onStepProgress, removeStepProgressListener } from './ws';
 import { apiFetch } from './api';
 
+function areaGradient(color: string, alphaTop = 0.25, alphaBottom = 0.02) {
+  return (ctx: any) => {
+    const chart = ctx.chart;
+    const { ctx: canvasCtx, chartArea } = chart;
+    if (!chartArea) return null;
+    const grad = canvasCtx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    grad.addColorStop(0, `rgba(${r},${g},${b},${alphaBottom})`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},${alphaTop})`);
+    return grad;
+  };
+}
+
 interface ScenarioInfo {
   name: string;
   last_run: string | null;
@@ -456,10 +471,11 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
                 label: 'Duration (ms)',
                 data: durations,
                 borderColor: accent,
-                backgroundColor: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(99, 102, 241, 0.08)',
+                backgroundColor: areaGradient(accent),
                 fill: true,
                 tension: 0.3,
-                pointRadius: 3,
+                borderWidth: 1.5,
+                pointRadius: 2,
               },
             ],
           },
@@ -496,10 +512,11 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
                 label: 'Success',
                 data: runningAvg,
                 borderColor: green,
-                backgroundColor: isDark ? 'rgba(63, 185, 80, 0.1)' : 'rgba(45, 198, 83, 0.1)',
+                backgroundColor: areaGradient(green),
                 fill: true,
                 tension: 0.3,
-                pointRadius: 3,
+                borderWidth: 1.5,
+                pointRadius: 2,
               },
             ],
           },
@@ -543,8 +560,11 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
             label: stepName,
             data,
             borderColor: stepColors[i % stepColors.length],
+            backgroundColor: areaGradient(stepColors[i % stepColors.length], 0.15, 0.01),
+            fill: true,
             tension: 0.3,
-            pointRadius: 2,
+            borderWidth: 1.5,
+            pointRadius: 1.5,
           };
         });
 
