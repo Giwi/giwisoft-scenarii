@@ -3,6 +3,8 @@ import { Step, StepMetrics } from '../types';
 import { executeHttpStep } from './http';
 import { executeBrowserStep } from './browser';
 
+// Dispatches step execution to the appropriate handler based on action prefix.
+// Supports http.* and browser.* actions. Throws on unknown action types.
 export async function executeStep(
   step: Step,
   page: Page | null,
@@ -36,6 +38,7 @@ export async function executeStep(
 
   if (!timeout) return cancellableRunner();
 
+  // Race the step execution against the per-step timeout
   return Promise.race([
     cancellableRunner(),
     new Promise<never>((_, reject) =>

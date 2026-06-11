@@ -16,14 +16,17 @@ import {
 
 type WorkerMessage = Record<string, unknown>;
 
+// Sends a JSON message back to the parent (runner.ts) via the worker message port.
 function send(msg: WorkerMessage): void {
   parentPort?.postMessage(msg);
 }
 
+// Returns a random port within the configured range to avoid collisions.
 function getRandomPort(): number {
   return MIN_PORT + Math.floor(Math.random() * PORT_RANGE);
 }
 
+// Polls a TCP port until it is reachable or the timeout expires.
 function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
@@ -43,6 +46,7 @@ function waitForPort(host: string, port: number, timeoutMs: number): Promise<voi
   });
 }
 
+// Starts a local Lightpanda process on the given port, retrying on EADDRINUSE.
 async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { wsEndpoint?: string }; port: number }> {
   let lastErr: Error | null = null;
   for (let attempt = 0; attempt < LIGHTPANDA_START_RETRIES; attempt++) {
@@ -65,6 +69,8 @@ async function startLightpanda(port: number): Promise<{ proc: ChildProcess & { w
   throw lastErr || new Error('Could not start Lightpanda');
 }
 
+// Core scenario execution logic run inside the worker thread.
+// Handles browser lifecycle, step execution, timeout, and cleanup.
 async function runScenarioInternal(scenario: Scenario, options: RunOptions): Promise<ScenarioMetrics> {
   const metrics = createScenarioMetrics(scenario.name);
   const vars: Record<string, string> = {};
@@ -83,6 +89,9 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
     try {
       if (hasBrowserActions) {
         if (options.lightpandaUrl) {
+          // Reuse the globally running Lightpanda instance (started in server.ts).
+          // Each worker creates its own isolated context so runs don't interfere.
+          // The shared browser/Lightpanda is NOT closed here — only the context is.
           browser = await chromium.connectOverCDP(options.lightpandaUrl);
           browserContext = await browser.newContext({
             viewport: DEFAULT_BROWSER_VIEWPORT,
@@ -90,6 +99,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
           });
           page = await browserContext.newPage();
         } else {
+          // Standalone mode: start a fresh Lightpanda instance just for this run.
           const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
           lightpandaProc = proc;
 
@@ -107,6 +117,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
         if (abortController.signal.aborted) break;
         send({ type: 'step_progress', scenario_name: scenario.name, step_name: step.name, action: step.action, status: 'running' });
 
+        // Evaluate step condition — skip if a prerequisite step didn't meet expectations
         if (step.condition) {
           const prevSuccess = stepResults.get(step.condition.if_step);
           if (step.condition.if_success !== undefined && prevSuccess !== step.condition.if_success) {
@@ -140,10 +151,13 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
       metrics.steps.push(stepMetrics);
     } finally {
       if (options.lightpandaUrl) {
+        // Shared Lightpanda mode: close only the per-run context.
+        // The global browser and Lightpanda process stay alive for other runs.
         if (browserContext) {
           try { await browserContext.close(); } catch {}
         }
       } else {
+        // Standalone mode: fully tear down the per-run browser and Lightpanda process.
         if (browser) {
           try { await browser.close(); } catch {}
         } else if (browserContext) {
@@ -192,6 +206,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
   return metrics;
 }
 
+// Worker entry point: receives scenario + options from parent, runs it, and posts the result.
 (async () => {
   const { scenario, options } = workerData as { scenario: Scenario; options: RunOptions };
   try {

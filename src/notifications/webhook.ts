@@ -3,6 +3,8 @@ import { ScenarioMetrics } from '../types';
 import logger from '../logger';
 import { fetchWithRetry } from '../retry';
 
+// Sends a scenario failure/recovery notification to a generic webhook endpoint.
+// The payload includes the full scenario metrics and step details.
 export async function sendWebhook(
   config: WebhookConfig,
   metrics: ScenarioMetrics,

@@ -1,6 +1,7 @@
 import { StepMetrics, ScenarioMetrics, Reporter } from './types';
 import chalk from 'chalk';
 
+// Creates a fresh StepMetrics object with the given name and action.
 export function createStepMetrics(step_name: string, action: string): StepMetrics {
   return {
     step_name,
@@ -11,6 +12,7 @@ export function createStepMetrics(step_name: string, action: string): StepMetric
   };
 }
 
+// Finalises a StepMetrics by merging in partial overrides.
 export function completeStepMetrics(
   metrics: StepMetrics,
   overrides: Partial<StepMetrics>
@@ -18,6 +20,7 @@ export function completeStepMetrics(
   return { ...metrics, ...overrides, timestamp: new Date() };
 }
 
+// Creates a fresh ScenarioMetrics object initialised as passing.
 export function createScenarioMetrics(scenario_name: string): ScenarioMetrics {
   return {
     scenario_name,
@@ -29,6 +32,7 @@ export function createScenarioMetrics(scenario_name: string): ScenarioMetrics {
   };
 }
 
+// Pretty-prints scenario metrics to the console with colored PASS/FAIL output.
 export const consoleReporter: Reporter = (metrics: ScenarioMetrics): void => {
   const status = metrics.success ? chalk.green('✓ PASS') : chalk.red('✗ FAIL');
   console.log(`\n${status} ${metrics.scenario_name}`);
@@ -43,6 +47,7 @@ export const consoleReporter: Reporter = (metrics: ScenarioMetrics): void => {
   }
 };
 
+// Outputs scenario metrics as a JSON blob.
 export const jsonReporter: Reporter = (metrics: ScenarioMetrics): void => {
   console.log(JSON.stringify(metrics, null, 2));
 };

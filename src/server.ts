@@ -23,10 +23,12 @@ import { ScenarioMetrics } from './types';
 import logger from './logger';
 import { DEFAULT_LIMIT, MIN_DAYS, MAX_DAYS, DEFAULT_HISTORY_DAYS } from './constants';
 
+// Escapes a string for use in Prometheus label values.
 function escapePrometheusLabel(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
+// Parses the "days" query parameter within valid bounds.
 function parseDaysParam(value: string | undefined): number {
   if (value === undefined) return DEFAULT_HISTORY_DAYS;
   const n = parseInt(value);
@@ -34,6 +36,7 @@ function parseDaysParam(value: string | undefined): number {
   return n;
 }
 
+// Escapes a string for CSV output (wraps in quotes if needed).
 function escapeCsv(val: string): string {
   if (val.includes(',') || val.includes('"') || val.includes('\n')) {
     return '"' + val.replace(/"/g, '""') + '"';
@@ -41,6 +44,7 @@ function escapeCsv(val: string): string {
   return val;
 }
 
+// Converts an array of ScenarioMetrics into CSV format with step-level detail.
 function toCsv(history: ScenarioMetrics[]): string {
   const header = 'started_at,finished_at,duration_ms,success,step_name,step_action,step_success,step_response_time_ms,step_error\n';
   const rows = history.flatMap(r =>
@@ -51,12 +55,14 @@ function toCsv(history: ScenarioMetrics[]): string {
   return header + rows.join('\n');
 }
 
+// Parses the "limit" query parameter into a number or undefined.
 function parseLimitParam(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const n = parseInt(value);
   return isNaN(n) ? undefined : n;
 }
 
+// In-memory session store for OIDC-authenticated users
 const sessions = new Map<string, { createdAt: number }>();
 
 function generateSessionId(): string {
@@ -79,6 +85,7 @@ function parseCookies(header: string | undefined): Record<string, string> {
 
 const SESSION_COOKIE = 'scenarii-session';
 
+// Express middleware that checks for a valid session cookie on /api/* routes (except public/auth/health endpoints).
 function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const config = getSettings().auth;
   if (!config?.enabled) return next();
@@ -94,6 +101,7 @@ function authMiddleware(req: express.Request, res: express.Response, next: expre
   next();
 }
 
+// Fetches OIDC discovery document to get authorization and token endpoints.
 async function fetchOidcDiscovery(issuerUrl: string): Promise<{ authorization_endpoint: string; token_endpoint: string }> {
   const discoveryUrl = `${issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`;
   const res = await fetch(discoveryUrl);
@@ -105,6 +113,7 @@ async function fetchOidcDiscovery(issuerUrl: string): Promise<{ authorization_en
   };
 }
 
+// In-memory OIDC state store (validated during callback, cleaned every 10 minutes)
 const oidcStates = new Map<string, { createdAt: number }>();
 const STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -115,6 +124,7 @@ function cleanOidcStates(): void {
   }
 }
 
+// Redirects the user to the OIDC provider's authorization page.
 function handleOidcLogin(req: express.Request, res: express.Response): void {
   const config = getSettings().auth;
   if (!config?.enabled || !config.oidc) {
@@ -133,6 +143,7 @@ function handleOidcLogin(req: express.Request, res: express.Response): void {
   res.redirect(authUrl);
 }
 
+// Handles the OIDC callback, exchanges the code for tokens, and sets a session cookie.
 async function handleOidcCallback(req: express.Request, res: express.Response): Promise<void> {
   const config = getSettings().auth;
   if (!config?.enabled || !config.oidc) {
@@ -186,6 +197,7 @@ async function handleOidcCallback(req: express.Request, res: express.Response): 
   }
 }
 
+// Returns the current authentication status to the client.
 function handleAuthMe(req: express.Request, res: express.Response): void {
   const config = getSettings().auth;
   const configured = !!(config?.enabled && config?.oidc);
@@ -201,6 +213,7 @@ function handleAuthMe(req: express.Request, res: express.Response): void {
   });
 }
 
+// Logs out by deleting the session and clearing the cookie.
 function handleLogout(req: express.Request, res: express.Response): void {
   const cookies = parseCookies(req.headers.cookie);
   const sessionId = cookies[SESSION_COOKIE];
@@ -209,6 +222,7 @@ function handleLogout(req: express.Request, res: express.Response): void {
   res.json({ status: 'logged_out' });
 }
 
+// Attaches a unique request ID to every request for traceability.
 function requestIdMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const requestId = Math.random().toString(36).slice(2, 10);
   res.locals.requestId = requestId;
@@ -219,12 +233,16 @@ function requestIdMiddleware(req: express.Request, res: express.Response, next: 
 let _scenariosDir: string | undefined;
 let _runOptions: { headless: boolean; persist: boolean; lightpandaUrl?: string } | undefined;
 
+// Global Lightpanda process — started once with the server and shared across all worker threads.
+// This keeps the headless browser alive for the server's lifetime, avoiding per-run startup
+// overhead and preventing the browser page from being closed between steps.
 let _lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
 let _lightpandaPort: number | null = null;
 
 const LIGHTPANDA_PORT = 9222;
 const PORT_WAIT_TIMEOUT = 10000;
 
+// Polls a TCP port until it becomes reachable or the timeout is exceeded.
 function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
@@ -244,10 +262,13 @@ function waitForPort(host: string, port: number, timeoutMs: number): Promise<voi
   });
 }
 
+// Returns the WebSocket URL of the globally shared Lightpanda instance, if available.
 export function getLightpandaUrl(): string | undefined {
   return _runOptions?.lightpandaUrl;
 }
 
+// Gracefully stops the global Lightpanda process on server shutdown.
+// Called from index.ts shutdown handler.
 export function closeLightpanda(): void {
   if (_lightpandaProc) {
     try {
@@ -259,6 +280,7 @@ export function closeLightpanda(): void {
   }
 }
 
+// Pauses a scheduled scenario so it won't run on the next tick.
 function handlePause(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (pauseScenario(name)) {
@@ -268,6 +290,7 @@ function handlePause(req: express.Request, res: express.Response): void {
   }
 }
 
+// Resumes a previously paused scenario.
 function handleResume(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (resumeScenario(name)) {
@@ -277,6 +300,7 @@ function handleResume(req: express.Request, res: express.Response): void {
   }
 }
 
+// Exports a scenario definition as a downloadable YAML file.
 function handleConfigExport(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (!_scenariosDir) {
@@ -302,6 +326,7 @@ function handleConfigExport(req: express.Request, res: express.Response): void {
   }
 }
 
+// Saves a new YAML definition for an existing scenario.
 function handleConfigSave(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
     res.status(400).json({ error: 'Server not configured for config save' });
@@ -327,6 +352,7 @@ function handleConfigSave(req: express.Request, res: express.Response): void {
   }
 }
 
+// Deletes a scenario's YAML file from disk.
 function handleConfigDelete(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
     res.status(400).json({ error: 'Server not configured for config delete' });
@@ -350,6 +376,7 @@ function handleConfigDelete(req: express.Request, res: express.Response): void {
   }
 }
 
+// Returns all distinct tags across scenarios.
 function handleTags(_req: express.Request, res: express.Response): void {
   try {
     const tags = getDistinctTags();
@@ -359,6 +386,7 @@ function handleTags(_req: express.Request, res: express.Response): void {
   }
 }
 
+// Returns aggregate health information for all scenarios.
 function handleStatus(_req: express.Request, res: express.Response): void {
   try {
     const list = getScenarioList();
@@ -376,6 +404,7 @@ function handleStatus(_req: express.Request, res: express.Response): void {
   }
 }
 
+// Renders a public-facing HTML status page for a single scenario (no auth required).
 function handlePublicScenarioStatus(req: express.Request, res: express.Response): void {
   try {
     const list = getScenarioList();
@@ -516,6 +545,7 @@ function handlePublicScenarioStatus(req: express.Request, res: express.Response)
   }
 }
 
+// Public API endpoint that returns scenario run data in JSON format (no auth required).
 function handlePublicScenarioApi(req: express.Request, res: express.Response): void {
   try {
     const list = getScenarioList();
@@ -546,10 +576,12 @@ function handlePublicScenarioApi(req: express.Request, res: express.Response): v
   }
 }
 
+// Escapes HTML special characters for safe embedding in HTML output.
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Triggers an immediate run of a scenario.
 function handleRunNow(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (!_scenariosDir) {
@@ -573,16 +605,19 @@ function handleRunNow(req: express.Request, res: express.Response): void {
   }
 }
 
+// Logs an error and sends a standardised JSON error response.
 function sendError(res: express.Response, status: number, err: unknown): void {
   logger.error({ requestId: res.locals.requestId, status, err: err instanceof Error ? err.message : String(err) }, 'Request failed');
   res.status(status).json({ error: 'Internal server error' });
 }
 
+// Logs every incoming request with its method and URL.
 function requestLogger(req: express.Request, res: express.Response, next: express.NextFunction): void {
   logger.info({ requestId: res.locals.requestId, method: req.method, url: req.url }, 'Request');
   next();
 }
 
+// Returns the list of all scenarios with pause/schedule/depends_on metadata.
 function handleScenarioList(req: express.Request, res: express.Response): void {
   try {
     const tag = req.query.tag as string | undefined;
@@ -598,6 +633,7 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
   }
 }
 
+// Reads the depends_on field from a scenario's YAML file.
 function getScenarioDependsOn(name: string): string | undefined {
   if (!_scenariosDir) return undefined;
   try {
@@ -613,6 +649,8 @@ function getScenarioDependsOn(name: string): string | undefined {
   return undefined;
 }
 
+// Returns detailed info, paginated history, and step names for a single scenario.
+// Uses getScenarioPassedRunCount for accurate passed-run totals regardless of pagination.
 function handleScenarioDetail(req: express.Request, res: express.Response): void {
   try {
     const days = parseDaysParam(req.query.days as string);
@@ -638,6 +676,7 @@ function handleScenarioDetail(req: express.Request, res: express.Response): void
   }
 }
 
+// Returns paginated history for a single scenario.
 function handleScenarioHistory(req: express.Request, res: express.Response): void {
   try {
     const name = req.params.name as string;
@@ -653,6 +692,7 @@ function handleScenarioHistory(req: express.Request, res: express.Response): voi
   }
 }
 
+// Exports scenario history as a downloadable JSON file.
 function handleExportJson(req: express.Request, res: express.Response): void {
   try {
     const name = req.params.name as string;
@@ -666,6 +706,7 @@ function handleExportJson(req: express.Request, res: express.Response): void {
   }
 }
 
+// Exports scenario history as a downloadable CSV file.
 function handleExportCsv(req: express.Request, res: express.Response): void {
   try {
     const name = req.params.name as string;
@@ -680,6 +721,7 @@ function handleExportCsv(req: express.Request, res: express.Response): void {
   }
 }
 
+// Cancels a currently running scenario.
 function handleCancel(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (cancelScenario(name)) {
@@ -689,6 +731,7 @@ function handleCancel(req: express.Request, res: express.Response): void {
   }
 }
 
+// Returns SLA stats (total, passed, failed, SLA %) for a scenario.
 function handleSla(req: express.Request, res: express.Response): void {
   try {
     const name = req.params.name as string;
@@ -708,6 +751,7 @@ function handleSla(req: express.Request, res: express.Response): void {
   }
 }
 
+// Triggers an on-demand database backup.
 function handleBackup(_req: express.Request, res: express.Response): void {
   try {
     const settings = getSettings();
@@ -719,6 +763,7 @@ function handleBackup(_req: express.Request, res: express.Response): void {
   }
 }
 
+// Health check endpoint — returns 503 if storage is not initialised.
 function handleHealth(_req: express.Request, res: express.Response): void {
   if (isStorageReady()) {
     res.json({ status: 'ok' });
@@ -727,6 +772,7 @@ function handleHealth(_req: express.Request, res: express.Response): void {
   }
 }
 
+// Middleware that enforces Bearer token auth on the /api/metrics endpoint.
 function metricsAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
   const config = getSettings().api?.auth;
   if (!config?.enabled) return next();
@@ -738,6 +784,7 @@ function metricsAuthMiddleware(req: express.Request, res: express.Response, next
   next();
 }
 
+// Generates and returns Prometheus-format metrics for all scenarios.
 function handleMetrics(_req: express.Request, res: express.Response): void {
   try {
     const list = getScenarioList();
@@ -820,6 +867,7 @@ function handleMetrics(_req: express.Request, res: express.Response): void {
   }
 }
 
+// Creates and configures an Express application with all middleware and route handlers.
 export function createApp(): express.Application {
   const app = express();
 
@@ -845,12 +893,14 @@ export function createApp(): express.Application {
   app.use(requestIdMiddleware);
   app.use(requestLogger);
 
+  // OIDC auth routes (unauthenticated)
   app.get('/api/auth/login', handleOidcLogin);
   app.get('/api/auth/callback', handleOidcCallback);
   app.get('/api/auth/me', handleAuthMe);
   app.post('/api/auth/logout', handleLogout);
   app.use(authMiddleware);
 
+  // Scenario CRUD and management
   app.get('/api/scenarios', handleScenarioList);
   app.get('/api/scenarios/:name', handleScenarioDetail);
   app.get('/api/scenarios/:name/history', handleScenarioHistory);
@@ -870,6 +920,7 @@ export function createApp(): express.Application {
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
 
+  // Public (unauthenticated) endpoints
   app.get('/api/public/scenario/:name', handlePublicScenarioApi);
   app.get('/public/status/:name', handlePublicScenarioStatus);
 
@@ -894,6 +945,7 @@ export function createApp(): express.Application {
   return app;
 }
 
+// Creates the full server: Express app, global Lightpanda, HTTP listener, WebSocket, and backup scheduler.
 export function createServer(port: number = 3000, scenariosDir?: string, runOptions?: { headless: boolean; persist: boolean }): http.Server {
   _scenariosDir = scenariosDir;
   if (runOptions) _runOptions = runOptions;
@@ -919,6 +971,7 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
   });
   initWebSocket(server);
 
+  // Schedule automated database backups if enabled in settings
   const s = getSettings();
   if (s.storage?.backup?.enabled) {
     try {

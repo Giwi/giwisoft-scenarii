@@ -8,6 +8,8 @@ import { sendDiscord } from './discord';
 import { sendWebhook } from './webhook';
 import logger from '../logger';
 
+// Dispatches notifications across all configured channels when a scenario's state
+// transitions from pass→fail or fail→pass. Skips if the previous run was the same state.
 export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<void> {
   const settings = getSettings();
   if (!settings.notifications) return;
@@ -20,9 +22,11 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
     return;
   }
 
+  // No previous run means no state change to report
   if (prevSuccess === null) return;
 
   const currentSuccess = metrics.success;
+  // Only notify on state changes (pass→fail or fail→pass)
   if (prevSuccess === currentSuccess) return;
 
   const event = currentSuccess ? 'recovery' : 'failure';

@@ -2,10 +2,12 @@ import fs from 'fs';
 import yaml from 'js-yaml';
 import { Scenario, Step, HttpStep, BrowserStep } from './types';
 
+// Parses a single step object from raw YAML data, dispatching by action prefix.
 function parseStep(raw: Record<string, unknown>, index: number): Step {
   const name = (raw.name as string) || `step_${index}`;
   const action = raw.action as string;
 
+  // HTTP step — extract URL, headers, body, expectations and variables
   if (action.startsWith('http.')) {
     const step: HttpStep = {
       name,
@@ -19,6 +21,7 @@ function parseStep(raw: Record<string, unknown>, index: number): Step {
     return step;
   }
 
+  // Browser step — extract selector, value, script, timeout and expectations
   if (action.startsWith('browser.')) {
     const step: BrowserStep = {
       name,
@@ -36,6 +39,7 @@ function parseStep(raw: Record<string, unknown>, index: number): Step {
   throw new Error(`Unknown action type: ${action} in step "${name}"`);
 }
 
+// Parses a YAML string into a Scenario object, validating required fields.
 export function parseScenario(content: string): Scenario {
   const raw = yaml.load(content) as Record<string, unknown>;
 
@@ -69,11 +73,13 @@ export function parseScenario(content: string): Scenario {
   return scenario;
 }
 
+// Reads a YAML file from disk and parses it into a Scenario.
 export function loadScenarioFile(filepath: string): Scenario {
   const content = fs.readFileSync(filepath, 'utf-8');
   return parseScenario(content);
 }
 
+// Serialises a Scenario object back into YAML, preserving optional fields.
 export function serializeScenario(scenario: Scenario): string {
   const obj: Record<string, unknown> = {
     name: scenario.name,

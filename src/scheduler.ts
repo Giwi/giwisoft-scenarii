@@ -16,6 +16,8 @@ interface ScheduledTask {
 
 const scheduledTasks: ScheduledTask[] = [];
 
+// Schedules a scenario based on its cron expression, or runs it immediately if no schedule is set.
+// Returns the cron task, or null when run-once.
 export function scheduleScenario(
   scenario: Scenario,
   options: RunOptions = {}
@@ -40,6 +42,7 @@ export function scheduleScenario(
       return;
     }
 
+    // If the scenario depends on another, check that dependency's last run succeeded
     if (scenario.depends_on) {
       const depOk = getLastRunSuccess(scenario.depends_on);
       if (depOk === false) {
@@ -52,6 +55,7 @@ export function scheduleScenario(
     logger.info({ scenario: scenario.name }, 'Running scenario');
     const metrics = await runScenario(scenario, options);
 
+    // Check for consecutive failures and emit a warning if threshold is exceeded
     const alertConfig: AlertConfig = scenario.alert || {};
     const threshold = alertConfig.consecutive_failures ?? DEFAULT_ALERT_CONSECUTIVE_FAILURES;
     if (!metrics.success && threshold > 0) {
@@ -79,6 +83,7 @@ export function scheduleScenario(
   return task;
 }
 
+// Pauses a scheduled scenario so it won't run on the next cron tick.
 export function pauseScenario(name: string): boolean {
   const entry = scheduledTasks.find(st => st.scenario.name === name);
   if (!entry) return false;
@@ -87,6 +92,7 @@ export function pauseScenario(name: string): boolean {
   return true;
 }
 
+// Resumes a previously paused scenario.
 export function resumeScenario(name: string): boolean {
   const entry = scheduledTasks.find(st => st.scenario.name === name);
   if (!entry) return false;
@@ -95,14 +101,17 @@ export function resumeScenario(name: string): boolean {
   return true;
 }
 
+// Returns true if the named scenario is currently paused.
 export function isPaused(name: string): boolean {
   return scheduledTasks.some(st => st.scenario.name === name && st.paused);
 }
 
+// Returns true if the named scenario has been scheduled.
 export function isScheduled(name: string): boolean {
   return scheduledTasks.some(st => st.scenario.name === name);
 }
 
+// Stops all scheduled tasks and clears the task list.
 export function stopAll(): void {
   for (const st of scheduledTasks) {
     st.task.stop();
@@ -110,10 +119,12 @@ export function stopAll(): void {
   scheduledTasks.length = 0;
 }
 
+// Returns the names of all currently scheduled scenarios.
 export function listScheduled(): string[] {
   return scheduledTasks.map((st) => st.scenario.name);
 }
 
+// Schedules the daily email report on the given cron expression.
 export function scheduleReport(cronExpression: string): cron.ScheduledTask {
   const task = cron.schedule(cronExpression, async () => {
     await sendDailyReport();

@@ -5,6 +5,8 @@ import { resolveUrl, interpolateVars } from '../helpers';
 import { BROWSER_RETRIES, RETRY_DELAYS } from '../retry';
 import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../constants';
 
+// Validates browser-level expectations against the current page state.
+// Returns an error string on failure, or null if all expectations pass.
 async function checkBrowserExpectations(
   page: Page,
   step: BrowserStep,
@@ -47,6 +49,8 @@ async function checkBrowserExpectations(
   return null;
 }
 
+// Executes a single browser step (navigate, click, fill, etc.) with retries.
+// Retries are disabled for evaluate, screenshot, and screenshot_compare actions.
 export async function executeBrowserStep(
   step: BrowserStep,
   page: Page,
@@ -76,6 +80,7 @@ export async function executeBrowserStep(
           try {
             await page.goto(resolvedUrl, { waitUntil: 'load', timeout: DEFAULT_PAGE_TIMEOUT });
           } catch {
+            // Fallback to domcontentloaded if 'load' event doesn't fire
             await page.goto(resolvedUrl, { waitUntil: 'domcontentloaded', timeout: DEFAULT_PAGE_TIMEOUT });
           }
           break;
@@ -85,6 +90,7 @@ export async function executeBrowserStep(
           if (!step.selector) throw new Error('browser.fill requires a "selector" field');
           if (step.value === undefined) throw new Error('browser.fill requires a "value" field');
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          // Uses native setter dispatch for reliable React/Angular form control compatibility
           const sel = JSON.stringify(step.selector);
           const val = JSON.stringify(interpolateVars(step.value, vars));
           await page.evaluate(`(() => {
@@ -165,6 +171,7 @@ export async function executeBrowserStep(
           const currentPath = `current-${step.name}-${Date.now()}.png`;
           await page.screenshot({ path: currentPath, fullPage: true });
           if (!fs.existsSync(basePath)) {
+            // First run — save as baseline and skip comparison
             fs.renameSync(currentPath, basePath);
             stepMetrics.error = `Baseline created at ${basePath}`;
             throw new Error('Baseline created — no comparison performed');
@@ -204,6 +211,7 @@ export async function executeBrowserStep(
       stepMetrics.response_time_ms = Date.now() - start;
     }
 
+    // Return on success or final attempt — otherwise retry
     if (stepMetrics.success || attempt === maxRetries) {
       return stepMetrics;
     }

@@ -2,6 +2,7 @@ import fs from 'fs';
 import yaml from 'js-yaml';
 import logger from './logger';
 
+// Notification channel configuration types
 export interface TelegramConfig {
   enabled: boolean;
   bot_token: string;
@@ -43,6 +44,7 @@ export interface NotificationsConfig {
   webhook?: WebhookConfig;
 }
 
+// API-level authentication settings (API key or OIDC)
 export interface ApiConfig {
   auth?: {
     enabled?: boolean;
@@ -74,12 +76,14 @@ export interface StorageConfig {
   backup?: BackupConfig;
 }
 
+// Per-scenario overrides for browser and notification settings
 export interface ScenarioOverrides {
   ignoreHTTPSErrors?: boolean;
   timeout?: number;
   notifications?: { enabled?: boolean };
 }
 
+// Top-level settings object loaded from settings.yaml
 export interface Settings {
   api?: ApiConfig;
   auth?: AuthConfig;
@@ -91,6 +95,7 @@ export interface Settings {
 let settings: Settings | undefined;
 let settingsPath: string | undefined;
 
+// Applies environment-variable overrides for notification credentials when the YAML values are empty.
 function applyEnvOverrides(s: Settings): void {
   if (!s.notifications) return;
   if (s.notifications.telegram && !s.notifications.telegram.bot_token && process.env.TELEGRAM_BOT_TOKEN) {
@@ -107,6 +112,7 @@ function applyEnvOverrides(s: Settings): void {
   }
 }
 
+// Loads settings from a YAML file. Subsequent calls are no-ops unless the file changes.
 export function loadSettings(path?: string): Settings {
   if (settings !== undefined) {
     logger.info('Settings already loaded, skipping');
@@ -134,6 +140,7 @@ export function loadSettings(path?: string): Settings {
   return settings;
 }
 
+// Re-reads settings from disk and merges env overrides. Used by watchSettings.
 export function reloadSettings(): Settings {
   if (!settingsPath) return settings || {};
   try {
@@ -148,6 +155,7 @@ export function reloadSettings(): Settings {
   return settings!;
 }
 
+// Watches the settings file for changes and reloads it automatically every 3 seconds.
 export function watchSettings(): void {
   if (!settingsPath) return;
   fs.watchFile(settingsPath, { interval: 3000 }, () => {
@@ -156,6 +164,7 @@ export function watchSettings(): void {
   });
 }
 
+// Searches common paths for a settings file.
 function findSettingsFile(): string | null {
   const candidates = [
     'settings.yaml',
@@ -169,10 +178,12 @@ function findSettingsFile(): string | null {
   return null;
 }
 
+// Returns the current settings object (may be empty if none were loaded).
 export function getSettings(): Settings {
   return settings || {};
 }
 
+// Returns per-scenario override settings for the named scenario.
 export function getScenarioSettings(name: string): ScenarioOverrides {
   return getSettings().scenarios?.[name] ?? {};
 }

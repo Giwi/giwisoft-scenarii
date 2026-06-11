@@ -7,6 +7,7 @@ interface FetchResponse {
   text(): Promise<string>;
 }
 
+// Performs an HTTP request and returns a simplified response object.
 async function doFetch(url: string, method: string, headers: Record<string, string> | undefined, body: string | undefined, signal?: AbortSignal): Promise<FetchResponse> {
   const res = await fetch(url, {
     method,
@@ -21,6 +22,8 @@ async function doFetch(url: string, method: string, headers: Record<string, stri
   };
 }
 
+// Validates HTTP response expectations against the actual response.
+// Returns an error string on failure, or null if all expectations pass.
 export function checkExpectations(step: HttpStep, response: FetchResponse, body: string, elapsed_ms: number): string | null {
   const expect = step.expect;
   if (!expect) return null;
@@ -86,6 +89,8 @@ export function checkExpectations(step: HttpStep, response: FetchResponse, body:
   return null;
 }
 
+// Extracts variables from the JSON response body using JSONPath expressions
+// defined in the step's "variables" field.
 function extractVariables(step: HttpStep, body: string, vars: Record<string, string>): void {
   if (!step.variables) return;
   for (const [key, path] of Object.entries(step.variables)) {
@@ -101,6 +106,7 @@ function extractVariables(step: HttpStep, body: string, vars: Record<string, str
   }
 }
 
+// Executes a single HTTP step (GET/POST/PUT/PATCH/DELETE) and validates expectations.
 export async function executeHttpStep(
   step: HttpStep,
   base_url: string | undefined,

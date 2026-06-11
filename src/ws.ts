@@ -2,8 +2,10 @@ import { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import logger from './logger';
 
+// Singleton WebSocket server instance
 let wss: WebSocketServer | null = null;
 
+// Attaches a WebSocket server to the given HTTP server on the /ws path.
 export function initWebSocket(server: HttpServer): void {
   wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -18,6 +20,7 @@ export function initWebSocket(server: HttpServer): void {
   });
 }
 
+// Broadcasts a completed scenario run to all connected WebSocket clients.
 export function broadcastScenarioRun(data: {
   scenario_name: string;
   success: boolean;
@@ -38,6 +41,7 @@ export function broadcastScenarioRun(data: {
   });
 }
 
+// Sends a per-step progress update to all connected WebSocket clients.
 export function broadcastStepProgress(data: {
   scenario_name: string;
   step_name: string;

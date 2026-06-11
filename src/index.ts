@@ -13,6 +13,7 @@ import { createServer, closeLightpanda } from './server';
 import logger from './logger';
 import { DAILY_REPORT_CRON } from './constants';
 
+// Top-level handlers for uncaught errors and promise rejections
 process.on('uncaughtException', (err) => {
   logger.fatal({ err }, 'Uncaught exception');
   process.exit(1);
@@ -22,6 +23,7 @@ process.on('unhandledRejection', (reason) => {
   logger.fatal({ err: reason instanceof Error ? reason.message : reason }, 'Unhandled rejection');
 });
 
+// Gracefully stops schedulers, Lightpanda, server, and the database before exiting.
 function shutdown(server?: http.Server): void {
   logger.info('Shutting down...');
   stopAll();
@@ -40,6 +42,7 @@ program
   .description('Execute periodic YAML-defined scenarios to test web applications')
   .version('1.0.0');
 
+// Default command: load scenario files and run or schedule them.
 program
   .argument('<files...>', 'One or more YAML scenario files')
   .option('--headless <bool>', 'Run browser in headless mode', 'true')
@@ -85,6 +88,7 @@ program
     }
   });
 
+// Server command: starts the HTTP API server, loads scenarios, and initialises scheduling.
 program
   .command('server')
   .description('Start the API server and Angular frontend')
@@ -146,6 +150,7 @@ program
     process.on('SIGTERM', () => shutdown(server));
   });
 
+// Validate command: checks YAML syntax without executing.
 program
   .command('validate')
   .description('Validate a scenario YAML file without running it')
@@ -160,6 +165,7 @@ program
     }
   });
 
+// Trigger command: immediately runs a scenario file.
 program
   .command('trigger')
   .description('Run a scenario immediately')
@@ -178,6 +184,7 @@ program
     await runScenario(scenario, runOptions);
   });
 
+// Status command: lists scheduled scenarios and storage readiness.
 program
   .command('status')
   .description('Show current status of scheduled scenarios')
@@ -191,6 +198,7 @@ program
     logger.info({ storageReady: isStorageReady() }, 'Storage status');
   });
 
+// Config command: generates a boilerplate settings.yaml file.
 program
   .command('config')
   .description('Generate a settings.yaml template')

@@ -3,6 +3,7 @@ import { ScenarioMetrics } from '../types';
 import logger from '../logger';
 import { sendMailgunEmail } from '../email';
 
+// Sends a scenario failure/recovery notification via the Mailgun email API.
 export async function sendEmail(
   config: EmailConfig,
   metrics: ScenarioMetrics,

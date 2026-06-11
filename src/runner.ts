@@ -12,8 +12,10 @@ import { DEFAULT_SCENARIO_TIMEOUT, DEFAULT_PURGE_DAYS } from './constants';
 
 export type { RunOptions };
 
+// Map of currently running scenario names to their worker thread instances
 const runningWorkers = new Map<string, Worker>();
 
+// Terminates a running scenario worker by name.
 export function cancelScenario(name: string): boolean {
   const worker = runningWorkers.get(name);
   if (worker) {
@@ -23,6 +25,7 @@ export function cancelScenario(name: string): boolean {
   return false;
 }
 
+// Builds a failed metrics object for scenarios that were cancelled or errored before completing.
 function createCancelledMetrics(scenarioName: string, error: string): ScenarioMetrics {
   const metrics = createScenarioMetrics(scenarioName);
   metrics.success = false;
@@ -36,6 +39,7 @@ function createCancelledMetrics(scenarioName: string, error: string): ScenarioMe
   return metrics;
 }
 
+// Persists metrics to the database, prints the report, sends notifications, and broadcasts over WebSocket.
 function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): void {
   if (options.persist) {
     try {
@@ -65,6 +69,8 @@ function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): void {
   });
 }
 
+// Runs a scenario in a worker thread. Returns a promise that resolves with the final metrics.
+// Handles timeout, worker messages (step progress, completion, errors), and unexpected exits.
 export async function runScenario(
   scenario: Scenario,
   options: RunOptions = {}
@@ -94,6 +100,7 @@ export async function runScenario(
 
     runningWorkers.set(scenario.name, worker);
 
+    // Safety timeout: kills the worker if it doesn't finish within reasonable bounds
     const safetyTimer = setTimeout(() => {
       if (!resolved) {
         resolved = true;

@@ -13,8 +13,10 @@ interface ScenarioInfo {
 }
 import logger from './logger';
 
+// Singleton SQLite database handle
 let db: Database.Database | undefined;
 
+// Opens (or creates) the SQLite database and ensures all required tables exist.
 export function initStorage(dbPath?: string): void {
   if (db) throw new Error('Storage already initialized');
   const resolved = dbPath || path.join(process.cwd(), 'db', 'scenarii.db');
@@ -59,6 +61,7 @@ export function initStorage(dbPath?: string): void {
   `);
 }
 
+// Persists a full scenario run (with all step metrics) inside a single transaction.
 export function storeMetrics(metrics: ScenarioMetrics): void {
   if (!db) throw new Error('Database not initialized');
 
@@ -101,6 +104,7 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
   transaction();
 }
 
+// Sets or replaces the tags for a given scenario.
 export function upsertScenarioTags(name: string, tags: string[]): void {
   if (!db) throw new Error('Database not initialized');
   db.prepare(`
@@ -109,6 +113,7 @@ export function upsertScenarioTags(name: string, tags: string[]): void {
   `).run(name, JSON.stringify(tags));
 }
 
+// Returns a list of all scenarios that have run data, optionally filtered by tag.
 export function getScenarioList(tagFilter?: string): ScenarioInfo[] {
   if (!db) throw new Error('Database not initialized');
   const rows = db.prepare(`
@@ -144,6 +149,7 @@ export function getScenarioList(tagFilter?: string): ScenarioInfo[] {
   }));
 }
 
+// Returns paginated run history for a scenario within the given number of days.
 export function getScenarioHistory(
   name: string,
   limitDays: number = 7,
@@ -199,6 +205,7 @@ export function getScenarioHistory(
     timestamp: string | null;
   }>;
 
+  // Collapse the flat join result into ScenarioMetrics objects
   const runMap = new Map<number, ScenarioMetrics>();
   for (const row of rows) {
     if (!runMap.has(row.run_id)) {
@@ -227,6 +234,8 @@ export function getScenarioHistory(
   return Array.from(runMap.values());
 }
 
+// Returns the count of passed runs for a scenario within the given lookback window.
+// Uses an aggregate query instead of filtering in-memory, so it's accurate even with pagination.
 export function getScenarioPassedRunCount(name: string, limitDays: number = 7): number {
   if (!db) throw new Error('Database not initialized');
   const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
@@ -237,6 +246,7 @@ export function getScenarioPassedRunCount(name: string, limitDays: number = 7): 
   return row.count;
 }
 
+// Returns the total number of runs for a scenario within the given lookback window.
 export function getScenarioHistoryCount(name: string, limitDays: number = 7): number {
   if (!db) throw new Error('Database not initialized');
   const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
@@ -247,6 +257,7 @@ export function getScenarioHistoryCount(name: string, limitDays: number = 7): nu
   return row.count;
 }
 
+// Fetches scenario info, paginated history, step names, and total run count in one call.
 export function getScenarioDetail(
   name: string,
   limitDays: number = 7,
@@ -263,6 +274,7 @@ export function getScenarioDetail(
   return { info: scenario, history, stepNames, total };
 }
 
+// Returns the distinct step names for a scenario across all of its runs.
 export function getScenarioStepNames(name: string): string[] {
   if (!db) throw new Error('Database not initialized');
   return db.prepare(`
@@ -273,6 +285,7 @@ export function getScenarioStepNames(name: string): string[] {
   `).pluck().all(name) as string[];
 }
 
+// Returns the success value of the run immediately before the latest one.
 export function getPreviousRunSuccess(scenarioName: string): boolean | null {
   if (!db) throw new Error('Database not initialized');
   const row = db.prepare(`
@@ -284,6 +297,7 @@ export function getPreviousRunSuccess(scenarioName: string): boolean | null {
   return row ? row.success === 1 : null;
 }
 
+// Deletes runs older than the specified number of days. Returns the count of deleted rows.
 export function purgeOldData(days: number = 7): number {
   if (!db) throw new Error('Database not initialized');
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
@@ -291,6 +305,7 @@ export function purgeOldData(days: number = 7): number {
   return result.changes;
 }
 
+// In-memory counters for notification delivery tracking
 let notificationSuccessCount = 0;
 let notificationFailureCount = 0;
 
@@ -303,6 +318,7 @@ export function getNotificationMetrics(): { success: number; failure: number } {
   return { success: notificationSuccessCount, failure: notificationFailureCount };
 }
 
+// Returns all distinct tags across all scenarios.
 export function getDistinctTags(): string[] {
   if (!db) throw new Error('Database not initialized');
   const rows = db.prepare(`SELECT DISTINCT tags FROM scenario_tags`).all() as { tags: string }[];
@@ -316,6 +332,7 @@ export function getDistinctTags(): string[] {
   return [...tagSet].sort();
 }
 
+// Returns the success value of the latest run for a scenario.
 export function getLastRunSuccess(scenarioName: string): boolean | null {
   if (!db) throw new Error('Database not initialized');
   const row = db.prepare(`
@@ -327,6 +344,7 @@ export function getLastRunSuccess(scenarioName: string): boolean | null {
   return row ? row.success === 1 : null;
 }
 
+// Copies the database file to the backup directory with a timestamp in the filename.
 export function backupDatabase(directory: string): string {
   if (!db) throw new Error('Database not initialized');
   const src = getDbPath();
@@ -344,6 +362,7 @@ function getDbPath(): string {
   return name;
 }
 
+// Closes the database connection gracefully.
 export function closeStorage(): void {
   if (db) {
     try {
@@ -356,6 +375,7 @@ export function closeStorage(): void {
   }
 }
 
+// Returns true if the database has been initialised.
 export function isStorageReady(): boolean {
   return db !== undefined;
 }

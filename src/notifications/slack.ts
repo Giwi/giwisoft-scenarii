@@ -3,6 +3,7 @@ import { ScenarioMetrics } from '../types';
 import logger from '../logger';
 import { fetchWithRetry } from '../retry';
 
+// Sends a scenario failure/recovery notification via a Slack webhook.
 export async function sendSlack(
   config: SlackConfig,
   metrics: ScenarioMetrics,

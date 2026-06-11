@@ -2,6 +2,7 @@ import { getScenarioList, getScenarioHistory } from './storage';
 import { getSettings } from './settings';
 import { sendMailgunEmail } from './email';
 
+// Generates and sends a daily summary email listing all scenarios with pass rates.
 export async function sendDailyReport(): Promise<void> {
   const settings = getSettings();
   if (!settings.notifications?.email?.enabled) return;

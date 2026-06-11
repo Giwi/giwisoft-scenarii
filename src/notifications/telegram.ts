@@ -3,6 +3,7 @@ import { ScenarioMetrics } from '../types';
 import logger from '../logger';
 import { fetchWithRetry } from '../retry';
 
+// Sends a scenario failure/recovery notification via the Telegram Bot API.
 export async function sendTelegram(
   config: TelegramConfig,
   metrics: ScenarioMetrics,
