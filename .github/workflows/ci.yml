@@ -67,7 +67,7 @@ jobs:
       - run: cd frontend && npm install
       - run: cd frontend && npx ng build
       - run: npm run build:backend
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
