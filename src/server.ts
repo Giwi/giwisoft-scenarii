@@ -9,14 +9,14 @@ import { lightpanda } from '@lightpanda/browser';
 import net from 'net';
 import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
-  getScenarioStepNames, getDistinctTags,
+  getScenarioStepNames, getDistinctTags, getDbScenarioTags,
   isStorageReady, backupDatabase,
 } from './storage';
 import { initWebSocket } from './ws';
 import { getSettings } from './settings';
 import { loadScenarioFile, parseScenario, serializeScenario } from './parser';
 import { runScenario, cancelScenario } from './runner';
-import { pauseScenario, resumeScenario, isPaused, isScheduled } from './scheduler';
+import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from './scheduler';
 import { authMiddleware, handleOidcLogin, handleOidcCallback, handleAuthMe, handleLogout } from './auth';
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
 import { metricsAuthMiddleware, handleMetrics } from './metrics-exporter';
@@ -103,13 +103,32 @@ function sendError(res: express.Response, status: number, err: unknown): void {
 function handleScenarioList(req: express.Request, res: express.Response): void {
   try {
     const tag = req.query.tag as string | undefined;
-    const list = getScenarioList(tag || undefined).map(s => ({
+    const dbList = getScenarioList();
+    const dbNames = new Set(dbList.map(s => s.name));
+
+    const scheduledNames = listScheduled();
+    for (const name of scheduledNames) {
+      if (!dbNames.has(name)) {
+        dbNames.add(name);
+        dbList.push({
+          name,
+          last_run: null,
+          last_success: null,
+          last_duration_ms: null,
+          total_runs: 0,
+          tags: getDbScenarioTags(name),
+        });
+      }
+    }
+
+    const list = dbList.map(s => ({
       ...s,
       paused: isPaused(s.name),
       scheduled: isScheduled(s.name),
       depends_on: getScenarioDependsOn(s.name),
     }));
-    res.json(list);
+
+    res.json(tag ? list.filter(s => s.tags?.includes(tag)) : list);
   } catch (err: unknown) {
     sendError(res, 500, err);
   }

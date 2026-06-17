@@ -318,6 +318,14 @@ export function getNotificationMetrics(): { success: number; failure: number } {
   return { success: notificationSuccessCount, failure: notificationFailureCount };
 }
 
+// Returns tags for a specific scenario from the scenario_tags table.
+export function getDbScenarioTags(name: string): string[] | undefined {
+  if (!db) return undefined;
+  const row = db.prepare(`SELECT tags FROM scenario_tags WHERE scenario_name = ?`).get(name) as { tags: string } | undefined;
+  if (!row) return undefined;
+  try { return JSON.parse(row.tags); } catch { return undefined; }
+}
+
 // Returns all distinct tags across all scenarios.
 export function getDistinctTags(): string[] {
   if (!db) throw new Error('Database not initialized');
