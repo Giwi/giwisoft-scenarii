@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenarii — YAML web test scenarios</title>
+  <style>
+    :root {
+      --bg: #f8f7fc;
+      --card: #fff;
+      --text: #1e1b3a;
+      --muted: #7c7a9a;
+      --accent: #6366f1;
+      --accent2: #a855f7;
+      --border: rgba(30,27,58,.1);
+      --success: #059669;
+      --danger: #dc2626;
+      --code-bg: #1e1e2e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: #fff;
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+    .hero h1 { font-size: 3rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 8px; }
+    .hero p { font-size: 1.2rem; opacity: .9; max-width: 640px; margin: 0 auto; }
+    .hero-badges { margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-badges a {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border-radius: 999px;
+      background: rgba(255,255,255,.2); color: #fff;
+      text-decoration: none; font-size: .9rem; font-weight: 600;
+      transition: background .2s;
+    }
+    .hero-badges a:hover { background: rgba(255,255,255,.32); }
+
+    /* Sections */
+    section { padding: 64px 0; }
+    section:nth-child(even) { background: #fff; }
+    h2 {
+      font-size: 1.8rem; font-weight: 700;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    h3 { font-size: 1.2rem; font-weight: 600; margin: 20px 0 8px; }
+
+    /* Cards */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(30,27,58,.04);
+    }
+    .card h3 { margin-top: 0; }
+    .card-icon { font-size: 1.6rem; margin-bottom: 8px; display: block; }
+
+    /* Screenshots */
+    .screenshots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+    .screenshots img { width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+
+    /* Code blocks */
+    pre {
+      background: var(--code-bg);
+      color: #cdd6f4;
+      padding: 16px 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-size: .85rem;
+      line-height: 1.5;
+      margin: 12px 0;
+    }
+    code { font-family: 'JetBrains Mono','Fira Code','Cascadia Code',monospace; }
+    .tag {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      font-size: .75rem; font-weight: 600;
+    }
+    .tag.http { background: #dbeafe; color: #1d4ed8; }
+    .tag.browser { background: #fce7f3; color: #be185d; }
+    .tag.mixed { background: #fef3c7; color: #b45309; }
+
+    /* Footer */
+    footer { text-align: center; padding: 32px 0; color: var(--muted); font-size: .9rem; }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 2rem; }
+      .screenshots { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="container">
+    <h1>Scenarii</h1>
+    <p>YAML-defined web test scenarios — run periodically via a headless browser or native HTTP, stored in SQLite, monitored via a modern Angular dashboard.</p>
+    <div class="hero-badges">
+      <a href="https://github.com/Giwi/giwisoft-scenarii">GitHub</a>
+      <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii">Container</a>
+      <a href="https://github.com/Giwi/giwisoft-scenarii/actions">CI</a>
+    </div>
+  </div>
+</div>
+
+<!-- What is Scenarii -->
+<section>
+  <div class="container">
+    <h2>What is Scenarii?</h2>
+    <p style="font-size:1.1rem;margin-bottom:20px;">
+      Scenarii lets you write web test scenarios as simple YAML files, run them on a cron schedule 
+      via a headless browser or native HTTP, and track results over time on a dashboard. 
+      Get alerted on failures via Telegram, Slack, Discord, email, or a generic webhook.
+    </p>
+    <div class="grid">
+      <div class="card"><span class="card-icon">&#x1F4DD;</span><h3>YAML-defined</h3><p>Scenarios are plain YAML files — no code to write. Define HTTP requests or browser interactions with step-by-step expectations.</p></div>
+      <div class="card"><span class="card-icon">&#x23F0;</span><h3>Cron scheduling</h3><p>Run scenarios every 5 minutes, hourly, daily — any cron expression. Built-in scheduler with pause/resume support.</p></div>
+      <div class="card"><span class="card-icon">&#x1F4CA;</span><h3>SQLite storage</h3><p>All metrics are persisted in SQLite with WAL mode. Configurable retention and optional automated backups.</p></div>
+      <div class="card"><span class="card-icon">&#x1F4BB;</span><h3>Angular dashboard</h3><p>Full-featured dashboard with dark/light theme, charts, SLA gauge, run history, JSON/CSV export, and public status pages.</p></div>
+      <div class="card"><span class="card-icon">&#x1F514;</span><h3>Multi-channel alerts</h3><p>Notify on state transitions (pass&rarr;fail, fail&rarr;pass) via Telegram, Slack, Discord, email (Mailgun), or a custom webhook.</p></div>
+      <div class="card"><span class="card-icon">&#x1F310;</span><h3>Browser + HTTP</h3><p>Use native fetch for API monitoring (no browser needed) or Lightpanda headless browser for full page interaction.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Start -->
+<section>
+  <div class="container">
+    <h2>Quick start</h2>
+    <pre><code># Clone and install
+git clone https://github.com/Giwi/giwisoft-scenarii.git
+cd giwisoft-scenarii
+npm install
+npm run build
+
+# Start the server (loads scenarios from ./scenarios)
+node dist/index.js server
+
+# Or run a scenario once
+node dist/index.js --once scenarios/example.yml</code></pre>
+    <p>Open <a href="http://localhost:3000">http://localhost:3000</a> for the dashboard.</p>
+
+    <h3>Docker</h3>
+    <pre><code>docker pull ghcr.io/giwi/giwisoft-scenarii:latest
+
+mkdir -p scenarios db
+cp settings.example.yaml settings.yml
+
+docker run -d \
+  --name scenarii \
+  -p 3000:3000 \
+  -v $(pwd)/scenarios:/scenarios \
+  -v $(pwd)/db:/app/db \
+  -v $(pwd)/settings.yml:/app/settings.yml:ro \
+  ghcr.io/giwi/giwisoft-scenarii:latest</code></pre>
+  </div>
+</section>
+
+<!-- Sample scenarios -->
+<section>
+  <div class="container">
+    <h2>Sample scenarios</h2>
+    <p style="margin-bottom:20px;">Scenarios are pure YAML — define steps, expectations, extraction variables, and optional conditions.</p>
+
+    <!-- HTTP health check -->
+    <h3><span class="tag http">HTTP</span> API health check</h3>
+    <p>Basic HTTP scenario that verifies an API is responding with the expected status code and response time.</p>
+    <pre><code>name: API health check
+description: Verify API health every 5 minutes
+schedule: "*/5 * * * *"
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Get posts
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+      response_time_under: 3000
+
+  - name: Verify JSON content
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+      json_path: $.userId
+      json_value: 1
+
+  - name: Create a post
+    action: http.post
+    url: /posts
+    body:
+      title: foo
+      body: bar
+      userId: 1
+    headers:
+      Content-Type: application/json
+    expect:
+      status: 201</code></pre>
+
+    <!-- Browser scenario -->
+    <h3><span class="tag browser">BROWSER</span> Browser form test</h3>
+    <p>Navigate to a page, wait for content, and evaluate JavaScript in the page — all through a headless Lightpanda browser.</p>
+    <pre><code>name: Browser form test
+description: Tests a form submission flow in the browser
+schedule: "*/10 * * * *"
+base_url: https://example.com
+
+steps:
+  - name: Open page
+    action: browser.navigate
+    url: /
+
+  - name: Verify page loaded
+    action: browser.wait_for
+    selector: body
+    expect:
+      has_text: "Example"
+
+  - name: Check URL
+    action: browser.evaluate
+    script: "window.location.href"
+    expect:
+      url_contains: "example.com"</code></pre>
+
+    <!-- Mixed scenario -->
+    <h3><span class="tag mixed">MIXED</span> Browser + HTTP</h3>
+    <p>Combine browser steps with HTTP API calls in the same scenario. Steps can reference results from previous ones.</p>
+    <pre><code>name: Mixed browser and HTTP
+base_url: https://example.com
+
+steps:
+  - name: Open page
+    action: browser.navigate
+    url: /
+    expect:
+      has_text: "Example"
+
+  - name: Check external API
+    action: http.get
+    url: https://jsonplaceholder.typicode.com/posts/1
+    expect:
+      status: 200
+      json_path: $.id
+      json_value: 1</code></pre>
+
+    <!-- Conditional steps -->
+    <h3><span class="tag http">HTTP</span> Conditional execution</h3>
+    <p>Skip steps based on the success or failure of a previous step using the <code>condition</code> field.</p>
+    <pre><code>name: Conditional scenario
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Login
+    action: http.post
+    url: /auth/login
+    body:
+      username: admin
+      password: secret
+    expect:
+      status: 200
+    variables:
+      token: $.access_token
+
+  - name: Dashboard check
+    action: http.get
+    url: /api/dashboard
+    condition:
+      if_step: "Login"
+      if_success: true
+    headers:
+      Authorization: "Bearer {{token}}"
+    expect:
+      status: 200</code></pre>
+
+    <!-- Advanced browser -->
+    <h3><span class="tag browser">BROWSER</span> Browser interactions</h3>
+    <p>Full browser interaction: fill forms, click buttons, select options, take screenshots, and compare against baselines.</p>
+    <pre><code>name: Full browser test
+base_url: https://example.com
+
+steps:
+  - name: Navigate to page
+    action: browser.navigate
+    url: /form
+
+  - name: Fill form field
+    action: browser.fill
+    selector: "#name"
+    value: "John Doe"
+
+  - name: Select option
+    action: browser.select
+    selector: "#country"
+    value: "FR"
+
+  - name: Check checkbox
+    action: browser.check
+    selector: "#agree"
+
+  - name: Submit
+    action: browser.click
+    selector: "#submit"
+
+  - name: Wait for result
+    action: browser.wait_for
+    selector: ".success-message"
+    timeout: 5000
+    expect:
+      has_text: "Thank you"
+
+  - name: Take screenshot
+    action: browser.screenshot
+    value: /tmp/screenshot.png</code></pre>
+
+    <!-- Variables extraction -->
+    <h3><span class="tag http">HTTP</span> Variable extraction</h3>
+    <p>Extract values from JSON responses with <code>json_path</code> and reuse them in subsequent steps using <code>{{variable}}</code> syntax.</p>
+    <pre><code>name: Variable extraction demo
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Get first post
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+    variables:
+      postTitle: $.title
+      postId: $.id
+
+  - name: Check user for post
+    action: http.get
+    url: /users/{{postId}}
+    expect:
+      status: 200
+
+  - name: Final log
+    action: http.get
+    url: /posts/{{postId}}
+    expect:
+      body_contains: "{{postTitle}}"</code></pre>
+  </div>
+</section>
+
+<!-- Dashboard -->
+<section>
+  <div class="container">
+    <h2>Dashboard</h2>
+    <p>The Angular frontend gives you real-time visibility into all your scenarios.</p>
+    <div class="screenshots">
+      <img src="../frontend/public/screenshots/scenario-list.png" alt="Scenario list (light)">
+      <img src="../frontend/public/screenshots/scenario-list-dark.png" alt="Scenario list (dark)">
+      <img src="../frontend/public/screenshots/scenario-detail.png" alt="Scenario detail (light)">
+      <img src="../frontend/public/screenshots/scenario-detail-dark.png" alt="Scenario detail (dark)">
+    </div>
+    <div class="grid" style="margin-top:24px;">
+      <div class="card"><h3>&#x1F4CB; Scenario list</h3><p>Overview of all scenarios with pass/fail badges, tag filters, dependencies, and auto-refresh via WebSocket.</p></div>
+      <div class="card"><h3>&#x1F4C8; Scenario detail</h3><p>Response time trend chart, success rate chart, SLA gauge, step breakdown, paginated history with JSON/CSV export.</p></div>
+      <div class="card"><h3>&#x23F3; Live ticker</h3><p>Inline step progress in the toolbar while a scenario is running — see which step is executing in real time.</p></div>
+      <div class="card"><h3>&#x1F310; Public status</h3><p>Shareable per-scenario pages at <code>/public/status/:name</code> with charts — no authentication required.</p></div>
+      <div class="card"><h3>&#x1F3AF; SLA tracking</h3><p>7-day SLA gauge per scenario with configurable window. Export SLA data via the detail page.</p></div>
+      <div class="card"><h3>&#x1F6D1; Real-time</h3><p>WebSocket push for run completions and step progress. Manual refresh button on both list and detail pages.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section>
+  <div class="container">
+    <h2>Features</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>&#x1F4E6; CLI &amp; API</h3>
+        <p>Run via CLI (<code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>config</code>) or REST API. Rich API with 20+ endpoints.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F510; Auth</h3>
+        <p>Optional OIDC-based dashboard authentication with HTTP-only session cookies. API key auth for Prometheus metrics endpoint.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F4E1; Notifications</h3>
+        <p>Telegram, Slack, Discord, email (Mailgun), or generic webhook. Fires on state transitions with retry logic and exponential backoff.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F4F0; Prometheus</h3>
+        <p>Exposes metrics in Prometheus/OpenMetrics format: run count, duration, success rate, step-level metrics, and notification delivery stats.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F4CA; SQLite storage</h3>
+        <p>WAL mode for concurrent reads. Configurable retention. Optional automated daily backups. No external database needed.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F433; Container</h3>
+        <p>Multi-arch Docker images (linux/amd64 + arm64). HEALTHCHECK, non-root user, dumb-init. Published to GitHub Container Registry.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F9F1; Hot-reload</h3>
+        <p>Settings YAML is watched and reloaded automatically. Add or modify scenario files on disk and they're picked up on the next schedule.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F3D7;&#xFE0F; Pause/Resume</h3>
+        <p>Toggle individual scheduled scenarios on and off from the dashboard without deleting their YAML files.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F527; API expectations</h3>
+        <p>Check status code, status_in list, body content (contains/matches regex), headers, JSON path values, and response time thresholds.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F5A5;&#xFE0F; Browser actions</h3>
+        <p>Navigate, click, fill, type, select, check, evaluate JS, wait for elements, take screenshots, and compare against baselines.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F4DC; HTPass</h3>
+        <p>HTTP, POST, PUT, PATCH, DELETE — all standard methods supported. Custom headers, JSON body, form data.</p>
+      </div>
+      <div class="card">
+        <h3>&#x2705; Testing</h3>
+        <p>Node built-in test runner. Tests cover execution queue, notification state machine, URL resolution, variable interpolation, YAML parse/serialize.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech stack -->
+<section>
+  <div class="container">
+    <h2>Tech stack</h2>
+    <div class="grid">
+      <div class="card"><strong>Runtime</strong><br>Node.js 26 + TypeScript strict</div>
+      <div class="card"><strong>HTTP</strong><br>Native fetch (no Playwright needed)</div>
+      <div class="card"><strong>Browser</strong><br>Lightpanda headless browser</div>
+      <div class="card"><strong>Database</strong><br>SQLite via better-sqlite3 (WAL)</div>
+      <div class="card"><strong>CLI</strong><br>Commander</div>
+      <div class="card"><strong>Scheduling</strong><br>node-cron (cron expressions)</div>
+      <div class="card"><strong>Logging</strong><br>pino (structured JSON)</div>
+      <div class="card"><strong>Security</strong><br>Helmet CSP + OIDC auth</div>
+      <div class="card"><strong>Frontend</strong><br>Angular 22 + Chart.js</div>
+      <div class="card"><strong>Container</strong><br>Alpine multi-stage, non-root</div>
+      <div class="card"><strong>Notifications</strong><br>Telegram, Slack, Discord, Mailgun, webhook</div>
+      <div class="card"><strong>CI/CD</strong><br>GitHub Actions + GHCR</div>
+    </div>
+  </div>
+</section>
+
+<!-- API reference -->
+<section>
+  <div class="container">
+    <h2>API endpoints</h2>
+    <pre><code style="color:#a6e3a1;"># Scenarios
+GET    /api/scenarios                   # List all scenarios (?tag=critical)
+GET    /api/scenarios/:name             # Detail with paginated history
+GET    /api/scenarios/:name/history     # Raw run history
+POST   /api/scenarios/:name/run         # Trigger ad-hoc run
+POST   /api/scenarios/:name/cancel      # Abort running scenario
+POST   /api/scenarios/:name/pause       # Pause scheduled scenario
+POST   /api/scenarios/:name/resume      # Resume paused scenario
+GET    /api/scenarios/:name/config      # Download YAML config
+PUT    /api/scenarios/:name/config      # Save/update YAML config
+DELETE /api/scenarios/:name/config      # Delete scenario file
+GET    /api/scenarios/:name/export/json # Download history as JSON
+GET    /api/scenarios/:name/export/csv  # Download history as CSV
+GET    /api/scenarios/:name/sla         # SLA stats (?days=7)
+
+# Auth
+GET    /api/auth/login                  # OIDC login redirect
+GET    /api/auth/callback               # OIDC callback
+GET    /api/auth/me                     # Session status
+POST   /api/auth/logout                 # Clear session
+
+# Public / system
+GET    /api/public/scenario/:name       # Public per-scenario detail
+GET    /api/status                      # Public summary
+GET    /api/health                      # Health check
+POST   /api/backup                      # Manual DB backup
+GET    /api/tags                        # List tags
+GET    /api/metrics                     # Prometheus format</code></pre>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p><a href="https://github.com/Giwi/giwisoft-scenarii">GitHub</a> &middot; <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii">Container</a> &middot; <a href="https://giwi.fr">GiwiSoft</a></p>
+    <p style="margin-top:8px;">Scenarii &copy; 2026 GiwiSoft</p>
+  </div>
+</footer>
+
+</body>
+</html>
