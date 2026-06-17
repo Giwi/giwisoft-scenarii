@@ -408,6 +408,7 @@ export function createApp(): express.Application {
         scriptSrc: ["'self'"],
         scriptSrcAttr: ["'none'"],
         styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+        upgradeInsecureRequests: null,
       },
     },
   }));
