@@ -406,7 +406,7 @@ export function createApp(): express.Application {
         imgSrc: ["'self'", 'data:'],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'"],
-        scriptSrcAttr: ["'none'"],
+        scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
         upgradeInsecureRequests: null,
       },
