@@ -26,6 +26,10 @@ COPY --from=builder /build/frontend/dist/ ./frontend/dist/
 
 RUN npm cache clean --force
 
+# Copy Lightpanda binary from builder stage (downloaded during npm ci)
+COPY --from=builder /root/.cache/lightpanda-node /home/node/.cache/lightpanda-node
+RUN chown -R node:node /home/node/.cache/lightpanda-node
+
 RUN mkdir -p /app/db && chown node:node /app/db
 
 EXPOSE 3000
