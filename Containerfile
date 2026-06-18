@@ -14,9 +14,10 @@ RUN npm run build && \
     npm prune --omit=dev && \
     rm -rf /build/frontend/node_modules
 
-FROM docker.io/node:26-alpine
+FROM docker.io/node:26-slim
 
-RUN apk add --no-cache libstdc++ dumb-init curl
+RUN apt-get update -qq && apt-get install -y -qq dumb-init curl && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -26,11 +27,13 @@ COPY --from=builder /build/frontend/dist/ ./frontend/dist/
 
 RUN npm cache clean --force
 
-# Copy Lightpanda binary from builder stage (downloaded during npm ci)
-COPY --from=builder /root/.cache/lightpanda-node /home/node/.cache/lightpanda-node
-RUN chown -R node:node /home/node/.cache/lightpanda-node
-
 RUN mkdir -p /app/db && chown node:node /app/db
+
+# Download Lightpanda browser binary as node user so it lands in /home/node/.cache/
+USER node
+RUN node node_modules/@lightpanda/browser/dist/scripts/postinstall.cjs || \
+    echo "Warning: Lightpanda binary download failed, browser scenarios will not work"
+USER root
 
 EXPOSE 3000
 
