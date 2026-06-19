@@ -109,7 +109,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
           const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
           lightpandaProc = proc;
 
-          browser = await chromium.connectOverCDP(`ws://127.0.0.1:${port}`);
+          browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
           browserContext = await browser.newContext({
             viewport: DEFAULT_BROWSER_VIEWPORT,
             ignoreHTTPSErrors,

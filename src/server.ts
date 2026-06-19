@@ -500,7 +500,7 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
       await waitForPort('127.0.0.1', LIGHTPANDA_PORT, PORT_WAIT_TIMEOUT);
       _lightpandaProc = proc;
       _lightpandaPort = LIGHTPANDA_PORT;
-      const url = `ws://127.0.0.1:${LIGHTPANDA_PORT}`;
+      const url = `http://127.0.0.1:${LIGHTPANDA_PORT}`;
       if (_runOptions) _runOptions.lightpandaUrl = url;
       logger.info({ port: LIGHTPANDA_PORT }, 'Lightpanda headless browser started');
     } catch (err: unknown) {
