@@ -6,7 +6,7 @@ import path from 'path';
 import http from 'http';
 import { loadScenarioFile } from './parser';
 import { runScenario, RunOptions } from './runner';
-import { scheduleScenario, stopAll, listScheduled, scheduleReport } from './scheduler';
+import { scheduleScenario, stopAll, listScheduled, scheduleReport, watchScenarios } from './scheduler';
 import { initStorage, closeStorage, isStorageReady } from './storage';
 import { loadSettings, watchSettings } from './settings';
 import { createServer, closeLightpanda } from './server';
@@ -133,7 +133,8 @@ program
       try {
         const scenario = loadScenarioFile(file);
         if (scenario.schedule) {
-          scheduleScenario(scenario, runOptions);
+          const stat = fs.statSync(file);
+          scheduleScenario(scenario, runOptions, file, stat.mtimeMs);
         }
       } catch (err: unknown) {
         logger.error({ file, err: err instanceof Error ? err.message : err }, 'Failed to load scenario');
@@ -143,6 +144,9 @@ program
     if (listScheduled().length > 0) {
       logger.info({ scheduled: listScheduled() }, 'Scheduled scenarios');
     }
+
+    // Start periodic watcher to pick up new/removed scenario files
+    watchScenarios(scenariosDir, runOptions);
 
     scheduleReport(DAILY_REPORT_CRON);
 
