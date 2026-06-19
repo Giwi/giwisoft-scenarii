@@ -89,10 +89,16 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
     try {
       if (hasBrowserActions) {
         if (options.lightpandaUrl) {
-          // Reuse the globally running Lightpanda instance (started in server.ts).
-          // Each worker creates its own isolated context so runs don't interfere.
-          // The shared browser/Lightpanda is NOT closed here — only the context is.
-          browser = await chromium.connectOverCDP(options.lightpandaUrl);
+          try {
+            // Reuse the globally running Lightpanda instance (started in server.ts).
+            // Each worker creates its own isolated context so runs don't interfere.
+            // The shared browser/Lightpanda is NOT closed here — only the context is.
+            browser = await chromium.connectOverCDP(options.lightpandaUrl);
+          } catch {
+            logger.warn({ url: options.lightpandaUrl }, 'Global Lightpanda unavailable, starting per-run instance');
+          }
+        }
+        if (browser) {
           browserContext = await browser.newContext({
             viewport: DEFAULT_BROWSER_VIEWPORT,
             ignoreHTTPSErrors,
@@ -150,29 +156,24 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
       };
       metrics.steps.push(stepMetrics);
     } finally {
-      if (options.lightpandaUrl) {
-        // Shared Lightpanda mode: close only the per-run context.
-        // The global browser and Lightpanda process stay alive for other runs.
-        if (browserContext) {
-          try { await browserContext.close(); } catch {}
-        }
-      } else {
-        // Standalone mode: fully tear down the per-run browser and Lightpanda process.
+      if (lightpandaProc) {
+        // Per-run Lightpanda (standalone or fallback): close browser and kill process
         if (browser) {
           try { await browser.close(); } catch {}
         } else if (browserContext) {
           try { await browserContext.close(); } catch {}
         }
-        if (lightpandaProc) {
-          try {
-            lightpandaProc.stdout?.destroy();
-            lightpandaProc.stderr?.destroy();
-            lightpandaProc.kill();
-            const timer = setTimeout(() => {}, PROCESS_EXIT_TIMEOUT);
-            lightpandaProc.once('exit', () => clearTimeout(timer));
-            lightpandaProc.once('error', () => clearTimeout(timer));
-          } catch {}
-        }
+        try {
+          lightpandaProc.stdout?.destroy();
+          lightpandaProc.stderr?.destroy();
+          lightpandaProc.kill();
+          const timer = setTimeout(() => {}, PROCESS_EXIT_TIMEOUT);
+          lightpandaProc.once('exit', () => clearTimeout(timer));
+          lightpandaProc.once('error', () => clearTimeout(timer));
+        } catch {}
+      } else if (browserContext) {
+        // Global Lightpanda: close only per-run context
+        try { await browserContext.close(); } catch {}
       }
     }
   };
