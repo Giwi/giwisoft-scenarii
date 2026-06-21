@@ -103,6 +103,25 @@ function sendError(res: express.Response, status: number, err: unknown): void {
 function handleScenarioList(req: express.Request, res: express.Response): void {
   try {
     const tag = req.query.tag as string | undefined;
+
+    // Pre-scan disk files — collect names and depends_on for all current scenarios.
+    // This serves two purposes:
+    //   1. Filter out stale DB entries whose files were deleted/renamed.
+    //   2. Avoid N×M file reads (one getScenarioDependsOn per scenario in the list).
+    const diskScenarios = new Map<string, string | undefined>(); // name → depends_on
+    if (_scenariosDir) {
+      try {
+        const files = fs.readdirSync(_scenariosDir)
+          .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+        for (const file of files) {
+          try {
+            const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+            diskScenarios.set(scenario.name, scenario.depends_on);
+          } catch { /* skip invalid files */ }
+        }
+      } catch { /* scenarios dir unavailable */ }
+    }
+
     const dbList = getScenarioList();
     const dbNames = new Set(dbList.map(s => s.name));
 
@@ -121,12 +140,15 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
       }
     }
 
-    const list = dbList.map(s => ({
-      ...s,
-      paused: isPaused(s.name),
-      scheduled: isScheduled(s.name),
-      depends_on: getScenarioDependsOn(s.name),
-    }));
+    // Only include scenarios whose files still exist on disk
+    const list = dbList
+      .filter(s => diskScenarios.has(s.name))
+      .map(s => ({
+        ...s,
+        paused: isPaused(s.name),
+        scheduled: isScheduled(s.name),
+        depends_on: diskScenarios.get(s.name) ?? getScenarioDependsOn(s.name),
+      }));
 
     res.json(tag ? list.filter(s => s.tags?.includes(tag)) : list);
   } catch (err: unknown) {
