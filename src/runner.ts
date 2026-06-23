@@ -150,7 +150,7 @@ export async function runScenario(
         clearTimeout(safetyTimer);
         runningWorkers.delete(scenario.name);
         logger.error({ scenario: scenario.name, err }, 'Worker error');
-        const metrics = createCancelledMetrics(scenario.name, err.message);
+        const metrics = createCancelledMetrics(scenario.name, err instanceof Error ? err.message : String(err));
         persistAndNotify(metrics, options);
         resolve(metrics);
       }

@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import cron, { type ScheduledTask as CronScheduledTask } from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { Scenario, AlertConfig } from './types';
@@ -12,7 +12,7 @@ import { DEFAULT_ALERT_CONSECUTIVE_FAILURES } from './constants';
 
 interface ScheduledTask {
   scenario: Scenario;
-  task: cron.ScheduledTask;
+  task: CronScheduledTask;
   options: RunOptions;
   paused: boolean;
   filePath?: string;
@@ -28,7 +28,7 @@ export function scheduleScenario(
   options: RunOptions = {},
   filePath?: string,
   mtimeMs?: number
-): cron.ScheduledTask | null {
+): CronScheduledTask | null {
   if (!scenario.schedule) {
     logger.info({ scenario: scenario.name }, 'No schedule, running once');
     runScenario(scenario, options);
@@ -206,7 +206,7 @@ export function watchScenarios(scenariosDir: string, options: RunOptions, interv
 }
 
 // Schedules the daily email report on the given cron expression.
-export function scheduleReport(cronExpression: string): cron.ScheduledTask {
+export function scheduleReport(cronExpression: string): CronScheduledTask {
   const task = cron.schedule(cronExpression, async () => {
     await sendDailyReport();
   });

@@ -1,5 +1,5 @@
 import { StepMetrics, ScenarioMetrics, Reporter } from './types';
-import chalk from 'chalk';
+import pc from 'picocolors';
 
 // Creates a fresh StepMetrics object with the given name and action.
 export function createStepMetrics(step_name: string, action: string): StepMetrics {
@@ -34,15 +34,15 @@ export function createScenarioMetrics(scenario_name: string): ScenarioMetrics {
 
 // Pretty-prints scenario metrics to the console with colored PASS/FAIL output.
 export const consoleReporter: Reporter = (metrics: ScenarioMetrics): void => {
-  const status = metrics.success ? chalk.green('✓ PASS') : chalk.red('✗ FAIL');
+  const status = metrics.success ? pc.green('✓ PASS') : pc.red('✗ FAIL');
   console.log(`\n${status} ${metrics.scenario_name}`);
   console.log(`  Duration: ${metrics.duration_ms}ms`);
   console.log(`  Steps: ${metrics.steps.length} total`);
 
   for (const step of metrics.steps) {
-    const icon = step.success ? chalk.green('✓') : chalk.red('✗');
-    const time = chalk.gray(`(${step.response_time_ms}ms)`);
-    const err = step.error ? chalk.red(` - ${step.error}`) : '';
+    const icon = step.success ? pc.green('✓') : pc.red('✗');
+    const time = pc.gray(`(${step.response_time_ms}ms)`);
+    const err = step.error ? pc.red(` - ${step.error}`) : '';
     console.log(`  ${icon} ${step.step_name} ${time}${err}`);
   }
 };
