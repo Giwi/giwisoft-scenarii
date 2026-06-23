@@ -94,8 +94,8 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
             // Each worker creates its own isolated context so runs don't interfere.
             // The shared browser/Lightpanda is NOT closed here — only the context is.
             browser = await chromium.connectOverCDP(options.lightpandaUrl);
-          } catch {
-            logger.warn({ url: options.lightpandaUrl }, 'Global Lightpanda unavailable, starting per-run instance');
+          } catch (err: unknown) {
+            logger.warn({ url: options.lightpandaUrl, err: err instanceof Error ? err.message : String(err) }, 'Global Lightpanda unavailable, starting per-run instance');
           }
         }
         if (browser) {
@@ -106,7 +106,8 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
           page = await browserContext.newPage();
         } else {
           // Standalone mode: start a fresh Lightpanda instance just for this run.
-          const { proc, port } = await startLightpanda(options.lightpandaPort ?? DEFAULT_LIGHTPANDA_PORT);
+          // Use a random port to avoid conflicting with the global instance on 9222.
+          const { proc, port } = await startLightpanda(getRandomPort());
           lightpandaProc = proc;
 
           browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
