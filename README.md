@@ -19,7 +19,7 @@ Open http://localhost:3000 to see the dashboard. Each scenario also has a sharea
 
 ## Requirements
 
-- Node.js ≥ 24.15.0 or ≥ 26.0.0 (for Angular 22)
+- Node.js ≥ 26 (for Angular 22 and native fetch)
 - For browser scenarios: `@lightpanda/browser` (optional — HTTP-only scenarios use native fetch)
 
 ## CLI
@@ -45,8 +45,8 @@ node dist/index.js config --init
 |--------|---------|-------------|
 | `-p, --port` | `3000` | HTTP port |
 | `--db` | `db/scenarii.db` | SQLite database path |
-| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files |
-| `--settings` | auto-detect | Path to settings file (see Notifications below) |
+| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files (watched every 5s — add/remove/rename files without restart) |
+| `--settings` | auto-detect | Path to settings file (hot-reloaded, see Notifications below) |
 
 ## Writing scenarios
 
@@ -124,6 +124,7 @@ HTTP-only scenarios use the native `fetch` API — no Playwright or browser need
 | `browser.check` / `browser.uncheck` | `selector` |
 | `browser.screenshot` | `value` (output path) |
 | `browser.screenshot_compare` | `value` (baseline path — creates baseline on first run, compares on subsequent) |
+| `browser.scroll` | `value` (pixels to scroll down), `selector` (scroll element into view) |
 
 Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.
 
@@ -321,13 +322,13 @@ Published on each push to `main`:
 docker pull ghcr.io/giwi/giwisoft-scenarii:latest
 
 mkdir -p scenarios db
-cp settings.example.yaml settings.yaml  # optional, for notifications
+cp settings.example.yaml settings.yml  # optional, for notifications
 docker run -d \
   --name scenarii \
   -p 3000:3000 \
   -v $(pwd)/scenarios:/scenarios \
   -v $(pwd)/db:/app/db \
-  -v $(pwd)/settings.yaml:/app/settings.yaml:ro \
+  -v $(pwd)/settings.yml:/app/settings.yml:ro \
   ghcr.io/giwi/giwisoft-scenarii:latest
 ```
 
@@ -343,11 +344,11 @@ docker run -d \
   -p 3000:3000 \
   -v $(pwd)/scenarios:/scenarios \
   -v $(pwd)/db:/app/db \
-  -v $(pwd)/settings.yaml:/app/settings.yaml:ro \
+  -v $(pwd)/settings.yml:/app/settings.yml:ro \
   giwisoft-scenarii:latest
 ```
 
-The container includes a `HEALTHCHECK` that pings `/api/health` every 30s, runs as non-root (`USER node`), and uses `dumb-init` for proper signal handling.
+The container uses `dumb-init` for proper signal handling, runs as non-root (`USER node`), and includes a `HEALTHCHECK` pinging `/api/health` every 30s. Built on `node:26-slim` (glibc) for full Lightpanda compatibility.
 
 > **Rootless podman** — if using rootless podman, mount volumes may be owned by the host user but inaccessible to the container's `node` user. Add `--userns=keep-id` to map the container user to your host UID:
 > ```bash
@@ -357,7 +358,7 @@ The container includes a `HEALTHCHECK` that pings `/api/health` every 30s, runs 
 >   -p 3000:3000 \
 >   -v $(pwd)/scenarios:/scenarios \
 >   -v $(pwd)/db:/app/db \
->   -v $(pwd)/settings.yaml:/app/settings.yaml:ro \
+>   -v $(pwd)/settings.yml:/app/settings.yml:ro \
 >   ghcr.io/giwi/giwisoft-scenarii:latest
 > ```
 
@@ -415,4 +416,4 @@ Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests 
 - **Logging** — pino (structured JSON, ISO timestamps)
 - **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.), optional OIDC-based dashboard auth with HTTP-only session cookies
 - **Frontend** — Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
-- **Container** — Alpine + multi-stage build, non-root user
+- **Container** — Debian-slim (`node:26-slim`), multi-stage build, non-root user

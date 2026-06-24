@@ -443,10 +443,10 @@ steps:
       <div class="card"><h3>&#x1F4F0; Prometheus metrics</h3><p>Native Prometheus/OpenMetrics export: run count, duration, success rate, step-level metrics, notification delivery stats.</p></div>
       <div class="card"><h3>&#x1F4CA; SQLite storage</h3><p>WAL mode for concurrent reads. Configurable retention (default 7 days). Optional automated daily backups. No external database.</p></div>
       <div class="card"><h3>&#x1F433; Container</h3><p>Multi-arch images (linux/amd64 + arm64). HEALTHCHECK, non-root user, dumb-init. Published to GitHub Container Registry on each push.</p></div>
-      <div class="card"><h3>&#x1F9F1; Hot-reload</h3><p>Settings YAML watched and reloaded automatically. Modify scenarios on disk, picked up on next schedule. No server restart needed.</p></div>
+      <div class="card"><h3>&#x1F9F1; Hot-reload</h3><p>Settings YAML watched and reloaded automatically. Scenario directory scanned every 5s — add, remove, or rename <code>.yml</code> files without restarting.</p></div>
       <div class="card"><h3>&#x1F3D7;&#xFE0F; Pause / Resume</h3><p>Toggle individual schedules on and off from the dashboard without deleting YAML files.</p></div>
       <div class="card"><h3>&#x1F527; HTTP expectations</h3><p>Check status, status_in, body_contains, body_matches, headers, JSON path, JSON value, and response_time_under.</p></div>
-      <div class="card"><h3>&#x1F5A5;&#xFE0F; Browser actions</h3><p>Navigate, click, fill, type, select, check, uncheck, evaluate JS, wait for elements, screenshot, screenshot comparison against baseline.</p></div>
+      <div class="card"><h3>&#x1F5A5;&#xFE0F; Browser actions</h3><p>Navigate, click, fill, type, select, check, uncheck, evaluate JS, scroll, wait for elements, screenshot, screenshot comparison against baseline.</p></div>
       <div class="card"><h3>&#x1F4DC; All HTTP methods</h3><p>GET, POST, PUT, PATCH, DELETE — all standard methods. Custom headers, JSON body, form data. Native fetch, no Playwright needed.</p></div>
       <div class="card"><h3>&#x2705; Testing</h3><p>Node built-in test runner. Tests cover execution queue, notification state machine, URL resolution, variable interpolation, YAML parsing, and more.</p></div>
     </div>
@@ -502,7 +502,7 @@ GET    /api/metrics                    <span style="color:#6c7086;">Prometheus f
       <div class="card"><strong>Logging</strong><br>pino (structured JSON)</div>
       <div class="card"><strong>Security</strong><br>Helmet CSP + OIDC auth</div>
       <div class="card"><strong>Frontend</strong><br>Angular 22 + Chart.js</div>
-      <div class="card"><strong>Container</strong><br>Alpine multi-stage, non-root</div>
+      <div class="card"><strong>Container</strong><br>Debian-slim multi-stage, non-root</div>
       <div class="card"><strong>Notifications</strong><br>Telegram, Slack, Discord, Mailgun, webhook</div>
       <div class="card"><strong>CI/CD</strong><br>GitHub Actions + GHCR</div>
     </div>
