@@ -49,7 +49,8 @@ export interface BrowserStep {
     | 'browser.evaluate'
     | 'browser.type'
     | 'browser.check'
-    | 'browser.uncheck';
+    | 'browser.uncheck'
+    | 'browser.scroll';
   url?: string;
   selector?: string;
   value?: string;

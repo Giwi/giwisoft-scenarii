@@ -188,6 +188,16 @@ export async function executeBrowserStep(
           break;
         }
 
+        case 'browser.scroll': {
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          if (step.value !== undefined) {
+            await page.evaluate(`window.scrollBy(0, ${Number(step.value)})`);
+          } else if (step.selector) {
+            await page.locator(step.selector).scrollIntoViewIfNeeded();
+          }
+          break;
+        }
+
         case 'browser.evaluate': {
           if (!step.script) throw new Error('browser.evaluate requires a "script" field');
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
