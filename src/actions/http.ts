@@ -86,6 +86,72 @@ export function checkExpectations(step: HttpStep, response: FetchResponse, body:
     return `Response time ${elapsed_ms}ms exceeded limit of ${expect.response_time_under}ms`;
   }
 
+  if (expect.body_schema) {
+    try {
+      const parsed = JSON.parse(body);
+      const error = validateSchema(parsed, expect.body_schema, '');
+      if (error) {
+        return `Body schema validation failed: ${error}`;
+      }
+    } catch {
+      return `Failed to parse JSON body for schema validation`;
+    }
+  }
+
+  return null;
+}
+
+// Simple recursive schema validator for body_schema.
+// Supports: { type: "object", properties: {...}, required: [...] }
+//           { type: "array", items: {...} }
+//           { type: "string" | "number" | "boolean" }
+function validateSchema(value: unknown, schema: Record<string, unknown>, path: string): string | null {
+  const type = schema.type as string | undefined;
+
+  if (type === 'object') {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return `${path || 'root'}: expected object, got ${typeof value}`;
+    }
+    const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+    if (properties) {
+      for (const [key, propSchema] of Object.entries(properties)) {
+        const childPath = path ? `${path}.${key}` : key;
+        if (key in (value as Record<string, unknown>)) {
+          const err = validateSchema((value as Record<string, unknown>)[key], propSchema, childPath);
+          if (err) return err;
+        }
+      }
+    }
+    const required = schema.required as string[] | undefined;
+    if (required) {
+      for (const key of required) {
+        if (!(key in (value as Record<string, unknown>))) {
+          return `${path || 'root'}: missing required field "${key}"`;
+        }
+      }
+    }
+  } else if (type === 'array') {
+    if (!Array.isArray(value)) {
+      return `${path || 'root'}: expected array, got ${typeof value}`;
+    }
+    const items = schema.items as Record<string, unknown> | undefined;
+    if (items) {
+      for (let i = 0; i < value.length; i++) {
+        const err = validateSchema(value[i], items, `${path}[${i}]`);
+        if (err) return err;
+      }
+    }
+  } else if (type === 'string') {
+    if (typeof value !== 'string') return `${path}: expected string, got ${typeof value}`;
+  } else if (type === 'number') {
+    if (typeof value !== 'number') return `${path}: expected number, got ${typeof value}`;
+  } else if (type === 'boolean') {
+    if (typeof value !== 'boolean') return `${path}: expected boolean, got ${typeof value}`;
+  } else if (type === 'null') {
+    if (value !== null) return `${path}: expected null`;
+  }
+
+  // When no type is specified or type is unknown, skip validation
   return null;
 }
 

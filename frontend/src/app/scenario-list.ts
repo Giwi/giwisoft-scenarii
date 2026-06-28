@@ -21,6 +21,7 @@ interface ScenarioInfo {
   scheduled?: boolean;
   tags?: string[];
   depends_on?: string;
+  group?: string;
 }
 
 @Component({
@@ -35,7 +36,11 @@ interface ScenarioInfo {
         scenarios.length
       }}</span>
       <div class="ms-auto d-flex gap-2">
-        <select class="form-select form-select-sm" style="width:auto" [(ngModel)]="tagFilter" (ngModelChange)="onTagFilterChange()" *ngIf="allTags.length">
+        <select class="form-select form-select-sm" style="width:auto" [(ngModel)]="groupFilter" (ngModelChange)="fetchScenarios()" *ngIf="allGroups.length">
+          <option value="">All groups</option>
+          <option *ngFor="let g of allGroups" [value]="g">{{ g }}</option>
+        </select>
+        <select class="form-select form-select-sm" style="width:auto" [(ngModel)]="tagFilter" (ngModelChange)="fetchScenarios()" *ngIf="allTags.length">
           <option value="">All tags</option>
           <option *ngFor="let t of allTags" [value]="t">{{ t }}</option>
         </select>
@@ -90,6 +95,7 @@ interface ScenarioInfo {
           <thead class="table-light">
             <tr>
               <th>Scenario</th>
+              <th>Group</th>
               <th>Tags</th>
               <th>Depends on</th>
               <th>Status</th>
@@ -102,6 +108,10 @@ interface ScenarioInfo {
           <tbody>
             <tr *ngFor="let s of scenarios">
               <td class="fw-semibold"><a [routerLink]="['/scenario', s.name]" class="text-decoration-none">{{ s.name }}</a></td>
+              <td>
+                <span class="badge bg-secondary me-1" style="font-size:.7rem" *ngIf="s.group">{{ s.group }}</span>
+                <span class="text-secondary small" *ngIf="!s.group">—</span>
+              </td>
               <td>
                 <span class="badge bg-info me-1" *ngFor="let tag of (s.tags || [])" style="font-size:.7rem">{{ tag }}</span>
                 <span class="text-secondary small" *ngIf="!s.tags?.length">—</span>
@@ -158,7 +168,9 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
   running = '';
   cancelling = '';
   tagFilter = '';
+  groupFilter = '';
   allTags: string[] = [];
+  allGroups: string[] = [];
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   fetching = false;
 
@@ -190,24 +202,28 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     if (!this.fetching) this.fetchScenarios();
   };
 
-  onTagFilterChange(): void {
-    this.fetchScenarios();
-  }
-
   async fetchScenarios(): Promise<void> {
     if (this.fetching) return;
     this.fetching = true;
     try {
-      const url = this.tagFilter ? `/api/scenarios?tag=${encodeURIComponent(this.tagFilter)}` : '/api/scenarios';
-      const [scenariosRes, tagsRes] = await Promise.all([
+      const params = new URLSearchParams();
+      if (this.tagFilter) params.set('tag', this.tagFilter);
+      if (this.groupFilter) params.set('group', this.groupFilter);
+      const qs = params.toString();
+      const url = qs ? `/api/scenarios?${qs}` : '/api/scenarios';
+      const [scenariosRes, tagsRes, groupsRes] = await Promise.all([
         apiFetch(url),
         apiFetch('/api/tags'),
+        apiFetch('/api/groups'),
       ]);
       if (scenariosRes.ok) {
         this.scenarios = await scenariosRes.json();
       }
       if (tagsRes.ok) {
         this.allTags = await tagsRes.json();
+      }
+      if (groupsRes.ok) {
+        this.allGroups = await groupsRes.json();
       }
     } catch {
       // Server not ready yet — will retry on next poll

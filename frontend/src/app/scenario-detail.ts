@@ -102,6 +102,9 @@ interface ScenarioDetail {
         <i class="bi bi-share"></i>
         <span *ngIf="copied" class="position-absolute small bg-success text-white rounded px-1" style="top:-8px;right:-8px;font-size:.6rem;line-height:1.2">Copied!</span>
       </button>
+      <a class="btn btn-sm btn-outline-secondary border-0" *ngIf="detail" [routerLink]="['/scenario', scenarioName, 'edit']" title="Edit scenario YAML">
+        <i class="bi bi-pencil"></i>
+      </a>
       <div class="dropdown" *ngIf="detail">
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
           <i class="bi bi-download me-1"></i>Export

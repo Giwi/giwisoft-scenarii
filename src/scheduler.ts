@@ -1,7 +1,7 @@
 import cron, { type ScheduledTask as CronScheduledTask } from 'node-cron';
 import fs from 'fs';
 import path from 'path';
-import { Scenario, AlertConfig } from './types';
+import { Scenario, AlertConfig, TimeWindow } from './types';
 import { runScenario, RunOptions } from './runner';
 import { sendDailyReport } from './report';
 import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess } from './storage';
@@ -20,6 +20,20 @@ interface ScheduledTask {
 }
 
 const scheduledTasks: ScheduledTask[] = [];
+
+// Checks if a given Date falls within a time window (HH:mm format).
+function isInTimeWindow(dt: Date, window: TimeWindow): boolean {
+  const minutes = dt.getHours() * 60 + dt.getMinutes();
+  const startParts = window.start.split(':').map(Number);
+  const endParts = window.end.split(':').map(Number);
+  const startMinutes = startParts[0] * 60 + (startParts[1] || 0);
+  const endMinutes = endParts[0] * 60 + (endParts[1] || 0);
+  if (startMinutes <= endMinutes) {
+    return minutes >= startMinutes && minutes <= endMinutes;
+  }
+  // Wraps past midnight (e.g. 22:00 - 06:00)
+  return minutes >= startMinutes || minutes <= endMinutes;
+}
 
 // Schedules a scenario based on its cron expression, or runs it immediately if no schedule is set.
 // Returns the cron task, or null when run-once.
@@ -47,6 +61,16 @@ export function scheduleScenario(
     if (entry?.paused) {
       logger.info({ scenario: scenario.name }, 'Scenario is paused, skipping run');
       return;
+    }
+
+    // If the scenario has time windows, check if current time falls within one
+    if (scenario.time_windows && scenario.time_windows.length > 0) {
+      const now = new Date();
+      const inWindow = scenario.time_windows.some(w => isInTimeWindow(now, w));
+      if (!inWindow) {
+        logger.info({ scenario: scenario.name, time_windows: scenario.time_windows }, 'Outside time window, skipping run');
+        return;
+      }
     }
 
     // If the scenario depends on another, check that dependency's last run succeeded

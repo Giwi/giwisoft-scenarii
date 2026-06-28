@@ -14,6 +14,7 @@ import {
 } from './storage';
 import { initWebSocket } from './ws';
 import { getSettings } from './settings';
+import yaml from 'js-yaml';
 import { loadScenarioFile, parseScenario, serializeScenario } from './parser';
 import { runScenario, cancelScenario } from './runner';
 import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from './scheduler';
@@ -103,12 +104,10 @@ function sendError(res: express.Response, status: number, err: unknown): void {
 function handleScenarioList(req: express.Request, res: express.Response): void {
   try {
     const tag = req.query.tag as string | undefined;
+    const group = req.query.group as string | undefined;
 
-    // Pre-scan disk files — collect names and depends_on for all current scenarios.
-    // This serves two purposes:
-    //   1. Filter out stale DB entries whose files were deleted/renamed.
-    //   2. Avoid N×M file reads (one getScenarioDependsOn per scenario in the list).
-    const diskScenarios = new Map<string, string | undefined>(); // name → depends_on
+    // Pre-scan disk files — collect names, depends_on and group for all current scenarios.
+    const diskScenarios = new Map<string, { depends_on?: string; group?: string }>();
     if (_scenariosDir) {
       try {
         const files = fs.readdirSync(_scenariosDir)
@@ -116,7 +115,7 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
         for (const file of files) {
           try {
             const scenario = loadScenarioFile(path.join(_scenariosDir, file));
-            diskScenarios.set(scenario.name, scenario.depends_on);
+            diskScenarios.set(scenario.name, { depends_on: scenario.depends_on, group: scenario.group });
           } catch { /* skip invalid files */ }
         }
       } catch { /* scenarios dir unavailable */ }
@@ -143,14 +142,106 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
     // Only include scenarios whose files still exist on disk
     const list = dbList
       .filter(s => diskScenarios.has(s.name))
-      .map(s => ({
-        ...s,
-        paused: isPaused(s.name),
-        scheduled: isScheduled(s.name),
-        depends_on: diskScenarios.get(s.name) ?? getScenarioDependsOn(s.name),
-      }));
+      .map(s => {
+        const info = diskScenarios.get(s.name)!;
+        return {
+          ...s,
+          paused: isPaused(s.name),
+          scheduled: isScheduled(s.name),
+          depends_on: info.depends_on ?? getScenarioDependsOn(s.name),
+          group: info.group,
+        };
+      });
 
-    res.json(tag ? list.filter(s => s.tags?.includes(tag)) : list);
+    let filtered = tag ? list.filter(s => s.tags?.includes(tag)) : list;
+    if (group) filtered = filtered.filter(s => s.group === group);
+    res.json(filtered);
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+// Bulk import scenarios from a YAML string containing one or more scenario documents.
+function handleBulkImport(req: express.Request, res: express.Response): void {
+  if (!_scenariosDir) {
+    res.status(400).json({ error: 'Server not configured for import' });
+    return;
+  }
+  try {
+    const body = req.body as { yaml?: string } | { scenarios?: string };
+    let yamlStr: string | undefined;
+    if ('yaml' in body && body.yaml) {
+      yamlStr = body.yaml;
+    } else if ('scenarios' in body && body.scenarios) {
+      yamlStr = body.scenarios;
+    }
+    if (!yamlStr) {
+      res.status(400).json({ error: 'YAML content required in "yaml" or "scenarios" field' });
+      return;
+    }
+
+    // Parse — may be a single scenario or a YAML array of scenarios
+    const parsed = yaml.load(yamlStr);
+    const scenarios: Record<string, unknown>[] = Array.isArray(parsed) ? parsed : [parsed as Record<string, unknown>];
+    const results: { name: string; status: string; error?: string }[] = [];
+
+    for (const raw of scenarios) {
+      try {
+        const scenario = parseScenario(yaml.dump(raw));
+        const filePath = path.join(_scenariosDir, `${scenario.name}.yaml`);
+        fs.writeFileSync(filePath, yaml.dump(raw, { indent: 2, lineWidth: 120, noRefs: true }), 'utf-8');
+        results.push({ name: scenario.name, status: 'imported' });
+      } catch (err: unknown) {
+        results.push({ name: (raw.name as string) || 'unknown', status: 'error', error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    res.json({ imported: results.length, results });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+// Bulk export all scenarios as a YAML array bundle.
+function handleBulkExport(req: express.Request, res: express.Response): void {
+  if (!_scenariosDir) {
+    res.status(400).json({ error: 'Server not configured for export' });
+    return;
+  }
+  try {
+    const files = fs.readdirSync(_scenariosDir)
+      .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+    const scenarios: Record<string, unknown>[] = [];
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(path.join(_scenariosDir, file), 'utf-8');
+        scenarios.push(yaml.load(content) as Record<string, unknown>);
+      } catch { /* skip invalid files */ }
+    }
+    const bundle = yaml.dump(scenarios, { indent: 2, lineWidth: 120, noRefs: true });
+    res.setHeader('Content-Type', 'text/yaml');
+    res.setHeader('Content-Disposition', 'attachment; filename="scenarios-bundle.yaml"');
+    res.send(bundle);
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+// Lists all distinct scenario groups found on disk.
+function handleGroups(req: express.Request, res: express.Response): void {
+  try {
+    const groups = new Set<string>();
+    if (_scenariosDir) {
+      const files = fs.readdirSync(_scenariosDir)
+        .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+      for (const file of files) {
+        try {
+          const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+          if (scenario.group) groups.add(scenario.group);
+        } catch { /* skip */ }
+      }
+    }
+    res.json([...groups].sort());
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -466,6 +557,9 @@ export function createApp(): express.Application {
 
   // Scenario CRUD and management
   app.get('/api/scenarios', handleScenarioList);
+  app.post('/api/scenarios/import', handleBulkImport);
+  app.get('/api/scenarios/export', handleBulkExport);
+  app.get('/api/groups', handleGroups);
   app.get('/api/scenarios/:name', handleScenarioDetail);
   app.get('/api/scenarios/:name/history', handleScenarioHistory);
   app.post('/api/scenarios/:name/run', handleRunNow);

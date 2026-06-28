@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars } from '../helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath } from '../helpers';
 import { BROWSER_RETRIES, RETRY_DELAYS } from '../retry';
 import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../constants';
 
@@ -201,7 +201,15 @@ export async function executeBrowserStep(
         case 'browser.evaluate': {
           if (!step.script) throw new Error('browser.evaluate requires a "script" field');
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
-          await page.evaluate(step.script);
+          const result = await page.evaluate(step.script);
+          if (step.variables && result !== undefined) {
+            for (const [key, path] of Object.entries(step.variables)) {
+              const resolved = resolveJsonPath(result, path);
+              if (resolved !== undefined) {
+                vars[key] = String(resolved);
+              }
+            }
+          }
           break;
         }
       }

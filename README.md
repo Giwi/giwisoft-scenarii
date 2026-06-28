@@ -64,6 +64,10 @@ timeout: 120000           # per-scenario timeout override (default 120s)
 ignoreHTTPSErrors: false  # per-scenario SSL override
 tags: [critical, auth]    # optional tags for dashboard filtering
 depends_on: "Health check" # optional - skip this scenario if dependency last run failed
+group: api                # optional group/category for dashboard filtering
+time_windows:             # optional - only run within these time windows
+  - start: "09:00"
+    end: "17:00"
 alert:                    # optional alert rules
   consecutive_failures: 3 # warn after N consecutive failures
 
@@ -102,6 +106,22 @@ steps:
       if_success: true
     expect:
       status: 200
+
+  - name: Login validation
+    action: http.post
+    url: /api/login
+    variables:
+      auth_token: $.token     # extract JSON value into {{auth_token}} for later steps
+    expect:
+      status: 200
+      body_schema:            # validate JSON body structure
+        type: object
+        properties:
+          token:
+            type: string
+        required: [token]
+
+  - include: health-check     # pull in steps from another scenario
 ```
 
 ### HTTP actions
@@ -112,7 +132,7 @@ HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed
 |--------|--------|
 | `http.get` / `http.post` / `http.put` / `http.patch` / `http.delete` | `url`, `headers`, `body`, `expect` |
 
-**Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `header_contains` (format `"HeaderName: value"`), `header_matches` (format `"HeaderName: regex"`), `json_path`, `json_value`, `response_time_under`
+**Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `header_contains` (format `"HeaderName: value"`), `header_matches` (format `"HeaderName: regex"`), `json_path`, `json_value`, `response_time_under`, `body_schema` (validate JSON body structure with a simple schema: `type` + `properties` + `required` for objects, `type` + `items` for arrays)
 
 ### Browser actions
 
@@ -124,7 +144,7 @@ HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed
 | `browser.click` | `selector` |
 | `browser.wait_for` | `selector`, `timeout`, `expect` (has_text, not_has_text, url_contains) |
 | `browser.select` | `selector`, `value` |
-| `browser.evaluate` | `script` (JavaScript to run in the page) |
+| `browser.evaluate` | `script` (JavaScript to run in the page), `variables` (capture return value fields via JSONPath) |
 | `browser.check` / `browser.uncheck` | `selector` |
 | `browser.screenshot` | `value` (output path) |
 | `browser.screenshot_compare` | `value` (baseline path - creates baseline on first run, compares on subsequent) |
@@ -134,14 +154,33 @@ Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s
 
 ### Variables
 
-Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses using the `variables` field with a `json_path` selector.
+Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses or browser evaluate results using the `variables` field with a `json_path` selector.
+
+```yaml
+- name: Get token
+  action: http.post
+  url: /api/login
+  variables:
+    auth_token: $.token       # store response.token as {{auth_token}}
+
+- name: Use token
+  action: http.get
+  url: /api/dashboard?token={{auth_token}}
+
+- name: Extract from page
+  action: browser.evaluate
+  script: "{ version: document.querySelector('meta[name=app-version]')?.content }"
+  variables:
+    app_version: $.version    # store evaluate result.version as {{app_version}}
+```
 
 ## Dashboard
 
 The dashboard provides:
 
-- **Scenario list** - overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, depends-on column, auto-refreshes via WebSocket
+- **Scenario list** - overview of all scenarios with pass/fail status, tag badges, group badges, tag/group filter dropdowns, depends-on column, auto-refreshes via WebSocket
 - **Scenario detail** - response time trend chart, success rate over time, step breakdown, SLA gauge (7-day window), paginated run history, JSON/CSV/YAML export, live ticker (inline step progress in the toolbar), copy public permalink
+- **Scenario editor** - click the pencil icon on the detail page to edit a scenario's YAML directly in the browser; create new scenarios from scratch via the "New" button
 - **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** - toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** - toggle in the navbar, preference saved to localStorage
@@ -178,7 +217,10 @@ node dist/index.js server
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/scenarios` | List all scenarios with last run status (`?tag=critical`) |
+| `GET /api/scenarios` | List all scenarios with last run status (`?tag=critical`, `?group=api`) |
+| `POST /api/scenarios/import` | Bulk import scenarios from YAML string (`{"yaml":"..."}` - single scenario or array) |
+| `GET /api/scenarios/export` | Download all scenarios as a YAML bundle file |
+| `GET /api/groups` | List all distinct scenario groups |
 | `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |
 | `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=&days=`) |
 | `POST /api/scenarios/:name/run` | Trigger an immediate ad-hoc run |

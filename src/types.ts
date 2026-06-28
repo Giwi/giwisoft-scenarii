@@ -12,6 +12,7 @@ export interface HttpExpect {
   json_path?: string;
   json_value?: unknown;
   response_time_under?: number;
+  body_schema?: Record<string, unknown>;
 }
 
 // An HTTP action step within a scenario
@@ -58,6 +59,7 @@ export interface BrowserStep {
   script?: string;
   expect?: BrowserExpect;
   condition?: StepCondition;
+  variables?: Record<string, string>;
 }
 
 // A condition that controls whether a step runs, based on a previous step's outcome
@@ -76,6 +78,13 @@ export interface IncludeStep {
 // Union of all supported step types
 export type Step = HttpStep | BrowserStep | IncludeStep;
 
+// Defines a time-of-day window for scheduling (e.g. only run between 9am-5pm)
+export interface TimeWindow {
+  start: string; // HH:mm
+  end: string;   // HH:mm
+  timezone?: string;
+}
+
 // A full scenario definition parsed from YAML
 export interface Scenario {
   name: string;
@@ -87,6 +96,8 @@ export interface Scenario {
   timeout?: number;
   tags?: string[];
   depends_on?: string;
+  group?: string;
+  time_windows?: TimeWindow[];
   steps: Step[];
   alert?: AlertConfig;
 }

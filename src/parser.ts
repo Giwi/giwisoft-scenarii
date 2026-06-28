@@ -41,6 +41,7 @@ function parseStep(raw: Record<string, unknown>, index: number): Step {
     if (raw.timeout) step.timeout = raw.timeout as number;
     if (raw.script) step.script = raw.script as string;
     if (raw.expect) step.expect = raw.expect as BrowserStep['expect'];
+    if (raw.variables) step.variables = raw.variables as Record<string, string>;
     return step;
   }
 
@@ -127,6 +128,8 @@ export function parseScenario(content: string): Scenario {
   if (raw.ignoreHTTPSErrors !== undefined) scenario.ignoreHTTPSErrors = raw.ignoreHTTPSErrors as boolean;
   if (raw.tags && Array.isArray(raw.tags)) scenario.tags = raw.tags as string[];
   if (raw.depends_on) scenario.depends_on = raw.depends_on as string;
+  if (raw.group) scenario.group = raw.group as string;
+  if (raw.time_windows && Array.isArray(raw.time_windows)) scenario.time_windows = raw.time_windows as Scenario['time_windows'];
   if (raw.alert && typeof raw.alert === 'object') scenario.alert = raw.alert as Scenario['alert'];
 
   return scenario;
@@ -168,6 +171,10 @@ export function serializeScenario(scenario: Scenario): string {
   if (scenario.timeout) obj.timeout = scenario.timeout;
   if (scenario.tags) obj.tags = scenario.tags;
   if (scenario.depends_on) obj.depends_on = scenario.depends_on;
+  if (scenario.headless !== undefined) obj.headless = scenario.headless;
+  if (scenario.ignoreHTTPSErrors !== undefined) obj.ignoreHTTPSErrors = scenario.ignoreHTTPSErrors;
+  if (scenario.group) obj.group = scenario.group;
+  if (scenario.time_windows) obj.time_windows = scenario.time_windows;
   if (scenario.alert) obj.alert = scenario.alert;
   return require('js-yaml').dump(obj, { indent: 2, lineWidth: 120, noRefs: true, sortKeys: false });
 }
