@@ -4,7 +4,7 @@ api:
     enabled: true
     api_key: "YOUR_API_KEY"
 
-# Dashboard authentication (optional — OIDC)
+# Dashboard authentication (optional - OIDC)
 auth:
   enabled: true
   oidc:
@@ -22,7 +22,7 @@ storage:
     cron: "0 4 * * *"       # default: daily at 4am
     directory: "./backups"  # default: ./backups
 
-# Alerting channels — fire on state transitions (pass→fail, fail→pass)
+# Alerting channels - fire on state transitions (pass->fail, fail->pass)
 notifications:
   telegram:
     enabled: false

@@ -1,6 +1,6 @@
 # scenarii
 
-Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite, and monitor them on a modern Angular dashboard with dark/light themes.
+Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite, and monitor them on a modern Dashboard with dark/light themes.
 
 ## Quick start
 
@@ -19,14 +19,14 @@ Open http://localhost:3000 to see the dashboard. Each scenario also has a sharea
 
 ## Requirements
 
-- Node.js ≥ 26 (for Angular 22 and native fetch)
-- For browser scenarios: `@lightpanda/browser` (optional — HTTP-only scenarios use native fetch)
+- Node.js >= 26 (for Angular 22 and native fetch)
+- For browser scenarios: `@lightpanda/browser` (optional - HTTP-only scenarios use native fetch)
 
 ## CLI
 
 | Command | Description |
 |---------|-------------|
-| `server` | Start API server + Angular dashboard |
+| `server` | Start API server + Dashboard |
 | `validate <file>` | Validate a scenario YAML without running it |
 | `trigger <file>` | Run a scenario immediately |
 | `status` | Show scheduled scenarios and storage status |
@@ -45,7 +45,7 @@ node dist/index.js config --init
 |--------|---------|-------------|
 | `-p, --port` | `3000` | HTTP port |
 | `--db` | `db/scenarii.db` | SQLite database path |
-| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files (watched every 5s — add/remove/rename files without restart) |
+| `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files (watched every 5s - add/remove/rename files without restart) |
 | `--settings` | auto-detect | Path to settings file (hot-reloaded, see Notifications below) |
 
 ## Writing scenarios
@@ -59,7 +59,7 @@ schedule: "*/5 * * * *"   # optional cron expression
 timeout: 120000           # per-scenario timeout override (default 120s)
 ignoreHTTPSErrors: false  # per-scenario SSL override
 tags: [critical, auth]    # optional tags for dashboard filtering
-depends_on: "Health check" # optional — skip this scenario if dependency last run failed
+depends_on: "Health check" # optional - skip this scenario if dependency last run failed
 alert:                    # optional alert rules
   consecutive_failures: 3 # warn after N consecutive failures
 
@@ -102,7 +102,7 @@ steps:
 
 ### HTTP actions
 
-HTTP-only scenarios use the native `fetch` API — no Playwright or browser needed for simple API monitoring.
+HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed for simple API monitoring.
 
 | Action | Fields |
 |--------|--------|
@@ -123,7 +123,7 @@ HTTP-only scenarios use the native `fetch` API — no Playwright or browser need
 | `browser.evaluate` | `script` (JavaScript to run in the page) |
 | `browser.check` / `browser.uncheck` | `selector` |
 | `browser.screenshot` | `value` (output path) |
-| `browser.screenshot_compare` | `value` (baseline path — creates baseline on first run, compares on subsequent) |
+| `browser.screenshot_compare` | `value` (baseline path - creates baseline on first run, compares on subsequent) |
 | `browser.scroll` | `value` (pixels to scroll down), `selector` (scroll element into view) |
 
 Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.
@@ -136,15 +136,15 @@ Steps can reference values from previous steps using `{{variable_name}}`. Variab
 
 The dashboard provides:
 
-- **Scenario list** — overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, depends-on column, auto-refreshes via WebSocket
-- **Scenario detail** — response time trend chart, success rate over time, step breakdown, **SLA gauge** (7-day window), paginated run history, **JSON/CSV/YAML export**, **live ticker** (inline step progress in the toolbar), **copy public permalink**
-- **Run Now / Cancel** — trigger an immediate ad-hoc run or abort a running scenario from list or detail
-- **Pause/Resume** — toggle scheduled scenarios on/off without deleting files
-- **Dark/light theme** — toggle in the navbar, preference saved to localStorage
-- **Dashboard auth** — optional OIDC-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/*` require a session cookie
-- **Manual refresh** — refresh button on both list and detail pages
-- **Public status** — per-scenario pages at `/public/status/:name` with stat cards and response time / success rate charts; no auth required
-- **Public API** — `GET /api/status` (summary) and `GET /api/public/scenario/:name` (per-scenario detail) — both accessible without auth
+- **Scenario list** - overview of all scenarios with pass/fail status, tag badges, tag filter dropdown, depends-on column, auto-refreshes via WebSocket
+- **Scenario detail** - response time trend chart, success rate over time, step breakdown, SLA gauge (7-day window), paginated run history, JSON/CSV/YAML export, live ticker (inline step progress in the toolbar), copy public permalink
+- **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
+- **Pause/Resume** - toggle scheduled scenarios on/off without deleting files
+- **Dark/light theme** - toggle in the navbar, preference saved to localStorage
+- **Dashboard auth** - optional OIDC-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/*` require a session cookie
+- **Manual refresh** - refresh button on both list and detail pages
+- **Public status** - per-scenario pages at `/public/status/:name` with stat cards and response time / success rate charts; no auth required
+- **Public API** - `GET /api/status` (summary) and `GET /api/public/scenario/:name` (per-scenario detail) - both accessible without auth
 
 <p align="center">
   <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
@@ -186,9 +186,9 @@ node dist/index.js server
 | `DELETE /api/scenarios/:name/config` | Delete a scenario file |
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
-| `GET /api/scenarios/:name/sla` | SLA calculation (`?days=7`) — returns `{ sla, total_runs, passed_runs, failed_runs }` |
+| `GET /api/scenarios/:name/sla` | SLA calculation (`?days=7`) - returns `{ sla, total_runs, passed_runs, failed_runs }` |
 | `GET /api/auth/login` | Redirect to OIDC provider (requires `auth.oidc` in settings) |
-| `GET /api/auth/callback` | OIDC callback — exchanges code for session cookie |
+| `GET /api/auth/callback` | OIDC callback - exchanges code for session cookie |
 | `GET /api/auth/me` | Return `{ authenticated: boolean }` |
 | `POST /api/auth/logout` | Clear session cookie |
 | `POST /api/backup` | Trigger a manual database backup |
@@ -202,13 +202,13 @@ Responses include an `X-Request-Id` header for tracing.
 
 Prometheus can scrape `http://localhost:3000/api/metrics` for:
 
-- `scenarii_scenario_runs_total{scenario}` — total run count
-- `scenarii_scenario_duration_ms{scenario}` — latest run duration (ms)
-- `scenarii_scenario_success{scenario}` — latest run 1=pass / 0=fail
-- `scenarii_scenario_last_run_seconds{scenario}` — last run timestamp
-- `scenarii_step_duration_ms{scenario,step,action}` — per-step duration
-- `scenarii_step_success{scenario,step,action}` — per-step success
-- `scenarii_notification_delivery_total{status}` — notification delivery success/failure count
+- `scenarii_scenario_runs_total{scenario}` - total run count
+- `scenarii_scenario_duration_ms{scenario}` - latest run duration (ms)
+- `scenarii_scenario_success{scenario}` - latest run 1=pass / 0=fail
+- `scenarii_scenario_last_run_seconds{scenario}` - last run timestamp
+- `scenarii_step_duration_ms{scenario,step,action}` - per-step duration
+- `scenarii_step_success{scenario,step,action}` - per-step success
+- `scenarii_notification_delivery_total{status}` - notification delivery success/failure count
 
 ## Real-time updates
 
@@ -291,7 +291,7 @@ notifications:
 
 Secrets can be overridden via environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`.
 
-The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions (pass→fail, fail→pass). Notifications include retry logic (3 attempts, exponential backoff).
+The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions (pass>fail, fail>pass). Notifications include retry logic (3 attempts, exponential backoff).
 
 A **daily email report** is automatically sent at 8:00 AM (cron) if email notifications are configured.
 
@@ -310,7 +310,7 @@ scenarios:
 
 ### Hot-reload
 
-`settings.yaml` is watched for changes and reloaded automatically — no server restart needed.
+`settings.yaml` is watched for changes and reloaded automatically - no server restart needed.
 
 ## Container
 
@@ -350,7 +350,7 @@ docker run -d \
 
 The container uses `dumb-init` for proper signal handling, runs as non-root (`USER node`), and includes a `HEALTHCHECK` pinging `/api/health` every 30s. Built on `node:26-slim` (glibc) for full Lightpanda compatibility.
 
-> **Rootless podman** — if using rootless podman, mount volumes may be owned by the host user but inaccessible to the container's `node` user. Add `--userns=keep-id` to map the container user to your host UID:
+> **Rootless podman** - if using rootless podman, mount volumes may be owned by the host user but inaccessible to the container's `node` user. Add `--userns=keep-id` to map the container user to your host UID:
 > ```bash
 > podman run -d \
 >   --name scenarii \
@@ -402,18 +402,18 @@ The workflow is in `.github/workflows/ci.yml`. Dependabot is configured for week
 npm test
 ```
 
-Uses Node's built-in test runner (`node:test`) — no extra dependencies. Tests cover the sequential execution queue, notification state machine, settings schema validation, URL resolution, variable interpolation, JSON path extraction, YAML parse/serialize, HTTP expectations, and retry logic. Test files live in `tests/` and are compiled via `tests/tsconfig.json` to `dist-test/`.
+Uses Node's built-in test runner (`node:test`) - no extra dependencies. Tests cover the sequential execution queue, notification state machine, settings schema validation, URL resolution, variable interpolation, JSON path extraction, YAML parse/serialize, HTTP expectations, and retry logic. Test files live in `tests/` and are compiled via `tests/tsconfig.json` to `dist-test/`.
 
 ## Tech stack
 
-- **Runtime** — Node.js 26 + TypeScript (strict mode)
-- **CLI** — Commander
-- **HTTP** — Native `fetch` (no Playwright needed for API monitoring)
-- **Browser** — Lightpanda headless browser via Playwright CDP (with retry)
-- **Database** — SQLite (better-sqlite3, WAL mode)
-- **Scheduling** — node-cron
-- **Notifications** — Telegram, Slack, Discord, Generic Webhook, Mailgun (all with retry)
-- **Logging** — pino (structured JSON, ISO timestamps)
-- **Security** — Helmet (CSP, HSTS, X-Frame-Options, etc.), optional OIDC-based dashboard auth with HTTP-only session cookies
-- **Frontend** — Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
-- **Container** — Debian-slim (`node:26-slim`), multi-stage build, non-root user
+- **Runtime** - Node.js 26 + TypeScript (strict mode)
+- **CLI** - Commander
+- **HTTP** - Native `fetch` (no Playwright needed for API monitoring)
+- **Browser** - Lightpanda headless browser via Playwright CDP (with retry)
+- **Database** - SQLite (better-sqlite3, WAL mode)
+- **Scheduling** - node-cron
+- **Notifications** - Telegram, Slack, Discord, Generic Webhook, Mailgun (all with retry)
+- **Logging** - pino (structured JSON, ISO timestamps)
+- **Security** - Helmet (CSP, HSTS, X-Frame-Options, etc.), optional OIDC-based dashboard auth with HTTP-only session cookies
+- **Frontend** - Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
+- **Container** - Debian-slim (`node:26-slim`), multi-stage build, non-root user

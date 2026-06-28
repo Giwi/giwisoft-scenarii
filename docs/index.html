@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scenarii — YAML web test scenarios</title>
+  <title>Scenarii - YAML web test scenarios</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     :root {
       --bg: #0f0f1a;
@@ -20,11 +21,13 @@
       --code-border: rgba(255,255,255,.06);
       --hero-from: #1e1b4b;
       --hero-to: #0f0f1a;
+      --nav-bg: rgba(15, 15, 26, .85);
       --navbar-shadow: 0 1px 3px rgba(0,0,0,.3);
       --card-shadow: 0 1px 2px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.15), 0 12px 32px rgba(0,0,0,.1);
       --card-hover-shadow: 0 2px 4px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.2), 0 16px 48px rgba(0,0,0,.15);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-padding-top: 60px; }
     body {
       font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;
       background: var(--bg);
@@ -46,6 +49,54 @@
     .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
 
     ::selection { background: rgba(99,102,241,.3); }
+
+    /* Nav */
+    .page-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--nav-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      box-shadow: var(--navbar-shadow);
+    }
+    .page-nav .container {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .page-nav .container::-webkit-scrollbar { display: none; }
+    .page-nav .brand {
+      font-weight: 700;
+      font-size: .95rem;
+      color: var(--text);
+      text-decoration: none;
+      white-space: nowrap;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      flex-shrink: 0;
+    }
+    .page-nav a:not(.brand) {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: .8rem;
+      font-weight: 500;
+      padding: 16px 0;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    .page-nav a:not(.brand):hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
 
     /* Hero */
     .hero {
@@ -144,30 +195,67 @@
     .intro-text { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 20px; }
     a { color: var(--accent); }
 
+    table {
+      width: 100%; border-collapse: collapse;
+      background: var(--card-bg); border-radius: 10px;
+      border: 1px solid var(--card-border);
+      margin: 12px 0; font-size: .85rem;
+      box-shadow: var(--card-shadow);
+    }
+    th, td { padding: 10px 14px; text-align: left; }
+    th { font-weight: 600; color: var(--accent); border-bottom: 1px solid var(--card-border); }
+    td { border-bottom: 1px solid rgba(255,255,255,.04); }
+    tr:last-child td { border-bottom: none; }
+    td code { font-size: .78rem; white-space: nowrap; }
+
     @media (max-width: 640px) {
+      html { scroll-padding-top: 52px; }
+      .page-nav .container { gap: 14px; }
+      .page-nav a:not(.brand) { font-size: .74rem; }
       .hero h1 { font-size: 2rem; }
       .hero p { font-size: 1rem; }
       .screenshots { grid-template-columns: 1fr; }
+      table { font-size: .78rem; }
+      th, td { padding: 6px 8px; }
+      td code { font-size: .7rem; }
     }
   </style>
 </head>
 <body>
 
+<nav class="page-nav">
+  <div class="container">
+    <a href="#" class="brand">Scenarii</a>
+    <a href="#what">Intro</a>
+    <a href="#quickstart">Quickstart</a>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#scenarios">Scenarios</a>
+    <a href="#actions">Actions</a>
+    <a href="#notifications">Alerts</a>
+    <a href="#realtime">Real-time</a>
+    <a href="#metrics">Metrics</a>
+    <a href="#cli">CLI</a>
+    <a href="#api">API</a>
+    <a href="#features">Features</a>
+    <a href="#stack">Stack</a>
+  </div>
+</nav>
+
 <!-- Hero -->
-<div class="hero">
+<div class="hero" id="hero">
   <div class="container">
     <h1><span>Scenarii</span></h1>
-    <p>YAML-defined web test scenarios — run periodically via a headless browser or native HTTP, stored in SQLite, monitored via a modern Angular dashboard.</p>
+    <p>YAML-defined web test scenarios - run periodically via a headless browser or native HTTP, stored in SQLite, monitored via a modern Dashboard.</p>
     <div class="hero-badges">
-      <a href="https://github.com/Giwi/giwisoft-scenarii">&#x2714; GitHub</a>
-      <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii">&#x1F4E6; Packages</a>
-      <a href="https://github.com/Giwi/giwisoft-scenarii/actions">&#x1F504; CI</a>
+      <a href="https://github.com/Giwi/giwisoft-scenarii"><i class="bi bi-github"></i> GitHub</a>
+      <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii"><i class="bi bi-box"></i> Packages</a>
+      <a href="https://github.com/Giwi/giwisoft-scenarii/actions"><i class="bi bi-arrow-repeat"></i> CI</a>
     </div>
   </div>
 </div>
 
 <!-- What is Scenarii -->
-<section>
+<section id="what">
   <div class="container">
     <h2>What is Scenarii?</h2>
     <p class="intro-text">
@@ -176,18 +264,39 @@
       Get alerted on failures via Telegram, Slack, Discord, email, or a generic webhook.
     </p>
     <div class="grid">
-      <div class="card"><span class="card-icon">&#x1F4DD;</span><h3>YAML-defined</h3><p>Scenarios are plain YAML files — no code. Define HTTP requests or browser interactions with step-by-step expectations.</p></div>
-      <div class="card"><span class="card-icon">&#x23F0;</span><h3>Cron scheduling</h3><p>Run every 5 minutes, hourly, daily — any cron expression. Built-in scheduler with pause/resume from the dashboard.</p></div>
-      <div class="card"><span class="card-icon">&#x1F4CA;</span><h3>SQLite storage</h3><p>All metrics persisted in SQLite with WAL mode. Configurable retention and optional automated daily backups.</p></div>
-      <div class="card"><span class="card-icon">&#x1F4BB;</span><h3>Angular dashboard</h3><p>Full dashboard with dark/light mode, response time charts, success rate, SLA gauge, run history, JSON/CSV export, and public status pages.</p></div>
-      <div class="card"><span class="card-icon">&#x1F514;</span><h3>Multi-channel alerts</h3><p>State transition notifications (pass&rarr;fail, fail&rarr;pass) via Telegram, Slack, Discord, email, or custom webhook with retry logic.</p></div>
-      <div class="card"><span class="card-icon">&#x1F310;</span><h3>Browser + HTTP</h3><p>Native fetch for API monitoring (no browser needed) or Lightpanda headless browser for full page interaction with retry and screenshots.</p></div>
+      <div class="card"><i class="bi bi-file-text card-icon"></i><h3>YAML-defined</h3><p>Scenarios are plain YAML files - no code. Define HTTP requests or browser interactions with step-by-step expectations.</p></div>
+      <div class="card"><i class="bi bi-clock card-icon"></i><h3>Cron scheduling</h3><p>Run every 5 minutes, hourly, daily - any cron expression. Built-in scheduler with pause/resume from the dashboard.</p></div>
+      <div class="card"><i class="bi bi-database card-icon"></i><h3>SQLite storage</h3><p>All metrics persisted in SQLite with WAL mode. Configurable retention and optional automated daily backups.</p></div>
+      <div class="card"><i class="bi bi-laptop card-icon"></i><h3>Dashboard</h3><p>Full dashboard with dark/light mode, response time charts, success rate, SLA gauge, run history, JSON/CSV export, and public status pages.</p></div>
+      <div class="card"><i class="bi bi-bell card-icon"></i><h3>Multi-channel alerts</h3><p>State transition notifications (pass -> fail, fail -> pass) via Telegram, Slack, Discord, email, or custom webhook with retry logic.</p></div>
+      <div class="card"><i class="bi bi-globe2 card-icon"></i><h3>Browser + HTTP</h3><p>Native fetch for API monitoring (no browser needed) or Lightpanda headless browser for full page interaction with retry and screenshots.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <h2>All features</h2>
+    <div class="grid">
+      <div class="card"><i class="bi bi-box card-icon"></i><h3>CLI &amp; API</h3><p>Commands: <code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>config</code>. Full REST API with 20+ endpoints.</p></div>
+      <div class="card"><i class="bi bi-lock card-icon"></i><h3>Authentication</h3><p>Optional OIDC dashboard auth with HTTP-only session cookies. API key auth for Prometheus metrics endpoint. </p></div>
+      <div class="card"><i class="bi bi-bell card-icon"></i><h3>Notifications</h3><p>Telegram, Slack, Discord, email (Mailgun), generic webhook. State transition triggers with retry and exponential backoff.</p></div>
+      <div class="card"><i class="bi bi-bar-chart card-icon"></i><h3>Prometheus metrics</h3><p>Native Prometheus/OpenMetrics export: run count, duration, success rate, step-level metrics, notification delivery stats.</p></div>
+      <div class="card"><i class="bi bi-database card-icon"></i><h3>SQLite storage</h3><p>WAL mode for concurrent reads. Configurable retention (default 7 days). Optional automated daily backups. No external database.</p></div>
+      <div class="card"><i class="bi bi-box-seam card-icon"></i><h3>Container</h3><p>Multi-arch images (linux/amd64 + arm64). HEALTHCHECK, non-root user, dumb-init. Published to GitHub Container Registry on each push.</p></div>
+      <div class="card"><i class="bi bi-arrow-clockwise card-icon"></i><h3>Hot-reload</h3><p>Settings YAML watched and reloaded automatically. Scenario directory scanned every 5s - add, remove, or rename <code>.yml</code> files without restarting.</p></div>
+      <div class="card"><i class="bi bi-pause-fill card-icon"></i><h3>Pause / Resume</h3><p>Toggle individual schedules on and off from the dashboard without deleting YAML files.</p></div>
+      <div class="card"><i class="bi bi-wrench card-icon"></i><h3>HTTP expectations</h3><p>Check status, status_in, body_contains, body_matches, headers, JSON path, JSON value, and response_time_under.</p></div>
+      <div class="card"><i class="bi bi-display card-icon"></i><h3>Browser actions</h3><p>Navigate, click, fill, type, select, check, uncheck, evaluate JS, scroll, wait for elements, screenshot, screenshot comparison against baseline.</p></div>
+      <div class="card"><i class="bi bi-journal-code card-icon"></i><h3>All HTTP methods</h3><p>GET, POST, PUT, PATCH, DELETE - all standard methods. Custom headers, JSON body, form data. Native fetch, no Playwright needed.</p></div>
+      <div class="card"><i class="bi bi-check-square-fill card-icon"></i><h3>Testing</h3><p>Node built-in test runner. Tests cover execution queue, notification state machine, URL resolution, variable interpolation, YAML parsing, and more.</p></div>
     </div>
   </div>
 </section>
 
 <!-- Quick Start -->
-<section>
+<section id="quickstart">
   <div class="container">
     <h2>Quick start</h2>
 
@@ -220,13 +329,34 @@ docker run -d \
   </div>
 </section>
 
+<!-- Dashboard -->
+<section id="dashboard">
+  <div class="container">
+    <h2>Dashboard</h2>
+    <p class="intro-text">The Angular frontend gives you real-time visibility into all your scenarios. Dark and light themes, WebSocket live updates, and public status pages.</p>
+    <div class="screenshots">
+      <img src="../frontend/public/screenshots/scenario-list.png" alt="Scenario list (light)">
+      <img src="../frontend/public/screenshots/scenario-list-dark.png" alt="Scenario list (dark)">
+      <img src="../frontend/public/screenshots/scenario-detail.png" alt="Scenario detail (light)">
+      <img src="../frontend/public/screenshots/scenario-detail-dark.png" alt="Scenario detail (dark)">
+    </div>
+    <div class="grid" style="margin-top:24px;">
+      <div class="card"><i class="bi bi-clipboard-data card-icon"></i><h3>Scenario list</h3><p>Overview with pass/fail badges, tag filters, dependencies column, and auto-refresh via WebSocket.</p></div>
+      <div class="card"><i class="bi bi-graph-up-arrow card-icon"></i><h3>Scenario detail</h3><p>Response time trend chart, success rate chart, SLA gauge, step breakdown, paginated run history, JSON/CSV export.</p></div>
+      <div class="card"><i class="bi bi-clock-history card-icon"></i><h3>Live ticker</h3><p>Inline step progress in the toolbar - see exactly which step is executing and its response time in real time.</p></div>
+      <div class="card"><i class="bi bi-globe card-icon"></i><h3>Public status</h3><p>Shareable per-scenario pages at <code style="font-size:.8rem;">/public/status/:name</code> with stat cards and charts - no auth required.</p></div>
+      <div class="card"><i class="bi bi-crosshair card-icon"></i><h3>SLA tracking</h3><p>7-day SLA gauge per scenario with configurable window. Track pass/fail ratios over time.</p></div>
+      <div class="card"><i class="bi bi-arrow-repeat card-icon"></i><h3>Real-time</h3><p>WebSocket push for run completions and step progress. Manual refresh on list and detail pages.</p></div>
+    </div>
+  </div>
+</section>
+
 <!-- Sample scenarios -->
-<section>
+<section id="scenarios">
   <div class="container">
     <h2>Sample scenarios</h2>
-    <p class="intro-text">Scenarios are pure YAML — define steps, expectations, extraction variables, and optional conditions. No programming required.</p>
+    <p class="intro-text">Scenarios are pure YAML - define steps, expectations, extraction variables, and optional conditions. No programming required.</p>
 
-    <!-- HTTP health check -->
     <h3><span class="tag http">HTTP</span> API health check</h3>
     <p>Basic HTTP scenario that verifies an API is responding with the expected status code and response time.</p>
     <pre><code><span style="color:#6c7086;"># scenarios/example.yml</span>
@@ -263,9 +393,8 @@ steps:
     <span style="color:#a6e3a1;">expect:</span>
       status: 201</code></pre>
 
-    <!-- Browser scenario -->
     <h3><span class="tag browser">BROWSER</span> Browser form test</h3>
-    <p>Navigate to a page, wait for content, and evaluate JavaScript in the page — all through a headless Lightpanda browser.</p>
+    <p>Navigate to a page, wait for content, and evaluate JavaScript in the page - all through a headless Lightpanda browser.</p>
     <pre><code><span style="color:#6c7086;"># scenarios/browser-example.yml</span>
 name: Browser form test
 description: Tests page load and content rendering
@@ -289,7 +418,6 @@ steps:
     expect:
       url_contains: <span style="color:#fab387;">"example.com"</span></code></pre>
 
-    <!-- Mixed scenario -->
     <h3><span class="tag mixed">MIXED</span> Browser + HTTP</h3>
     <p>Combine browser steps with HTTP API calls in the same scenario.</p>
     <pre><code><span style="color:#6c7086;"># scenarios/mixed.yml</span>
@@ -311,7 +439,6 @@ steps:
       json_path: $.id
       json_value: <span style="color:#fab387;">1</span></code></pre>
 
-    <!-- Conditional steps -->
     <h3><span class="tag http">HTTP</span> Conditional execution</h3>
     <p>Skip steps based on a previous step's result using the <code>condition</code> field. Extract variables with <code>json_path</code> and reuse with <code>&#123;&#123;variable&#125;&#125;</code>.</p>
     <pre><code>name: Conditional scenario
@@ -340,7 +467,6 @@ steps:
     <span style="color:#a6e3a1;">expect:</span>
       status: 200</code></pre>
 
-    <!-- Advanced browser -->
     <h3><span class="tag browser">BROWSER</span> Full browser interactions</h3>
     <p>Fill forms, click buttons, select options, take screenshots, and compare against baselines.</p>
     <pre><code>name: Full browser test
@@ -380,7 +506,6 @@ steps:
     action: browser.screenshot
     value: /tmp/screenshot.png</code></pre>
 
-    <!-- Variables extraction -->
     <h3><span class="tag http">HTTP</span> Variable extraction &amp; reuse</h3>
     <p>Extract values from JSON responses and reference them in later steps.</p>
     <pre><code>name: Variable extraction demo
@@ -410,51 +535,242 @@ steps:
   </div>
 </section>
 
-<!-- Dashboard -->
-<section>
+<!-- Actions Reference -->
+<section id="actions">
   <div class="container">
-    <h2>Dashboard</h2>
-    <p class="intro-text">The Angular frontend gives you real-time visibility into all your scenarios. Dark and light themes, WebSocket live updates, and public status pages.</p>
-    <div class="screenshots">
-      <img src="../frontend/public/screenshots/scenario-list.png" alt="Scenario list (light)">
-      <img src="../frontend/public/screenshots/scenario-list-dark.png" alt="Scenario list (dark)">
-      <img src="../frontend/public/screenshots/scenario-detail.png" alt="Scenario detail (light)">
-      <img src="../frontend/public/screenshots/scenario-detail-dark.png" alt="Scenario detail (dark)">
-    </div>
-    <div class="grid" style="margin-top:24px;">
-      <div class="card"><h3>&#x1F4CB; Scenario list</h3><p>Overview with pass/fail badges, tag filters, dependencies column, and auto-refresh via WebSocket.</p></div>
-      <div class="card"><h3>&#x1F4C8; Scenario detail</h3><p>Response time trend chart, success rate chart, SLA gauge, step breakdown, paginated run history, JSON/CSV export.</p></div>
-      <div class="card"><h3>&#x23F3; Live ticker</h3><p>Inline step progress in the toolbar — see exactly which step is executing and its response time in real time.</p></div>
-      <div class="card"><h3>&#x1F310; Public status</h3><p>Shareable per-scenario pages at <code style="font-size:.8rem;">/public/status/:name</code> with stat cards and charts — no auth required.</p></div>
-      <div class="card"><h3>&#x1F3AF; SLA tracking</h3><p>7-day SLA gauge per scenario with configurable window. Track pass/fail ratios over time.</p></div>
-      <div class="card"><h3>&#x1F6D1; Real-time</h3><p>WebSocket push for run completions and step progress. Manual refresh on list and detail pages.</p></div>
-    </div>
+    <h2>Actions Reference</h2>
+    <p class="intro-text">Every step must have a <code>name</code> and an <code>action</code>. Actions are either HTTP-based (no browser needed) or browser-based (Lightpanda headless browser).</p>
+
+    <h3><span class="tag http">HTTP</span> Actions</h3>
+    <p>HTTP steps use the native <code>fetch</code> API - no Playwright or browser required for simple API monitoring.</p>
+    <table>
+      <tr><th>Action</th><th>Required fields</th><th>Optional fields</th></tr>
+      <tr><td><code>http.get</code></td><td><code>url</code></td><td><code>headers</code>, <code>expect</code></td></tr>
+      <tr><td><code>http.post</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
+      <tr><td><code>http.put</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
+      <tr><td><code>http.patch</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
+      <tr><td><code>http.delete</code></td><td><code>url</code></td><td><code>headers</code>, <code>expect</code></td></tr>
+    </table>
+
+    <h3>HTTP expectations</h3>
+    <table>
+      <tr><th>Expectation</th><th>Description</th></tr>
+      <tr><td><code>status: 200</code></td><td>Exact HTTP status code match.</td></tr>
+      <tr><td><code>status_in: [200, 201]</code></td><td>Status code is one of the listed values.</td></tr>
+      <tr><td><code>body_contains: "text"</code></td><td>Response body contains the given string.</td></tr>
+      <tr><td><code>body_matches: "regex"</code></td><td>Response body matches the given regex.</td></tr>
+      <tr><td><code>header_contains: "Content-Type: json"</code></td><td>Response header contains the given value (format: <code>"HeaderName: value"</code>).</td></tr>
+      <tr><td><code>header_matches: "X-RateLimit: \\d+"</code></td><td>Response header matches the given regex (format: <code>"HeaderName: regex"</code>).</td></tr>
+      <tr><td><code>json_path: "$.user.id"</code></td><td>Extract a JSON path and optionally check <code>json_value</code>.</td></tr>
+      <tr><td><code>json_value: 42</code></td><td>Value at the <code>json_path</code> must match (used together).</td></tr>
+      <tr><td><code>response_time_under: 3000</code></td><td>Response time must be under the given milliseconds.</td></tr>
+    </table>
+
+    <h3><span class="tag browser">BROWSER</span> Actions</h3>
+    <p>Browser steps run through a headless Lightpanda instance via Playwright CDP. Steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.</p>
+    <table>
+      <tr><th>Action</th><th>Fields</th><th>Description</th></tr>
+      <tr><td><code>browser.navigate</code></td><td><code>url</code></td><td>Navigate to a URL. Falls back to <code>domcontentloaded</code> if the <code>load</code> event does not fire.</td></tr>
+      <tr><td><code>browser.click</code></td><td><code>selector</code></td><td>Click an element. Uses Playwright actionability checks (visible, enabled, stable, in viewport).</td></tr>
+      <tr><td><code>browser.fill</code></td><td><code>selector</code>, <code>value</code></td><td>Fill an input field using native property setters for reliable React/Angular form control compatibility.</td></tr>
+      <tr><td><code>browser.type</code></td><td><code>selector</code>, <code>value</code></td><td>Type into an input field. Like <code>fill</code> but dispatches <code>input</code> + <code>change</code> events.</td></tr>
+      <tr><td><code>browser.select</code></td><td><code>selector</code>, <code>value</code></td><td>Select an option from a <code>&lt;select&gt;</code> element.</td></tr>
+      <tr><td><code>browser.check</code></td><td><code>selector</code></td><td>Check a checkbox or radio button.</td></tr>
+      <tr><td><code>browser.uncheck</code></td><td><code>selector</code></td><td>Uncheck a checkbox.</td></tr>
+      <tr><td><code>browser.wait_for</code></td><td><code>selector</code>, <code>timeout</code>, <code>expect</code></td><td>Wait for an element to appear. Optional <code>expect</code> can check <code>has_text</code>, <code>not_has_text</code>, or <code>url_contains</code>.</td></tr>
+      <tr><td><code>browser.evaluate</code></td><td><code>script</code></td><td>Run arbitrary JavaScript in the page context. Useful for programmatic clicks, data extraction, and complex interactions.</td></tr>
+      <tr><td><code>browser.scroll</code></td><td><code>value</code> or <code>selector</code></td><td>Scroll <code>value</code> pixels down, or scroll a <code>selector</code> into view. Useful for lazy-loaded content or elements below the fold.</td></tr>
+      <tr><td><code>browser.screenshot</code></td><td><code>value</code> (path)</td><td>Take a full-page screenshot and save to the given path.</td></tr>
+      <tr><td><code>browser.screenshot_compare</code></td><td><code>value</code> (baseline path)</td><td>Take a screenshot and compare file size against a baseline. Creates baseline on first run; reports diff percentage on subsequent runs.</td></tr>
+    </table>
+
+    <h3>Step options</h3>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td><code>timeout</code></td><td>number</td><td>Per-step timeout in milliseconds (overrides the default 30s for browser actions, 10s for HTTP).</td></tr>
+      <tr><td><code>condition</code></td><td>object</td><td>Conditional execution: <code>{ if_step: "Step name", if_success: true }</code> skips this step unless the named step succeeded (or failed, if <code>false</code>).</td></tr>
+      <tr><td><code>variables</code></td><td>object</td><td>Extract values from HTTP JSON responses: <code>{ varName: "$.json.path" }</code>. Referenced as <code>&#123;&#123;varName&#125;&#125;</code> in later steps.</td></tr>
+      <tr><td><code>expect</code></td><td>object</td><td>Assertions on the step result (status code, body content, headers, JSON path, response time).</td></tr>
+    </table>
   </div>
 </section>
 
-<!-- Features -->
-<section>
+<!-- Notifications -->
+<section id="notifications">
   <div class="container">
-    <h2>All features</h2>
+    <h2>Notifications</h2>
+    <p class="intro-text">Get alerted when a scenario fails and when it recovers. Create a <code>settings.yaml</code> file to configure channels.</p>
+
+    <h3>Supported channels</h3>
     <div class="grid">
-      <div class="card"><h3>&#x1F4E6; CLI &amp; API</h3><p>Commands: <code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>config</code>. Full REST API with 20+ endpoints.</p></div>
-      <div class="card"><h3>&#x1F510; Authentication</h3><p>Optional OIDC dashboard auth with HTTP-only session cookies. API key auth for Prometheus metrics endpoint. </p></div>
-      <div class="card"><h3>&#x1F4E1; Notifications</h3><p>Telegram, Slack, Discord, email (Mailgun), generic webhook. State transition triggers with retry and exponential backoff.</p></div>
-      <div class="card"><h3>&#x1F4F0; Prometheus metrics</h3><p>Native Prometheus/OpenMetrics export: run count, duration, success rate, step-level metrics, notification delivery stats.</p></div>
-      <div class="card"><h3>&#x1F4CA; SQLite storage</h3><p>WAL mode for concurrent reads. Configurable retention (default 7 days). Optional automated daily backups. No external database.</p></div>
-      <div class="card"><h3>&#x1F433; Container</h3><p>Multi-arch images (linux/amd64 + arm64). HEALTHCHECK, non-root user, dumb-init. Published to GitHub Container Registry on each push.</p></div>
-      <div class="card"><h3>&#x1F9F1; Hot-reload</h3><p>Settings YAML watched and reloaded automatically. Scenario directory scanned every 5s — add, remove, or rename <code>.yml</code> files without restarting.</p></div>
-      <div class="card"><h3>&#x1F3D7;&#xFE0F; Pause / Resume</h3><p>Toggle individual schedules on and off from the dashboard without deleting YAML files.</p></div>
-      <div class="card"><h3>&#x1F527; HTTP expectations</h3><p>Check status, status_in, body_contains, body_matches, headers, JSON path, JSON value, and response_time_under.</p></div>
-      <div class="card"><h3>&#x1F5A5;&#xFE0F; Browser actions</h3><p>Navigate, click, fill, type, select, check, uncheck, evaluate JS, scroll, wait for elements, screenshot, screenshot comparison against baseline.</p></div>
-      <div class="card"><h3>&#x1F4DC; All HTTP methods</h3><p>GET, POST, PUT, PATCH, DELETE — all standard methods. Custom headers, JSON body, form data. Native fetch, no Playwright needed.</p></div>
-      <div class="card"><h3>&#x2705; Testing</h3><p>Node built-in test runner. Tests cover execution queue, notification state machine, URL resolution, variable interpolation, YAML parsing, and more.</p></div>
+      <div class="card"><i class="bi bi-send card-icon"></i><h3>Telegram</h3><p>Bot token + chat ID. Configure <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> env vars or <code>settings.yaml</code>.</p></div>
+      <div class="card"><i class="bi bi-envelope card-icon"></i><h3>Email (Mailgun)</h3><p>Mailgun API key and domain. Supports multiple recipients. Includes a daily report sent at 8:00 AM.</p></div>
+      <div class="card"><i class="bi bi-chat-dots card-icon"></i><h3>Slack</h3><p>Webhook URL. Simple JSON payload with scenario name, status, and duration.</p></div>
+      <div class="card"><i class="bi bi-mic card-icon"></i><h3>Discord</h3><p>Webhook URL. Embedded message with color-coded pass/fail status.</p></div>
+      <div class="card"><i class="bi bi-globe2 card-icon"></i><h3>Generic webhook</h3><p>Custom endpoint. Receives JSON payload for integration with any system.</p></div>
     </div>
+
+    <h3>Sample configuration</h3>
+    <pre><code><span style="color:#6c7086;"># settings.yaml</span>
+auth:
+  enabled: true                  <span style="color:#6c7086;"># optional dashboard auth</span>
+  oidc:
+    issuer_url: "https://..."
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR_SECRET"
+
+storage:
+  retentionDays: 30              <span style="color:#6c7086;"># data retention (default 7)</span>
+  backup:
+    enabled: true                <span style="color:#6c7086;"># automated daily backups</span>
+    cron: "0 4 * * *"
+
+notifications:
+  telegram:
+    enabled: true
+    bot_token: "YOUR_TOKEN"
+    chat_id: "YOUR_CHAT_ID"
+  email:
+    enabled: true
+    mailgun:
+      api_key: "YOUR_KEY"
+      domain: "your.domain"
+      from: "scenarii &lt;noreply@your.domain&gt;"
+    to:
+      - "admin@example.com"
+  slack:
+    enabled: true
+    webhook_url: "https://hooks.slack.com/..."</code></pre>
+
+    <h3>Per-scenario overrides</h3>
+    <pre><code><span style="color:#6c7086;"># settings.yaml -- override per scenario</span>
+scenarios:
+  my-scenario:
+    ignoreHTTPSErrors: true
+    timeout: 60000
+    notifications:
+      enabled: false</code></pre>
+
+    <p>Secrets can be overridden via environment variables: <code>TELEGRAM_BOT_TOKEN</code>, <code>MAILGUN_API_KEY</code>, etc.</p>
+
+    <p>Notifications trigger on state transitions (pass -> fail, fail -> pass) with retry logic (3 attempts, exponential backoff). The server watches <code>settings.yaml</code> and reloads it automatically on change.</p>
+  </div>
+</section>
+
+<!-- Real-time updates -->
+<section id="realtime">
+  <div class="container">
+    <h2>Real-time updates</h2>
+    <p class="intro-text">The server exposes a WebSocket endpoint at <code>/ws</code> that pushes live updates to connected clients.</p>
+
+    <h3>Scenario run events</h3>
+    <pre><code><span style="color:#6c7086;">// Broadcast after every run</span>
+{
+  "type": "scenario_run",
+  "scenario_name": "Lusk.bzh validation",
+  "success": true,
+  "duration_ms": 2500,
+  "timestamp": "2026-06-06T12:00:00.000Z"
+}</code></pre>
+
+    <h3>Step progress (live ticker)</h3>
+    <pre><code><span style="color:#6c7086;">// Streamed during execution -- one per step</span>
+{
+  "type": "step_progress",
+  "scenario_name": "Lusk.bzh validation",
+  "step_name": "Homepage",
+  "action": "http.get",
+  "status": "running",       <span style="color:#6c7086;">// "running" | "done" | "error"</span>
+  "timestamp": "2026-06-06T12:00:00.000Z"
+}</code></pre>
+
+    <p>The dashboard shows a live ticker in the detail toolbar while steps are executing - current step name, response time, and status icon update in real time.</p>
+  </div>
+</section>
+
+<!-- Prometheus Metrics -->
+<section id="metrics">
+  <div class="container">
+    <h2>Prometheus Metrics</h2>
+    <p class="intro-text">The server exposes a <code>/api/metrics</code> endpoint in Prometheus/OpenMetrics format. Scrape it with Prometheus or any OpenMetrics-compatible collector.</p>
+
+    <pre><code><span style="color:#6c7086;"># HELP scenarii_scenario_runs_total Total run count</span>
+<span style="color:#6c7086;"># TYPE scenarii_scenario_runs_total counter</span>
+scenarii_scenario_runs_total&#123;scenario="Lusk.bzh"&#125; 142
+
+<span style="color:#6c7086;"># HELP scenarii_scenario_duration_ms Latest run duration</span>
+scenarii_scenario_duration_ms&#123;scenario="Lusk.bzh"&#125; 2540
+
+<span style="color:#6c7086;"># HELP scenarii_scenario_success Latest run result (1=pass, 0=fail)</span>
+scenarii_scenario_success&#123;scenario="Lusk.bzh"&#125; 1
+
+<span style="color:#6c7086;"># HELP scenarii_scenario_last_run_seconds Last run timestamp</span>
+scenarii_scenario_last_run_seconds&#123;scenario="Lusk.bzh"&#125; 1.756e9
+
+<span style="color:#6c7086;"># HELP scenarii_step_duration_ms Per-step duration</span>
+scenarii_step_duration_ms&#123;scenario="Lusk.bzh",step="Homepage",action="http.get"&#125; 127
+
+<span style="color:#6c7086;"># HELP scenarii_step_success Per-step success</span>
+scenarii_step_success&#123;scenario="Lusk.bzh",step="Homepage",action="http.get"&#125; 1
+
+<span style="color:#6c7086;"># HELP scenarii_notification_delivery_total Notification delivery count</span>
+scenarii_notification_delivery_total&#123;status="success"&#125; 12</code></pre>
+
+    <p>Protect the endpoint with the <code>api_key</code> setting. Configure Prometheus to scrape <code>http://localhost:3000/api/metrics</code> with the key in the <code>Authorization</code> header.</p>
+
+    <pre><code><span style="color:#6c7086;"># prometheus.yml</span>
+scrape_configs:
+  - job_name: 'scenarii'
+    authorization:
+      credentials: 'YOUR_API_KEY'
+    static_configs:
+      - targets: ['localhost:3000']
+        metrics_path: '/api/metrics'</code></pre>
+  </div>
+</section>
+
+<!-- CLI Reference -->
+<section id="cli">
+  <div class="container">
+    <h2>CLI Reference</h2>
+    <p class="intro-text">The <code>scenarii</code> CLI provides commands for running, validating, and managing scenarios.</p>
+
+    <pre><code><span style="color:#a6e3a1;"># Start the API server + Dashboard</span>
+node dist/index.js server <span style="color:#6c7086;">-p 3000 --db db/scenarii.db --scenarios-dir ./scenarios</span>
+
+<span style="color:#a6e3a1;"># Validate a YAML file without running</span>
+node dist/index.js validate scenarios/example.yml
+
+<span style="color:#a6e3a1;"># Run a scenario immediately</span>
+node dist/index.js trigger scenarios/example.yml
+
+<span style="color:#a6e3a1;"># Show scheduled scenarios and storage status</span>
+node dist/index.js status
+
+<span style="color:#a6e3a1;"># Generate a settings.yaml template</span>
+node dist/index.js config --init</code></pre>
+
+    <table>
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td><code>server</code></td><td>Start HTTP server with Dashboard, scenario scheduler, and WebSocket. Scenarios directory is rescanned every 5s - add, remove, or rename <code>.yml</code> files without restarting.</td></tr>
+      <tr><td><code>validate &lt;file&gt;</code></td><td>Parse a YAML file and validate its structure without executing it.</td></tr>
+      <tr><td><code>trigger &lt;file&gt;</code></td><td>Run a scenario file immediately (single run, no scheduling).</td></tr>
+      <tr><td><code>status</code></td><td>List all scheduled scenarios and show database connectivity.</td></tr>
+      <tr><td><code>config --init</code></td><td>Generate a boilerplate <code>settings.yaml</code> with all notification channels commented out.</td></tr>
+    </table>
+
+    <table>
+      <tr><th>Server option</th><th>Default</th><th>Description</th></tr>
+      <tr><td><code>-p, --port</code></td><td><code>3000</code></td><td>HTTP listen port.</td></tr>
+      <tr><td><code>--db</code></td><td><code>db/scenarii.db</code></td><td>Path to SQLite database file.</td></tr>
+      <tr><td><code>--scenarios-dir</code></td><td><code>./scenarios</code></td><td>Directory containing <code>.yml</code> / <code>.yaml</code> scenario files. Watched every 5s for changes.</td></tr>
+      <tr><td><code>--settings</code></td><td>auto-detect</td><td>Path to <code>settings.yaml</code>. Hot-reloaded on change.</td></tr>
+    </table>
   </div>
 </section>
 
 <!-- API reference -->
-<section>
+<section id="api">
   <div class="container">
     <h2>API reference</h2>
     <pre><code style="color:#a6e3a1;"><span style="color:#6c7086;"># Scenarios</span>
@@ -489,7 +805,7 @@ GET    /api/metrics                    <span style="color:#6c7086;">Prometheus f
 </section>
 
 <!-- Tech stack -->
-<section>
+<section id="stack">
   <div class="container">
     <h2>Tech stack</h2>
     <div class="grid">
