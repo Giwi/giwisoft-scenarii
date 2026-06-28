@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parseScenario, serializeScenario } from '../src/parser';
-import { Scenario } from '../src/types';
+import { Scenario, HttpStep } from '../src/types';
 
 describe('parseScenario', () => {
   it('parses a minimal valid scenario', () => {
@@ -14,7 +14,7 @@ steps:
     const s = parseScenario(yaml);
     assert.strictEqual(s.name, 'test');
     assert.strictEqual(s.steps.length, 1);
-    assert.strictEqual(s.steps[0].action, 'http.get');
+    assert.strictEqual((s.steps[0] as HttpStep).action, 'http.get');
   });
 
   it('throws when name is missing', () => {
@@ -126,7 +126,7 @@ describe('serializeScenario', () => {
     const parsed = parseScenario(yaml);
     assert.strictEqual(parsed.name, 'roundtrip');
     assert.strictEqual(parsed.steps.length, 1);
-    assert.strictEqual(parsed.steps[0].action, 'http.get');
+    assert.strictEqual((parsed.steps[0] as HttpStep).action, 'http.get');
   });
 
   it('handles browser steps with condition', () => {
@@ -149,6 +149,6 @@ describe('serializeScenario', () => {
     };
     const yaml = serializeScenario(scenario);
     const parsed = parseScenario(yaml);
-    assert.strictEqual(parsed.steps[1].action, 'http.get');
+    assert.strictEqual((parsed.steps[1] as HttpStep).action, 'http.get');
   });
 });
