@@ -10,8 +10,8 @@ import { NgIf } from '@angular/common';
   template: `
     <nav class="navbar navbar-expand">
       <div class="container">
-        <a class="navbar-brand" routerLink="/">
-          <img src="logo.svg" alt="Scenarii" height="28">
+        <a class="navbar-brand fw-semibold" routerLink="/">
+          <i class="bi bi-activity me-2"></i>Scenarii
         </a>
         <div class="ms-auto d-flex gap-2 align-items-center">
           <button
