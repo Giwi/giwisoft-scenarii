@@ -1,6 +1,10 @@
-# scenarii
+<p align="center">
+  <img src="docs/logo.svg" alt="Scenarii" width="300">
+</p>
 
-Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite, and monitor them on a modern Dashboard with dark/light themes.
+<p align="center">
+  Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite, and monitor them on a modern Dashboard with dark/light themes.
+</p>
 
 ## Quick start
 
