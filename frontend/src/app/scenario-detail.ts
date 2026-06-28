@@ -284,7 +284,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   copied = false;
   private copyTimer: ReturnType<typeof setTimeout> | null = null;
   private charts: Chart[] = [];
-  private scenarioName = '';
+  scenarioName = '';
   pageSize = 15;
   currentPage = 1;
 

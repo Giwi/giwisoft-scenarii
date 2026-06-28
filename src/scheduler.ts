@@ -22,7 +22,7 @@ interface ScheduledTask {
 const scheduledTasks: ScheduledTask[] = [];
 
 // Checks if a given Date falls within a time window (HH:mm format).
-function isInTimeWindow(dt: Date, window: TimeWindow): boolean {
+export function isInTimeWindow(dt: Date, window: TimeWindow): boolean {
   const minutes = dt.getHours() * 60 + dt.getMinutes();
   const startParts = window.start.split(':').map(Number);
   const endParts = window.end.split(':').map(Number);

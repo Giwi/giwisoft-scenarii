@@ -85,4 +85,47 @@ describe('checkExpectations', () => {
     assert.strictEqual(checkExpectations(step, makeResponse(), '', 50), null);
     assert.match(checkExpectations(step, makeResponse(), '', 200)!, /exceeded limit/);
   });
+
+  describe('body_schema', () => {
+    function schemaStep(schema: Record<string, unknown>) {
+      return { name: 's', action: 'http.post', url: '/', expect: { body_schema: schema } } as HttpStep;
+    }
+
+    it('passes on valid object', () => {
+      assert.strictEqual(checkExpectations(schemaStep({ type: 'object', properties: { id: { type: 'number' } }, required: ['id'] }), makeResponse({ body: '{"id":1}' }), '{"id":1}', 0), null);
+    });
+
+    it('rejects type mismatch', () => {
+      assert.match(checkExpectations(schemaStep({ type: 'object', properties: { id: { type: 'string' } } }), makeResponse({ body: '{"id":1}' }), '{"id":1}', 0)!, /expected string/);
+    });
+
+    it('rejects missing required field', () => {
+      assert.match(checkExpectations(schemaStep({ type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }), makeResponse({ body: '{}' }), '{}', 0)!, /missing required field/);
+    });
+
+    it('validates nested properties', () => {
+      const nested = { type: 'object', properties: { user: { type: 'object', properties: { age: { type: 'number' } }, required: ['age'] } } };
+      assert.strictEqual(checkExpectations(schemaStep(nested), makeResponse({ body: '{"user":{"age":30}}' }), '{"user":{"age":30}}', 0), null);
+      assert.match(checkExpectations(schemaStep(nested), makeResponse({ body: '{"user":{}}' }), '{"user":{}}', 0)!, /missing required field/);
+    });
+
+    it('validates array items', () => {
+      assert.strictEqual(checkExpectations(schemaStep({ type: 'array', items: { type: 'number' } }), makeResponse({ body: '[1,2,3]' }), '[1,2,3]', 0), null);
+      assert.match(checkExpectations(schemaStep({ type: 'array', items: { type: 'number' } }), makeResponse({ body: '[1,"x"]' }), '[1,"x"]', 0)!, /expected number/);
+    });
+
+    it('validates boolean type', () => {
+      assert.strictEqual(checkExpectations(schemaStep({ type: 'object', properties: { active: { type: 'boolean' } } }), makeResponse({ body: '{"active":true}' }), '{"active":true}', 0), null);
+      assert.match(checkExpectations(schemaStep({ type: 'object', properties: { active: { type: 'boolean' } } }), makeResponse({ body: '{"active":"yes"}' }), '{"active":"yes"}', 0)!, /expected boolean/);
+    });
+
+    it('validates null type', () => {
+      assert.strictEqual(checkExpectations(schemaStep({ type: 'object', properties: { data: { type: 'null' } } }), makeResponse({ body: '{"data":null}' }), '{"data":null}', 0), null);
+      assert.match(checkExpectations(schemaStep({ type: 'object', properties: { data: { type: 'null' } } }), makeResponse({ body: '{"data":1}' }), '{"data":1}', 0)!, /expected null/);
+    });
+
+    it('returns error on non-JSON body', () => {
+      assert.match(checkExpectations(schemaStep({ type: 'object' }), makeResponse({ body: 'not-json' }), 'not-json', 0)!, /Failed to parse JSON/);
+    });
+  });
 });
