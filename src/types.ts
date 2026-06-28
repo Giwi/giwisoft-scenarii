@@ -67,8 +67,14 @@ export interface StepCondition {
   if_success?: boolean;
 }
 
+// A step that includes steps from another scenario
+export interface IncludeStep {
+  include: string;
+  name?: string;
+}
+
 // Union of all supported step types
-export type Step = HttpStep | BrowserStep;
+export type Step = HttpStep | BrowserStep | IncludeStep;
 
 // A full scenario definition parsed from YAML
 export interface Scenario {
@@ -131,6 +137,7 @@ export interface RunOptions {
   lightpandaUrl?: string;
   timeout?: number;
   ignoreHTTPSErrors?: boolean;
+  scenariosDir?: string;
 }
 
 // Function signature for output reporters (console or JSON)

@@ -3,10 +3,13 @@ import { Step, StepMetrics } from '../types';
 import { executeHttpStep } from './http';
 import { executeBrowserStep } from './browser';
 
+// IncludeStep are resolved at parse time, never reach the executor
+type ExecutableStep = Exclude<Step, { include: string }>;
+
 // Dispatches step execution to the appropriate handler based on action prefix.
 // Supports http.* and browser.* actions. Throws on unknown action types.
 export async function executeStep(
-  step: Step,
+  step: ExecutableStep,
   page: Page | null,
   base_url: string | undefined,
   vars: Record<string, string>,

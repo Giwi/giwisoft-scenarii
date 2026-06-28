@@ -3,7 +3,7 @@ import { chromium, Page, BrowserContext, Browser } from 'playwright-core';
 import { lightpanda } from '@lightpanda/browser';
 import net from 'net';
 import { ChildProcess } from 'child_process';
-import { Scenario, ScenarioMetrics, StepMetrics, RunOptions } from './types';
+import { Scenario, ScenarioMetrics, StepMetrics, RunOptions, Step } from './types';
 import { executeStep } from './actions/index';
 import { createScenarioMetrics } from './metrics';
 import { getScenarioSettings } from './settings';
@@ -79,7 +79,10 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
   let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
   let browser: Browser | null = null;
 
-  const hasBrowserActions = scenario.steps.some((s) => s.action.startsWith('browser.'));
+  // IncludeStep are resolved at parse time, never reach the worker
+  type ExecutableStep = Exclude<Step, { include: string }>;
+  const execSteps = scenario.steps as ExecutableStep[];
+  const hasBrowserActions = execSteps.some((s) => s.action.startsWith('browser.'));
   const scenarioSettings = getScenarioSettings(scenario.name);
   const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? DEFAULT_SCENARIO_TIMEOUT;
   const ignoreHTTPSErrors = options.ignoreHTTPSErrors ?? scenarioSettings.ignoreHTTPSErrors ?? scenario.ignoreHTTPSErrors ?? false;
@@ -120,7 +123,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
       }
 
       const stepResults: Map<string, boolean> = new Map();
-      for (const step of scenario.steps) {
+      for (const step of execSteps) {
         if (abortController.signal.aborted) break;
         send({ type: 'step_progress', scenario_name: scenario.name, step_name: step.name, action: step.action, status: 'running' });
 

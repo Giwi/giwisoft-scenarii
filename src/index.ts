@@ -56,7 +56,7 @@ program
     }
 
     const headless = options.headless !== 'false';
-    const runOptions = { headless, json_output: options.json, persist: !!options.db };
+    const runOptions = { headless, json_output: options.json, persist: !!options.db, scenariosDir: path.dirname(path.resolve(files[0])) };
 
     const scenarios = files.map((f) => {
       logger.info({ file: f }, 'Loading scenario');
@@ -121,7 +121,7 @@ program
       logger.warn(`No .yml or .yaml files found in ${scenariosDir} — server will start with no scenarios`);
     }
 
-    const runOptions = { headless: true, persist: true };
+    const runOptions = { headless: true, persist: true, scenariosDir };
 
     // Start the API server immediately so it's available
     const port = parseInt(options.port);

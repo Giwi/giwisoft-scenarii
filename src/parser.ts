@@ -1,9 +1,17 @@
 import fs from 'fs';
+import path from 'path';
 import yaml from 'js-yaml';
-import { Scenario, Step, HttpStep, BrowserStep } from './types';
+import { Scenario, Step, HttpStep, BrowserStep, IncludeStep } from './types';
 
 // Parses a single step object from raw YAML data, dispatching by action prefix.
 function parseStep(raw: Record<string, unknown>, index: number): Step {
+  // Include step — references steps from another scenario
+  if (raw.include) {
+    const step: IncludeStep = { include: raw.include as string };
+    if (raw.name) step.name = raw.name as string;
+    return step;
+  }
+
   const name = (raw.name as string) || `step_${index}`;
   const action = raw.action as string;
 
@@ -37,6 +45,57 @@ function parseStep(raw: Record<string, unknown>, index: number): Step {
   }
 
   throw new Error(`Unknown action type: ${action} in step "${name}"`);
+}
+
+// Recursively resolves include steps by loading the referenced YAML files
+export function resolveIncludes(scenario: Scenario, scenariosDir: string, visited: Set<string> = new Set()): Step[] {
+  const steps: Step[] = [];
+
+  for (const step of scenario.steps) {
+    if ('include' in step) {
+      const inc = step as IncludeStep;
+      // Find the referenced scenario file
+      const includeName = inc.include.replace(/\.ya?ml$/, '');
+      if (visited.has(includeName)) {
+        throw new Error(`Circular include detected: ${includeName}`);
+      }
+      visited.add(includeName);
+
+      // Look for a matching file in the scenarios directory
+      const files = fs.readdirSync(scenariosDir).filter(f =>
+        f.endsWith('.yml') || f.endsWith('.yaml')
+      );
+
+      let found = false;
+      for (const file of files) {
+        const filePath = path.join(scenariosDir, file);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const includedScenario = parseScenario(content);
+        if (includedScenario.name === includeName || file.replace(/\.ya?ml$/, '') === includeName) {
+          const resolved = resolveIncludes(includedScenario, scenariosDir, visited);
+          // Optionally prefix step names with the include reference name
+          for (const s of resolved) {
+            if (inc.name && 'name' in s) {
+              (s as any).name = `${inc.name}: ${(s as any).name}`;
+            }
+          }
+          steps.push(...resolved);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        throw new Error(`Included scenario not found: ${inc.include}`);
+      }
+
+      visited.delete(includeName);
+    } else {
+      steps.push(step);
+    }
+  }
+
+  return steps;
 }
 
 // Parses a YAML string into a Scenario object, validating required fields.
@@ -84,6 +143,11 @@ export function serializeScenario(scenario: Scenario): string {
   const obj: Record<string, unknown> = {
     name: scenario.name,
     steps: scenario.steps.map(s => {
+      if ('include' in s) {
+        const step: Record<string, unknown> = { include: s.include };
+        if (s.name) step.name = s.name;
+        return step;
+      }
       const step: Record<string, unknown> = { name: s.name, action: s.action };
       if ('url' in s && s.url) step.url = s.url;
       if ('selector' in s && s.selector) step.selector = s.selector;

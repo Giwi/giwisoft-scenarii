@@ -7,6 +7,7 @@ import { storeMetrics, purgeOldData, upsertScenarioTags } from './storage';
 import { notifyIfStateChanged } from './notifications/index';
 import { broadcastScenarioRun, broadcastStepProgress } from './ws';
 import { getScenarioSettings, getSettings } from './settings';
+import { resolveIncludes } from './parser';
 import logger from './logger';
 import { DEFAULT_SCENARIO_TIMEOUT, DEFAULT_PURGE_DAYS } from './constants';
 
@@ -85,6 +86,16 @@ export async function runScenario(
 
   const scenarioSettings = getScenarioSettings(scenario.name);
   const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? DEFAULT_SCENARIO_TIMEOUT;
+
+  if (options.scenariosDir) {
+    try {
+      scenario.steps = resolveIncludes(scenario, options.scenariosDir);
+    } catch (err: unknown) {
+      const metrics = createCancelledMetrics(scenario.name, `Include resolution failed: ${err instanceof Error ? err.message : String(err)}`);
+      persistAndNotify(metrics, options);
+      return Promise.resolve(metrics);
+    }
+  }
 
   return new Promise<ScenarioMetrics>((resolve) => {
     let resolved = false;
