@@ -337,7 +337,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.isRunning = false;
     this.tickerStatus = 'idle';
     if (event.scenario_name === this.scenarioName && !this.loading) {
-      this.refresh();
+      this.reloadData();
     }
   };
 
@@ -414,6 +414,30 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.refresh();
   }
 
+  private async reloadData(): Promise<void> {
+    const name = this.scenarioName;
+    try {
+      const offset = (this.currentPage - 1) * this.pageSize;
+      const [detailRes, slaRes] = await Promise.all([
+        apiFetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`),
+        apiFetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`),
+      ]);
+      if (detailRes.ok) {
+        this.detail = await detailRes.json();
+      }
+      if (slaRes.ok) {
+        const slaData = await slaRes.json();
+        this.sla = slaData.sla;
+      }
+      if (detailRes.ok || slaRes.ok) {
+        this.updateCharts();
+        this.cdr.detectChanges();
+      }
+    } catch (err) {
+      console.error('Failed to reload scenario data', err);
+    }
+  }
+
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
     try {
@@ -438,6 +462,46 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     } finally {
       this.loading = false;
       this.cdr.detectChanges();
+    }
+  }
+
+  private updateCharts(): void {
+    if (this.charts.length === 0) {
+      setTimeout(() => this.renderCharts(), 100);
+      return;
+    }
+    if (!this.detail || this.detail.history.length === 0) return;
+    const history = this.detail.history;
+    const labels = history.map((r) => new Date(r.started_at).toLocaleString()).reverse();
+
+    // Duration chart
+    const durations = history.map((r) => r.duration_ms).reverse();
+    this.charts[0].data.labels = labels;
+    this.charts[0].data.datasets[0].data = durations;
+    this.charts[0].update('none');
+
+    // Success chart
+    const successCounts = history.map((r) => (r.success ? 1 : 0)).reverse();
+    const runningAvg = this.runningAverage(successCounts, 5);
+    this.charts[1].data.labels = labels;
+    this.charts[1].data.datasets[0].data = runningAvg;
+    this.charts[1].update('none');
+
+    // Step chart (if exists)
+    if (this.charts.length > 2 && this.detail.stepNames.length > 1) {
+      this.charts[2].data.labels = labels;
+      this.detail.stepNames.forEach((stepName, i) => {
+        const data = history
+          .map((run) => {
+            const step = run.steps.find((s) => s.step_name === stepName);
+            return step ? step.response_time_ms : 0;
+          })
+          .reverse();
+        if (this.charts[2].data.datasets[i]) {
+          this.charts[2].data.datasets[i].data = data;
+        }
+      });
+      this.charts[2].update('none');
     }
   }
 
