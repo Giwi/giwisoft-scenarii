@@ -22,13 +22,14 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
     return;
   }
 
-  // No previous run means no state change to report
-  if (prevSuccess === null) return;
+  // No previous run — notify on failure, skip on success
+  if (prevSuccess === null) {
+    if (metrics.success) return;
+  } else if (prevSuccess === metrics.success) {
+    return;
+  }
 
   const currentSuccess = metrics.success;
-  // Only notify on state changes (pass→fail or fail→pass)
-  if (prevSuccess === currentSuccess) return;
-
   const event = currentSuccess ? 'recovery' : 'failure';
   const promises: Promise<void>[] = [];
 
