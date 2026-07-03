@@ -593,7 +593,7 @@ export function createApp(): express.Application {
   app.get('/public/status/:name', handlePublicScenarioStatus);
 
   // Serve Angular frontend in production (only if built)
-  const frontendDir = path.join(__dirname, '../frontend/dist/frontend/browser');
+  const frontendDir = path.join(__dirname, '../../frontend/dist/frontend/browser');
   const frontendBuilt = fs.existsSync(path.join(frontendDir, 'index.html'));
   if (frontendBuilt) {
     app.use(express.static(frontendDir));
