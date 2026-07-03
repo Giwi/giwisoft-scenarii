@@ -1,8 +1,8 @@
 import { Routes } from '@angular/router';
-import { ScenarioListComponent } from './scenario-list';
-import { ScenarioDetailComponent } from './scenario-detail';
-import { ScenarioEditorComponent } from './scenario-editor';
-import { PublicStatusComponent } from './public-status';
+import { ScenarioListComponent } from './features/scenario-list/scenario-list';
+import { ScenarioDetailComponent } from './features/scenario-detail/scenario-detail';
+import { ScenarioEditorComponent } from './features/scenario-editor/scenario-editor';
+import { PublicStatusComponent } from './features/public-status/public-status';
 
 export const routes: Routes = [
   { path: '', component: ScenarioListComponent },

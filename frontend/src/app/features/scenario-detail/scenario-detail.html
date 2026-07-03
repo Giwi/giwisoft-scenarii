@@ -1,0 +1,200 @@
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a routerLink="/" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <button class="btn btn-sm btn-outline-primary" (click)="refresh()" [disabled]="loading">
+    <i class="bi bi-arrow-clockwise"></i>
+  </button>
+  <button class="btn btn-sm btn-outline-success" (click)="runNow()" [disabled]="running" title="Run now">
+    <i class="bi bi-send-fill"></i>{{ running ? '...' : '' }}
+  </button>
+  <button class="btn btn-sm btn-outline-danger" (click)="cancelRun()" *ngIf="isRunning" title="Cancel">
+    <i class="bi bi-stop-fill"></i>
+  </button>
+
+  <span *ngIf="isRunning" class="small text-nowrap ms-1 d-flex align-items-center gap-1">
+    <i class="bi"
+      [class.bi-arrow-repeat]="tickerStatus==='running'"
+      [class.bi-check-circle-fill]="tickerStatus==='done'"
+      [class.bi-x-circle-fill]="tickerStatus==='error'"
+      [class.text-primary]="tickerStatus==='running'"
+      [class.text-success]="tickerStatus==='done'"
+      [class.text-danger]="tickerStatus==='error'"
+      [class.spin]="tickerStatus==='running'"
+    ></i>
+    <span>{{ tickerStep }}</span>
+    <span class="text-secondary" *ngIf="tickerResponseTime !== null">{{ tickerResponseTime }}ms</span>
+    <span class="text-danger" *ngIf="tickerError">({{ tickerError }})</span>
+  </span>
+
+  <button *ngIf="detail" class="btn btn-sm btn-outline-secondary border-0 position-relative ms-auto" (click)="copyPublicLink()" title="Copy public status link">
+    <i class="bi bi-share"></i>
+    <span *ngIf="copied" class="position-absolute small bg-success text-white rounded px-1" style="top:-8px;right:-8px;font-size:.6rem;line-height:1.2">Copied!</span>
+  </button>
+  <a class="btn btn-sm btn-outline-secondary border-0" *ngIf="detail" [routerLink]="['/scenario', scenarioName, 'edit']" title="Edit scenario YAML">
+    <i class="bi bi-pencil"></i>
+  </a>
+  <div class="dropdown" *ngIf="detail">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+      <i class="bi bi-download me-1"></i>Export
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li><a class="dropdown-item" [href]="exportUrl('json')" target="_blank"><i class="bi bi-filetype-json me-2"></i>JSON</a></li>
+      <li><a class="dropdown-item" [href]="exportUrl('csv')" target="_blank"><i class="bi bi-filetype-csv me-2"></i>CSV</a></li>
+      <li><a class="dropdown-item" [href]="configUrl()" target="_blank"><i class="bi bi-filetype-yml me-2"></i>YAML</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+  <h1 class="h4 mb-0">{{ detail?.info?.name }}</h1>
+  <span class="small text-secondary" *ngIf="detail">
+    <span class="fw-semibold">{{ detail.info.total_runs }}</span> runs ·
+    <span class="text-success fw-semibold">{{ detail.info.passed_runs }}</span> passed ·
+    <span class="text-danger fw-semibold">{{ detail.info.failed_runs }}</span> failed
+    <span class="ms-2" *ngIf="detail.info.depends_on">· depends on <span class="fw-semibold">{{ detail.info.depends_on }}</span></span>
+  </span>
+</div>
+
+<div class="text-center py-5 text-secondary" *ngIf="loading">
+  <i class="bi bi-hourglass-split fs-2 mb-2 d-block"></i>
+  Loading...
+</div>
+
+<div class="text-center py-5 text-secondary" *ngIf="!loading && !detail">
+  <i class="bi bi-search fs-2 mb-2 d-block"></i>
+  Scenario not found.
+</div>
+
+<ng-container *ngIf="detail">
+  <div class="row g-3 mb-4">
+    <div class="col-sm-4">
+      <div class="card border-0 shadow-sm text-center p-3">
+        <div class="fs-2 fw-bold" [class.text-success]="sla >= 99" [class.text-warning]="sla >= 90 && sla < 99" [class.text-danger]="sla < 90">{{ sla }}%</div>
+        <div class="small text-secondary text-uppercase">SLA (7 days)</div>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="card border-0 shadow-sm text-center p-3">
+        <div class="fs-2 fw-bold">{{ detail.info.total_runs }}</div>
+        <div class="small text-secondary text-uppercase">Total Runs</div>
+      </div>
+    </div>
+    <div class="col-sm-4">
+      <div class="card border-0 shadow-sm text-center p-3">
+        <div class="fs-2 fw-bold" [class.text-danger]="detail.info.failed_runs > 0">{{ detail.info.failed_runs }}</div>
+        <div class="small text-secondary text-uppercase">Failed Runs</div>
+      </div>
+    </div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title small text-secondary text-uppercase">
+            Response Time Trend
+          </h3>
+          <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title small text-secondary text-uppercase">Success Rate Over Time</h3>
+          <div class="chart-wrapper"><canvas id="successChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4" *ngIf="detail.stepNames.length > 1">
+    <div class="card-body">
+      <h3 class="card-title small text-secondary text-uppercase">Step Response Times</h3>
+      <div class="chart-wrapper"><canvas id="stepChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <h3 class="card-title small text-secondary text-uppercase mb-3">Recent Runs</h3>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Time</th>
+              <th>Duration</th>
+              <th>Status</th>
+              <th>Steps</th>
+            </tr>
+          </thead>
+          <tbody>
+             <tr *ngFor="let run of detail.history">
+              <td class="small">{{ run.started_at | date: 'MMM d, HH:mm:ss' }}</td>
+              <td class="font-monospace small">{{ run.duration_ms }}ms</td>
+              <td>
+                <span
+                  class="badge"
+                  [class.bg-success]="run.success"
+                  [class.bg-danger]="!run.success"
+                >
+                  {{ run.success ? 'Pass' : 'Fail' }}
+                </span>
+              </td>
+              <td>
+                <details>
+                  <summary class="text-primary small" style="cursor:pointer">
+                    {{ run.steps.length }} steps
+                  </summary>
+                  <table class="table table-sm mt-2 mb-0" style="font-size: .75rem">
+                    <tr *ngFor="let step of run.steps" class="align-top">
+                      <td class="py-0 ps-0 pe-2 border-0">{{ step.step_name }}</td>
+                      <td class="font-monospace py-0 px-2 border-0 text-nowrap">
+                        {{ step.response_time_ms }}ms
+                      </td>
+                      <td class="py-0 px-2 border-0">
+                        <span
+                          class="badge bg-success"
+                          *ngIf="step.success"
+                          style="font-size: .65rem"
+                          >OK</span
+                        >
+                        <span
+                          class="badge bg-danger"
+                          *ngIf="!step.success"
+                          style="font-size: .65rem"
+                          >ERR</span
+                        >
+                      </td>
+                      <td
+                        class="text-danger py-0 ps-2 pe-0 border-0"
+                        *ngIf="step.error"
+                        style="font-size: .65rem"
+                      >
+                        {{ step.error }}
+                      </td>
+                    </tr>
+                  </table>
+                </details>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-center mt-3" *ngIf="detail.history.length > 0">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item" [class.disabled]="currentPage === 1">
+            <a class="page-link" (click)="goToPage(currentPage - 1)">Prev</a>
+          </li>
+          <li class="page-item" *ngFor="let p of pageNumbers" [class.active]="p === currentPage" [class.disabled]="p === -1">
+            <a class="page-link" (click)="goToPage(p)" *ngIf="p !== -1">{{ p }}</a>
+            <span class="page-link" *ngIf="p === -1">&hellip;</span>
+          </li>
+          <li class="page-item" [class.disabled]="currentPage === totalPages">
+            <a class="page-link" (click)="goToPage(currentPage + 1)">Next</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</ng-container>
