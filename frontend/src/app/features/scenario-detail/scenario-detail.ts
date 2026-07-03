@@ -88,7 +88,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   currentPage = 1;
 
   get totalPages(): number {
-    return Math.max(1, Math.ceil((this.detail?.info.total_runs ?? 0) / this.pageSize));
+    return Math.max(1, Math.ceil(Math.min(this.detail?.info.total_runs ?? 0, this.detail?.history.length ?? 0) / this.pageSize));
+  }
+
+  get displayedRuns(): ScenarioRun[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.detail?.history.slice(start, start + this.pageSize) ?? [];
   }
 
   get pageNumbers(): number[] {
@@ -210,15 +215,14 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   async goToPage(page: number): Promise<void> {
     if (page < 1 || page > this.totalPages || page === this.currentPage) return;
     this.currentPage = page;
-    this.refresh();
+    this.cdr.detectChanges();
   }
 
   private async reloadData(): Promise<void> {
     const name = this.scenarioName;
     try {
-      const offset = (this.currentPage - 1) * this.pageSize;
       const [detailRes, slaRes] = await Promise.all([
-        fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`, { credentials: 'include' }),
+        fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=10000`, { credentials: 'include' }),
         fetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`, { credentials: 'include' }),
       ]);
       if (detailRes.ok) {
@@ -240,9 +244,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   private async loadDetail(): Promise<void> {
     const name = this.scenarioName;
     try {
-      const offset = (this.currentPage - 1) * this.pageSize;
       const [detailRes, slaRes] = await Promise.all([
-        fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`, { credentials: 'include' }),
+        fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=10000`, { credentials: 'include' }),
         fetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`, { credentials: 'include' }),
       ]);
       if (detailRes.ok) {

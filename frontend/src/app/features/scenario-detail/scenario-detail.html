@@ -129,7 +129,7 @@
             </tr>
           </thead>
           <tbody>
-             <tr *ngFor="let run of detail.history">
+             <tr *ngFor="let run of displayedRuns">
               <td class="small">{{ run.started_at | date: 'MMM d, HH:mm:ss' }}</td>
               <td class="font-monospace small">{{ run.duration_ms }}ms</td>
               <td>
