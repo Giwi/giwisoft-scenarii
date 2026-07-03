@@ -4,7 +4,8 @@ WORKDIR /build
 
 COPY package.json package-lock.json tsconfig.json ./
 COPY frontend/package.json frontend/package-lock.json ./frontend/
-RUN apt-get update -qq && apt-get install -y -qq python3 make g++ && \
+RUN apt-get update -qq --fix-missing && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends python3 make g++ && \
     rm -rf /var/lib/apt/lists/* && \
     npm ci && \
     cd frontend && npm ci
