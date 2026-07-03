@@ -1,8 +1,8 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import * as settingsModule from '../../src/settings';
-import * as countersModule from '../../src/counters';
-import * as storageModule from '../../src/storage';
+import * as settingsModule from '../../src/config/settings';
+import * as metricsModule from '../../src/metrics/metrics-exporter';
+import * as storageModule from '../../src/config/storage';
 import * as telegramModule from '../../src/notifications/telegram';
 import { ScenarioMetrics } from '../../src/types';
 
@@ -20,7 +20,7 @@ const failMetrics: ScenarioMetrics = { ...metrics, success: false };
 describe('notifyIfStateChanged', () => {
   beforeEach(() => {
     mock.method(telegramModule, 'sendTelegram', () => Promise.resolve());
-    mock.method(countersModule, 'recordNotificationDelivery', () => {});
+    mock.method(metricsModule, 'recordNotificationDelivery', () => {});
   });
 
   afterEach(() => {
@@ -57,7 +57,7 @@ describe('notifyIfStateChanged', () => {
       notifications: { telegram: { enabled: true, bot_token: 't', chat_id: 'c' } },
     }));
     mock.method(storageModule, 'getPreviousRunSuccess', () => true);
-    mock.method(countersModule, 'recordNotificationDelivery', () => { recorded = true; });
+    mock.method(metricsModule, 'recordNotificationDelivery', () => { recorded = true; });
     const { notifyIfStateChanged } = await import('../../src/notifications/index');
     await notifyIfStateChanged(failMetrics);
     assert.strictEqual(recorded, true);
@@ -69,7 +69,7 @@ describe('notifyIfStateChanged', () => {
       notifications: { telegram: { enabled: true, bot_token: 't', chat_id: 'c' } },
     }));
     mock.method(storageModule, 'getPreviousRunSuccess', () => false);
-    mock.method(countersModule, 'recordNotificationDelivery', () => { recorded = true; });
+    mock.method(metricsModule, 'recordNotificationDelivery', () => { recorded = true; });
     const { notifyIfStateChanged } = await import('../../src/notifications/index');
     await notifyIfStateChanged(metrics);
     assert.strictEqual(recorded, true);

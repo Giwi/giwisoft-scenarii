@@ -1,9 +1,11 @@
 import fs from 'fs';
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars, resolveJsonPath } from '../helpers';
-import { BROWSER_RETRIES, RETRY_DELAYS } from '../retry';
-import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../constants';
+import { resolveUrl, interpolateVars, resolveJsonPath } from '../utils/helpers';
+import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../utils/constants';
+
+const BROWSER_RETRIES = 2;
+const RETRY_DELAYS = [1000, 2000];
 
 // Validates browser-level expectations against the current page state.
 // Returns an error string on failure, or null if all expectations pass.

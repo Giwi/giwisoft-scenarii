@@ -1,9 +1,7 @@
-import { TelegramConfig } from '../settings';
+import { TelegramConfig } from '../config/settings';
 import { ScenarioMetrics } from '../types';
-import logger from '../logger';
-import { fetchWithRetry } from '../retry';
+import { postJson } from '../utils/retry';
 
-// Sends a scenario failure/recovery notification via the Telegram Bot API.
 export async function sendTelegram(
   config: TelegramConfig,
   metrics: ScenarioMetrics,
@@ -25,24 +23,10 @@ export async function sendTelegram(
     }
   }
 
-  const text = lines.join('\n');
-
-  const url = `https://api.telegram.org/bot${config.bot_token}/sendMessage`;
-  const body = {
+  await postJson(`https://api.telegram.org/bot${config.bot_token}/sendMessage`, {
     chat_id: config.chat_id,
-    text,
+    text: lines.join('\n'),
     parse_mode: 'Markdown',
     disable_web_page_preview: true,
-  };
-
-  const res = await fetchWithRetry(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    logger.error({ status: res.status, err }, 'Telegram notification failed');
-  }
+  }, 'Telegram');
 }

@@ -1,14 +1,14 @@
 import cron, { type ScheduledTask as CronScheduledTask } from 'node-cron';
 import fs from 'fs';
 import path from 'path';
-import { Scenario, AlertConfig, TimeWindow } from './types';
+import { Scenario, AlertConfig, TimeWindow } from '../types';
 import { runScenario, RunOptions } from './runner';
-import { sendDailyReport } from './report';
-import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess } from './storage';
-import { getSettings } from './settings';
-import { loadScenarioFile } from './parser';
-import logger from './logger';
-import { DEFAULT_ALERT_CONSECUTIVE_FAILURES } from './constants';
+import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess, getScenarioList, getScenarioHistory } from '../config/storage';
+import { getSettings } from '../config/settings';
+import { loadScenarioFile } from '../config/parser';
+import { sendMailgunEmail } from '../notifications/email-client';
+import logger from '../utils/logger';
+import { DEFAULT_ALERT_CONSECUTIVE_FAILURES } from '../utils/constants';
 
 interface ScheduledTask {
   scenario: Scenario;
@@ -227,6 +227,29 @@ export function watchScenarios(scenariosDir: string, options: RunOptions, interv
   setInterval(() => {
     rescanScenarios(scenariosDir, options);
   }, intervalMs);
+}
+
+async function sendDailyReport(): Promise<void> {
+  const settings = getSettings();
+  if (!settings.notifications?.email?.enabled) return;
+
+  const scenarios = getScenarioList();
+  const lines: string[] = ['Daily Scenario Report', '====================\n'];
+
+  for (const s of scenarios) {
+    const history = getScenarioHistory(s.name, 1);
+    const totalRuns = history.length;
+    const passedRuns = history.filter(r => r.success).length;
+    const passRate = totalRuns > 0 ? Math.round(passedRuns / totalRuns * 100) : 0;
+    lines.push(`  ${s.name}: ${passedRuns}/${totalRuns} passed (${passRate}%)`);
+    const last = history[0];
+    if (last) {
+      lines.push(`    Last run: ${last.success ? 'PASS' : 'FAIL'} (${last.duration_ms}ms)`);
+    }
+  }
+
+  const { mailgun, to } = settings.notifications.email;
+  await sendMailgunEmail(mailgun.api_key, mailgun.domain, mailgun.from, to, 'Daily Scenario Report', lines.join('\n'));
 }
 
 // Schedules the daily email report on the given cron expression.

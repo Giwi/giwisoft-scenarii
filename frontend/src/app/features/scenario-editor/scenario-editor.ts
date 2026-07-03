@@ -7,7 +7,6 @@ import {
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { apiFetch } from '../../shared/api';
 
 @Component({
   selector: 'app-scenario-editor',
@@ -40,7 +39,7 @@ export class ScenarioEditorComponent implements OnInit {
 
   async loadYaml(): Promise<void> {
     try {
-      const res = await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/config`);
+      const res = await fetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/config`, { credentials: 'include' });
       if (res.ok) {
         this.yaml = await res.text();
       } else {
@@ -58,10 +57,11 @@ export class ScenarioEditorComponent implements OnInit {
     this.error = '';
     this.cdr.detectChanges();
     try {
-      const res = await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/config`, {
+      const res = await fetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ yaml: this.yaml }),
+        credentials: 'include',
       });
       if (res.ok) {
         this.saved = true;

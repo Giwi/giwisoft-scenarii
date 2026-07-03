@@ -153,3 +153,6 @@ export interface RunOptions {
 
 // Function signature for output reporters (console or JSON)
 export type Reporter = (metrics: ScenarioMetrics) => void;
+
+// Steps with include resolved at parse time — never reach the executor
+export type ExecutableStep = Exclude<Step, { include: string }>;

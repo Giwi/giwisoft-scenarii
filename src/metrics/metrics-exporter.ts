@@ -1,12 +1,23 @@
 // Prometheus-format metrics exporter for scenario run data and notification delivery stats.
 
 import express from 'express';
-import { getNotificationMetrics } from './counters';
-import { getScenarioList, getScenarioHistory } from './storage';
-import { escapePrometheusLabel } from './helpers';
-import { getSettings } from './settings';
-import { DEFAULT_HISTORY_DAYS } from './constants';
-import logger from './logger';
+import { getScenarioList, getScenarioHistory } from '../config/storage';
+import { escapePrometheusLabel } from '../utils/helpers';
+import { getSettings } from '../config/settings';
+import { DEFAULT_HISTORY_DAYS } from '../utils/constants';
+import logger from '../utils/logger';
+
+let notificationSuccessCount = 0;
+let notificationFailureCount = 0;
+
+export function recordNotificationDelivery(success: boolean): void {
+  if (success) notificationSuccessCount++;
+  else notificationFailureCount++;
+}
+
+function getNotificationMetrics(): { success: number; failure: number } {
+  return { success: notificationSuccessCount, failure: notificationFailureCount };
+}
 
 // Middleware that enforces Bearer token auth on the /api/metrics endpoint.
 export function metricsAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {

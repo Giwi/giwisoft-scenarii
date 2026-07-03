@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { isInTimeWindow } from '../src/scheduler';
+import { isInTimeWindow } from '../src/runner/scheduler';
 import { TimeWindow } from '../src/types';
 
 function makeDate(hours: number, minutes: number = 0): Date {

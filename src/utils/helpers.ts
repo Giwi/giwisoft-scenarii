@@ -2,8 +2,8 @@
 // JSON path resolution, port polling, and various output-formatting helpers (CSV, Prometheus, HTML).
 
 import net from 'net';
-import { ScenarioMetrics } from './types';
-import { DEFAULT_HISTORY_DAYS, MIN_DAYS, MAX_DAYS, SOCKET_TIMEOUT, SOCKET_RETRY_INTERVAL } from './constants';
+import { ScenarioMetrics } from '../types';
+import { DEFAULT_HISTORY_DAYS, MIN_DAYS, MAX_DAYS } from './constants';
 
 // Polls a TCP port until it becomes reachable or the timeout is exceeded.
 export function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
@@ -15,10 +15,10 @@ export function waitForPort(host: string, port: number, timeoutMs: number): Prom
         return;
       }
       const sock = new net.Socket();
-      sock.setTimeout(SOCKET_TIMEOUT);
+      sock.setTimeout(1000);
       sock.once('connect', () => { sock.destroy(); resolve(); });
-      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
-      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
+      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, 200); });
+      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, 200); });
       sock.connect(port, host);
     }
     tryConnect();
@@ -78,11 +78,6 @@ export function toCsv(history: ScenarioMetrics[]): string {
     )
   );
   return header + rows.join('\n');
-}
-
-// Escapes HTML special characters for safe embedding in HTML output.
-export function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // Parses the "days" query parameter within valid bounds.

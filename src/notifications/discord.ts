@@ -1,9 +1,7 @@
-import { DiscordConfig } from '../settings';
+import { DiscordConfig } from '../config/settings';
 import { ScenarioMetrics } from '../types';
-import logger from '../logger';
-import { fetchWithRetry } from '../retry';
+import { postJson } from '../utils/retry';
 
-// Sends a scenario failure/recovery notification via a Discord webhook.
 export async function sendDiscord(
   config: DiscordConfig,
   metrics: ScenarioMetrics,
@@ -26,23 +24,12 @@ export async function sendDiscord(
     });
   }
 
-  const body = {
+  await postJson(config.webhook_url, {
     embeds: [{
       title: `Scenario ${statusText}: ${metrics.scenario_name}`,
       color,
       fields,
       timestamp: new Date().toISOString(),
     }],
-  };
-
-  const res = await fetchWithRetry(config.webhook_url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    logger.error({ status: res.status, err }, 'Discord notification failed');
-  }
+  }, 'Discord');
 }

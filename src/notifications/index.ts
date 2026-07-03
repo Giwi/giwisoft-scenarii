@@ -1,13 +1,13 @@
-import { getSettings } from '../settings';
+import { getSettings } from '../config/settings';
 import { ScenarioMetrics } from '../types';
-import { recordNotificationDelivery } from '../counters';
-import { getPreviousRunSuccess } from '../storage';
+import { getPreviousRunSuccess } from '../config/storage';
+import { recordNotificationDelivery } from '../metrics/metrics-exporter';
 import { sendTelegram } from './telegram';
-import { sendEmail } from './mailgun';
+import { sendEmail } from './email-client';
 import { sendSlack } from './slack';
 import { sendDiscord } from './discord';
 import { sendWebhook } from './webhook';
-import logger from '../logger';
+import logger from '../utils/logger';
 
 // Dispatches notifications across all configured channels when a scenario's state
 // transitions from pass→fail or fail→pass. Skips if the previous run was the same state.

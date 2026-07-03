@@ -1,6 +1,6 @@
 import fs from 'fs';
 import yaml from 'js-yaml';
-import logger from './logger';
+import logger from '../utils/logger';
 
 // Notification channel configuration types
 export interface TelegramConfig {

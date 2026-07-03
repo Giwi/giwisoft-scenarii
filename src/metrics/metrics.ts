@@ -1,4 +1,4 @@
-import { StepMetrics, ScenarioMetrics, Reporter } from './types';
+import { StepMetrics, ScenarioMetrics, Reporter } from '../types';
 import pc from 'picocolors';
 
 // Creates a fresh StepMetrics object with the given name and action.

@@ -1,6 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import logger from './logger';
+import logger from '../utils/logger';
 
 // Singleton WebSocket server instance
 let wss: WebSocketServer | null = null;

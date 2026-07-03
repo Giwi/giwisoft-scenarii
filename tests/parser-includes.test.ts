@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { resolveIncludes } from '../src/parser';
+import { resolveIncludes } from '../src/config/parser';
 import { Scenario } from '../src/types';
 
 let scenariosDir: string;

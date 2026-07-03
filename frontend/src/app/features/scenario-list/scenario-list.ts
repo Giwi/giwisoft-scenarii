@@ -9,7 +9,6 @@ import { DatePipe, NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from '../../shared/ws';
-import { apiFetch } from '../../shared/api';
 
 interface ScenarioInfo {
   name: string;
@@ -82,9 +81,9 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
       const qs = params.toString();
       const url = qs ? `/api/scenarios?${qs}` : '/api/scenarios';
       const [scenariosRes, tagsRes, groupsRes] = await Promise.all([
-        apiFetch(url),
-        apiFetch('/api/tags'),
-        apiFetch('/api/groups'),
+        fetch(url, { credentials: 'include' }),
+        fetch('/api/tags', { credentials: 'include' }),
+        fetch('/api/groups', { credentials: 'include' }),
       ]);
       if (scenariosRes.ok) {
         this.scenarios = await scenariosRes.json();
@@ -108,7 +107,7 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     this.running = name;
     this.cdr.detectChanges();
     try {
-      await apiFetch(`/api/scenarios/${encodeURIComponent(name)}/run`, { method: 'POST' });
+      await fetch(`/api/scenarios/${encodeURIComponent(name)}/run`, { method: 'POST', credentials: 'include' });
     } catch {
       // Ignore — the run will proceed server-side
     } finally {
@@ -121,7 +120,7 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
     this.cancelling = name;
     this.cdr.detectChanges();
     try {
-      await apiFetch(`/api/scenarios/${encodeURIComponent(name)}/cancel`, { method: 'POST' });
+      await fetch(`/api/scenarios/${encodeURIComponent(name)}/cancel`, { method: 'POST', credentials: 'include' });
     } catch {
       // Ignore
     } finally {
@@ -133,7 +132,7 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
   async togglePause(s: ScenarioInfo): Promise<void> {
     const action = s.paused ? 'resume' : 'pause';
     try {
-      const res = await apiFetch(`/api/scenarios/${encodeURIComponent(s.name)}/${action}`, { method: 'POST' });
+      const res = await fetch(`/api/scenarios/${encodeURIComponent(s.name)}/${action}`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
         s.paused = !s.paused;
         this.cdr.detectChanges();

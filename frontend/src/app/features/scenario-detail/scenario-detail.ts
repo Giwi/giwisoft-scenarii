@@ -9,7 +9,6 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgFor, NgIf, DatePipe } from '@angular/common';
 import Chart from 'chart.js/auto';
 import { onScenarioRun, removeScenarioRunListener, onStepProgress, removeStepProgressListener } from '../../shared/ws';
-import { apiFetch } from '../../shared/api';
 
 function areaGradient(color: string, alphaTop = 0.25, alphaBottom = 0.02) {
   return (ctx: any) => {
@@ -170,7 +169,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     this.running = true;
     this.cdr.detectChanges();
     try {
-      await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/run`, { method: 'POST' });
+      await fetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/run`, { method: 'POST', credentials: 'include' });
     } catch {
       // Ignore
     } finally {
@@ -181,7 +180,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
 
   async cancelRun(): Promise<void> {
     try {
-      await apiFetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/cancel`, { method: 'POST' });
+      await fetch(`/api/scenarios/${encodeURIComponent(this.scenarioName)}/cancel`, { method: 'POST', credentials: 'include' });
     } catch {
       // Ignore
     }
@@ -219,8 +218,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     try {
       const offset = (this.currentPage - 1) * this.pageSize;
       const [detailRes, slaRes] = await Promise.all([
-        apiFetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`),
-        apiFetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`),
+        fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`, { credentials: 'include' }),
+        fetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`, { credentials: 'include' }),
       ]);
       if (detailRes.ok) {
         this.detail = await detailRes.json();
@@ -243,8 +242,8 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     try {
       const offset = (this.currentPage - 1) * this.pageSize;
       const [detailRes, slaRes] = await Promise.all([
-        apiFetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`),
-        apiFetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`),
+        fetch(`/api/scenarios/${encodeURIComponent(name)}?days=7&limit=${this.pageSize}&offset=${offset}`, { credentials: 'include' }),
+        fetch(`/api/scenarios/${encodeURIComponent(name)}/sla?days=7`, { credentials: 'include' }),
       ]);
       if (detailRes.ok) {
         this.detail = await detailRes.json();

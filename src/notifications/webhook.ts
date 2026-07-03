@@ -1,16 +1,13 @@
-import { WebhookConfig } from '../settings';
+import { WebhookConfig } from '../config/settings';
 import { ScenarioMetrics } from '../types';
-import logger from '../logger';
-import { fetchWithRetry } from '../retry';
+import { postJson } from '../utils/retry';
 
-// Sends a scenario failure/recovery notification to a generic webhook endpoint.
-// The payload includes the full scenario metrics and step details.
 export async function sendWebhook(
   config: WebhookConfig,
   metrics: ScenarioMetrics,
   event: 'failure' | 'recovery'
 ): Promise<void> {
-  const body = {
+  await postJson(config.url, {
     event,
     scenario: metrics.scenario_name,
     success: metrics.success,
@@ -25,16 +22,5 @@ export async function sendWebhook(
       error: s.error || null,
       status_code: s.status_code || null,
     })),
-  };
-
-  const res = await fetchWithRetry(config.url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    logger.error({ status: res.status, err }, 'Webhook notification failed');
-  }
+  }, 'Webhook');
 }

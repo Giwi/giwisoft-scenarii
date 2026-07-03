@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import { Scenario, Step, HttpStep, BrowserStep, IncludeStep } from './types';
+import { Scenario, Step, HttpStep, BrowserStep, IncludeStep } from '../types';
 
 // Parses a single step object from raw YAML data, dispatching by action prefix.
 function parseStep(raw: Record<string, unknown>, index: number): Step {
@@ -139,42 +139,4 @@ export function parseScenario(content: string): Scenario {
 export function loadScenarioFile(filepath: string): Scenario {
   const content = fs.readFileSync(filepath, 'utf-8');
   return parseScenario(content);
-}
-
-// Serialises a Scenario object back into YAML, preserving optional fields.
-export function serializeScenario(scenario: Scenario): string {
-  const obj: Record<string, unknown> = {
-    name: scenario.name,
-    steps: scenario.steps.map(s => {
-      if ('include' in s) {
-        const step: Record<string, unknown> = { include: s.include };
-        if (s.name) step.name = s.name;
-        return step;
-      }
-      const step: Record<string, unknown> = { name: s.name, action: s.action };
-      if ('url' in s && s.url) step.url = s.url;
-      if ('selector' in s && s.selector) step.selector = s.selector;
-      if ('value' in s && s.value) step.value = s.value;
-      if ('timeout' in s && s.timeout) step.timeout = s.timeout;
-      if ('script' in s && s.script) step.script = s.script;
-      if ('headers' in s && s.headers) step.headers = s.headers;
-      if ('body' in s && s.body) step.body = s.body;
-      if ('expect' in s && s.expect) step.expect = s.expect;
-      if ('variables' in s && s.variables) step.variables = s.variables;
-      if ('condition' in s && s.condition) step.condition = s.condition;
-      return step;
-    }),
-  };
-  if (scenario.description) obj.description = scenario.description;
-  if (scenario.schedule) obj.schedule = scenario.schedule;
-  if (scenario.base_url) obj.base_url = scenario.base_url;
-  if (scenario.timeout) obj.timeout = scenario.timeout;
-  if (scenario.tags) obj.tags = scenario.tags;
-  if (scenario.depends_on) obj.depends_on = scenario.depends_on;
-  if (scenario.headless !== undefined) obj.headless = scenario.headless;
-  if (scenario.ignoreHTTPSErrors !== undefined) obj.ignoreHTTPSErrors = scenario.ignoreHTTPSErrors;
-  if (scenario.group) obj.group = scenario.group;
-  if (scenario.time_windows) obj.time_windows = scenario.time_windows;
-  if (scenario.alert) obj.alert = scenario.alert;
-  return require('js-yaml').dump(obj, { indent: 2, lineWidth: 120, noRefs: true, sortKeys: false });
 }

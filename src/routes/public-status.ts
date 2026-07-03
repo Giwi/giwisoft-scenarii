@@ -1,7 +1,11 @@
 import express from 'express';
-import { getScenarioList, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount } from './storage';
-import { escapeHtml, parseDaysParam } from './helpers';
-import logger from './logger';
+import { getScenarioList, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount } from '../config/storage';
+import { parseDaysParam } from '../utils/helpers';
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+import logger from '../utils/logger';
 
 // Renders a public-facing HTML status page for a single scenario (no auth required).
 export function handlePublicScenarioStatus(req: express.Request, res: express.Response): void {

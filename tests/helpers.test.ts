@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { resolveUrl, interpolateVars, resolveJsonPath } from '../src/helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath } from '../src/utils/helpers';
 
 describe('resolveUrl', () => {
   it('returns absolute URLs unchanged', () => {

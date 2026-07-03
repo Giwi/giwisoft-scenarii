@@ -2,16 +2,16 @@ import { parentPort, workerData } from 'worker_threads';
 import { chromium, Page, BrowserContext, Browser } from 'playwright-core';
 import { lightpanda } from '@lightpanda/browser';
 import { ChildProcess } from 'child_process';
-import { Scenario, ScenarioMetrics, StepMetrics, RunOptions, Step } from './types';
-import { executeStep } from './actions/index';
-import { createScenarioMetrics } from './metrics';
-import { getScenarioSettings } from './settings';
-import { waitForPort } from './helpers';
-import logger from './logger';
+import { Scenario, ScenarioMetrics, StepMetrics, RunOptions, ExecutableStep } from '../types';
+import { executeStep } from '../actions/index';
+import { createScenarioMetrics } from '../metrics/metrics';
+import { getScenarioSettings } from '../config/settings';
+import { waitForPort } from '../utils/helpers';
+import logger from '../utils/logger';
 import {
   DEFAULT_LIGHTPANDA_PORT, DEFAULT_BROWSER_VIEWPORT, DEFAULT_SCENARIO_TIMEOUT,
   PORT_WAIT_TIMEOUT, PROCESS_EXIT_TIMEOUT, LIGHTPANDA_START_RETRIES, MIN_PORT, PORT_RANGE,
-} from './constants';
+} from '../utils/constants';
 
 type WorkerMessage = Record<string, unknown>;
 
@@ -58,8 +58,6 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
   let lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
   let browser: Browser | null = null;
 
-  // IncludeStep are resolved at parse time, never reach the worker
-  type ExecutableStep = Exclude<Step, { include: string }>;
   const execSteps = scenario.steps as ExecutableStep[];
   const hasBrowserActions = execSteps.some((s) => s.action.startsWith('browser.'));
   const scenarioSettings = getScenarioSettings(scenario.name);

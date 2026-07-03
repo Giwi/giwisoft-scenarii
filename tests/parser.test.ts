@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { parseScenario, serializeScenario, resolveIncludes } from '../src/parser';
+import { parseScenario, resolveIncludes } from '../src/config/parser';
 import { Scenario, HttpStep, IncludeStep } from '../src/types';
 
 describe('parseScenario', () => {
@@ -188,64 +188,3 @@ steps:
   });
 });
 
-describe('serializeScenario', () => {
-  it('round-trips a full scenario with all fields', () => {
-    const scenario: Scenario = {
-      name: 'roundtrip',
-      description: 'test',
-      base_url: 'https://example.com',
-      schedule: '*/10 * * * *',
-      tags: ['a', 'b'],
-      timeout: 60000,
-      group: 'api',
-      ignoreHTTPSErrors: true,
-      time_windows: [{ start: '09:00', end: '17:00' }],
-      steps: [
-        {
-          name: 'Get',
-          action: 'http.get',
-          url: '/api',
-          headers: { Authorization: 'Bearer {{token}}' },
-          expect: { status: 200, body_schema: { type: 'object', properties: { id: { type: 'number' } }, required: ['id'] } },
-          variables: { token: '$.data.token' },
-        },
-        { include: 'health', name: 'HealthInc' },
-      ],
-    };
-    const yaml = serializeScenario(scenario);
-    const parsed = parseScenario(yaml);
-    assert.strictEqual(parsed.name, 'roundtrip');
-    assert.strictEqual(parsed.steps.length, 2);
-    assert.strictEqual((parsed.steps[0] as HttpStep).action, 'http.get');
-    assert.strictEqual((parsed.steps[1] as IncludeStep).include, 'health');
-    assert.strictEqual((parsed.steps[1] as IncludeStep).name, 'HealthInc');
-    assert.strictEqual(parsed.group, 'api');
-    assert.strictEqual(parsed.ignoreHTTPSErrors, true);
-    assert.ok(parsed.time_windows);
-    assert.strictEqual(parsed.time_windows![0].start, '09:00');
-    assert.strictEqual(parsed.time_windows![0].end, '17:00');
-  });
-
-  it('handles browser steps with condition', () => {
-    const scenario: Scenario = {
-      name: 'conditional',
-      steps: [
-        {
-          name: 'Login',
-          action: 'http.post',
-          url: '/login',
-          expect: { status: 200 },
-        },
-        {
-          name: 'Dashboard',
-          action: 'http.get',
-          url: '/dashboard',
-          condition: { if_step: 'Login', if_success: true },
-        },
-      ],
-    };
-    const yaml = serializeScenario(scenario);
-    const parsed = parseScenario(yaml);
-    assert.strictEqual((parsed.steps[1] as HttpStep).action, 'http.get');
-  });
-});

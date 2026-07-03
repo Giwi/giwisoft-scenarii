@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
-import { getSettings } from './settings';
-import logger from './logger';
+import { getSettings } from '../config/settings';
+import logger from '../utils/logger';
 
 // In-memory session store for OIDC-authenticated users
 const sessions = new Map<string, { createdAt: number }>();

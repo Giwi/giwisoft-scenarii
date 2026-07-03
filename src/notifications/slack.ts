@@ -1,9 +1,7 @@
-import { SlackConfig } from '../settings';
+import { SlackConfig } from '../config/settings';
 import { ScenarioMetrics } from '../types';
-import logger from '../logger';
-import { fetchWithRetry } from '../retry';
+import { postJson } from '../utils/retry';
 
-// Sends a scenario failure/recovery notification via a Slack webhook.
 export async function sendSlack(
   config: SlackConfig,
   metrics: ScenarioMetrics,
@@ -26,23 +24,12 @@ export async function sendSlack(
     });
   }
 
-  const body = {
+  await postJson(config.webhook_url, {
     attachments: [{
       color,
       title: `Scenario ${statusText}: ${metrics.scenario_name}`,
       fields,
       ts: Math.floor(Date.now() / 1000),
     }],
-  };
-
-  const res = await fetchWithRetry(config.webhook_url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    logger.error({ status: res.status, err }, 'Slack notification failed');
-  }
+  }, 'Slack');
 }

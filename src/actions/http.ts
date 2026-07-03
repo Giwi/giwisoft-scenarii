@@ -1,5 +1,5 @@
 import { HttpStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars, resolveJsonPath } from '../helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath } from '../utils/helpers';
 
 interface FetchResponse {
   status: number;

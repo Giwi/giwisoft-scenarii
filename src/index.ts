@@ -4,14 +4,14 @@ import { Command } from 'commander';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
-import { loadScenarioFile } from './parser';
-import { runScenario, RunOptions } from './runner';
-import { scheduleScenario, stopAll, listScheduled, scheduleReport, watchScenarios } from './scheduler';
-import { initStorage, closeStorage, isStorageReady } from './storage';
-import { loadSettings, watchSettings } from './settings';
-import { createServer, closeLightpanda } from './server';
-import logger from './logger';
-import { DAILY_REPORT_CRON } from './constants';
+import { loadScenarioFile } from './config/parser';
+import { runScenario, RunOptions } from './runner/runner';
+import { scheduleScenario, stopAll, listScheduled, scheduleReport, watchScenarios } from './runner/scheduler';
+import { initStorage, closeStorage, isStorageReady } from './config/storage';
+import { loadSettings, watchSettings } from './config/settings';
+import { createServer, closeLightpanda } from './routes/server';
+import logger from './utils/logger';
+import { DAILY_REPORT_CRON } from './utils/constants';
 
 // Top-level handlers for uncaught errors and promise rejections
 process.on('uncaughtException', (err) => {

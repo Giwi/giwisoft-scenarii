@@ -1,14 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import { fetchWithRetry, RETRY_DELAYS, BROWSER_RETRIES, NOTIFICATION_RETRIES } from '../src/retry';
-
-describe('retry constants', () => {
-  it('has expected delay values', () => {
-    assert.deepStrictEqual(RETRY_DELAYS, [1000, 2000]);
-    assert.strictEqual(BROWSER_RETRIES, 2);
-    assert.strictEqual(NOTIFICATION_RETRIES, 3);
-  });
-});
+import { fetchWithRetry, NOTIFICATION_RETRIES } from '../src/utils/retry';
 
 describe('fetchWithRetry', () => {
   const originalFetch = global.fetch;

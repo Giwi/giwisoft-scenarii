@@ -14,10 +14,7 @@ export const DEFAULT_PAGE_TIMEOUT = 30000;
 export const DEFAULT_SELECTOR_TIMEOUT = 10000;
 // Time to wait for a port to become reachable
 export const PORT_WAIT_TIMEOUT = 5000;
-// Socket connection timeout for port probes
-export const SOCKET_TIMEOUT = 1000;
-// Retry interval for socket connection attempts
-export const SOCKET_RETRY_INTERVAL = 200;
+
 // Grace period for Lightpanda to exit after kill signal
 export const PROCESS_EXIT_TIMEOUT = 3000;
 // Cron expression for daily email report

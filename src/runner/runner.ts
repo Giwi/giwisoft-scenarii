@@ -1,15 +1,15 @@
 import { Worker } from 'worker_threads';
 import path from 'path';
 import fs from 'fs';
-import { Scenario, ScenarioMetrics, RunOptions } from './types';
-import { createScenarioMetrics, consoleReporter, jsonReporter } from './metrics';
-import { storeMetrics, purgeOldData, upsertScenarioTags } from './storage';
-import { notifyIfStateChanged } from './notifications/index';
-import { broadcastScenarioRun, broadcastStepProgress } from './ws';
-import { getScenarioSettings, getSettings } from './settings';
-import { resolveIncludes } from './parser';
-import logger from './logger';
-import { DEFAULT_SCENARIO_TIMEOUT, DEFAULT_PURGE_DAYS } from './constants';
+import { Scenario, ScenarioMetrics, RunOptions } from '../types';
+import { createScenarioMetrics, consoleReporter, jsonReporter } from '../metrics/metrics';
+import { storeMetrics, purgeOldData, upsertScenarioTags } from '../config/storage';
+import { notifyIfStateChanged } from '../notifications/index';
+import { broadcastScenarioRun, broadcastStepProgress } from '../routes/ws';
+import { getScenarioSettings, getSettings } from '../config/settings';
+import { resolveIncludes } from '../config/parser';
+import logger from '../utils/logger';
+import { DEFAULT_SCENARIO_TIMEOUT, DEFAULT_PURGE_DAYS } from '../utils/constants';
 
 export type { RunOptions };
 
@@ -58,7 +58,7 @@ function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): void {
   }
 
   if (options.persist) {
-    notifyIfStateChanged(metrics).catch((err) => {
+    notifyIfStateChanged(metrics).catch((err: unknown) => {
       logger.error({ err }, 'Notification failed');
     });
   }

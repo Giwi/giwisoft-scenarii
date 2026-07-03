@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { createStepMetrics, completeStepMetrics, createScenarioMetrics } from '../src/metrics';
+import { createStepMetrics, completeStepMetrics, createScenarioMetrics } from '../src/metrics/metrics';
 
 describe('createStepMetrics', () => {
   it('creates a default failing step', () => {

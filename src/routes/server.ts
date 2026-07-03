@@ -10,19 +10,19 @@ import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
   getScenarioStepNames, getDistinctTags, getDbScenarioTags,
   isStorageReady, backupDatabase,
-} from './storage';
+} from '../config/storage';
 import { initWebSocket } from './ws';
-import { getSettings } from './settings';
+import { getSettings } from '../config/settings';
 import yaml from 'js-yaml';
-import { loadScenarioFile, parseScenario, serializeScenario } from './parser';
-import { runScenario, cancelScenario } from './runner';
-import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from './scheduler';
+import { loadScenarioFile, parseScenario } from '../config/parser';
+import { runScenario, cancelScenario } from '../runner/runner';
+import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from '../runner/scheduler';
 import { authMiddleware, handleOidcLogin, handleOidcCallback, handleAuthMe, handleLogout } from './auth';
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
-import { metricsAuthMiddleware, handleMetrics } from './metrics-exporter';
-import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort } from './helpers';
-import logger from './logger';
-import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from './constants';
+import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
+import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort } from '../utils/helpers';
+import logger from '../utils/logger';
+import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from '../utils/constants';
 
 // Module-level state shared across request handlers
 let _scenariosDir: string | undefined;
@@ -339,10 +339,42 @@ function handleConfigExport(req: express.Request, res: express.Response): void {
     for (const file of files) {
       const scenario = loadScenarioFile(path.join(_scenariosDir, file));
       if (scenario.name === name) {
-        const yaml = serializeScenario(scenario);
+        const obj: Record<string, unknown> = {
+          name: scenario.name,
+          steps: scenario.steps.map(s => {
+            if ('include' in s) {
+              const step: Record<string, unknown> = { include: s.include };
+              if (s.name) step.name = s.name;
+              return step;
+            }
+            const step: Record<string, unknown> = { name: s.name, action: s.action };
+            if ('url' in s && s.url) step.url = s.url;
+            if ('selector' in s && s.selector) step.selector = s.selector;
+            if ('value' in s && s.value) step.value = s.value;
+            if ('timeout' in s && s.timeout) step.timeout = s.timeout;
+            if ('script' in s && s.script) step.script = s.script;
+            if ('headers' in s && s.headers) step.headers = s.headers;
+            if ('body' in s && s.body) step.body = s.body;
+            if ('expect' in s && s.expect) step.expect = s.expect;
+            if ('variables' in s && s.variables) step.variables = s.variables;
+            if ('condition' in s && s.condition) step.condition = s.condition;
+            return step;
+          }),
+        };
+        if (scenario.description) obj.description = scenario.description;
+        if (scenario.schedule) obj.schedule = scenario.schedule;
+        if (scenario.base_url) obj.base_url = scenario.base_url;
+        if (scenario.timeout) obj.timeout = scenario.timeout;
+        if (scenario.tags) obj.tags = scenario.tags;
+        if (scenario.depends_on) obj.depends_on = scenario.depends_on;
+        if (scenario.headless !== undefined) obj.headless = scenario.headless;
+        if (scenario.ignoreHTTPSErrors !== undefined) obj.ignoreHTTPSErrors = scenario.ignoreHTTPSErrors;
+        if (scenario.group) obj.group = scenario.group;
+        if (scenario.time_windows) obj.time_windows = scenario.time_windows;
+        if (scenario.alert) obj.alert = scenario.alert;
         res.setHeader('Content-Type', 'text/yaml');
         res.setHeader('Content-Disposition', `attachment; filename="${name}.yaml"`);
-        res.send(yaml);
+        res.send(require('js-yaml').dump(obj, { indent: 2, lineWidth: 120, noRefs: true, sortKeys: false }));
         return;
       }
     }

@@ -1,7 +1,11 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
-import { ScenarioMetrics } from './types';
+import { ScenarioMetrics } from '../types';
+
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+}
 
 interface ScenarioInfo {
   name: string;
@@ -11,7 +15,7 @@ interface ScenarioInfo {
   total_runs: number;
   tags?: string[];
 }
-import logger from './logger';
+import logger from '../utils/logger';
 
 // Singleton SQLite database handle
 let db: Database.Database | undefined;
@@ -158,7 +162,7 @@ export function getScenarioHistory(
 ): ScenarioMetrics[] {
   if (!db) throw new Error('Database not initialized');
 
-  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const since = daysAgo(limitDays);
   const queryLimit = limit ?? 50;
   const queryOffset = offset ?? 0;
 
@@ -238,7 +242,7 @@ export function getScenarioHistory(
 // Uses an aggregate query instead of filtering in-memory, so it's accurate even with pagination.
 export function getScenarioPassedRunCount(name: string, limitDays: number = 7): number {
   if (!db) throw new Error('Database not initialized');
-  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const since = daysAgo(limitDays);
   const row = db.prepare(`
     SELECT COUNT(*) AS count FROM scenario_runs
     WHERE scenario_name = ? AND created_at >= ? AND success = 1
@@ -249,7 +253,7 @@ export function getScenarioPassedRunCount(name: string, limitDays: number = 7): 
 // Returns the total number of runs for a scenario within the given lookback window.
 export function getScenarioHistoryCount(name: string, limitDays: number = 7): number {
   if (!db) throw new Error('Database not initialized');
-  const since = new Date(Date.now() - limitDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const since = daysAgo(limitDays);
   const row = db.prepare(`
     SELECT COUNT(*) AS count FROM scenario_runs
     WHERE scenario_name = ? AND created_at >= ?
@@ -300,7 +304,7 @@ export function getPreviousRunSuccess(scenarioName: string): boolean | null {
 // Deletes runs older than the specified number of days. Returns the count of deleted rows.
 export function purgeOldData(days: number = 7): number {
   if (!db) throw new Error('Database not initialized');
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+  const since = daysAgo(days);
   const result = db.prepare(`DELETE FROM scenario_runs WHERE created_at < ?`).run(since);
   return result.changes;
 }
@@ -342,19 +346,13 @@ export function getLastRunSuccess(scenarioName: string): boolean | null {
 // Copies the database file to the backup directory with a timestamp in the filename.
 export function backupDatabase(directory: string): string {
   if (!db) throw new Error('Database not initialized');
-  const src = getDbPath();
+  const src = db.name;
   fs.mkdirSync(directory, { recursive: true });
   db.pragma('wal_checkpoint(TRUNCATE)');
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dest = path.join(directory, `scenarii-${timestamp}.db`);
   fs.copyFileSync(src, dest);
   return dest;
-}
-
-function getDbPath(): string {
-  if (!db) return '';
-  const name = db.name;
-  return name;
 }
 
 // Closes the database connection gracefully.

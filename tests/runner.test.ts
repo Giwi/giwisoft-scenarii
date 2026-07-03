@@ -35,7 +35,7 @@ mock.module('worker_threads', {
 });
 
 // ── Imports (after mock) ─────────────────────────────────────────────────
-import { runScenario, cancelScenario } from '../src/runner';
+import { runScenario, cancelScenario } from '../src/runner/runner';
 import type { Scenario, ScenarioMetrics, RunOptions } from '../src/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ describe('runScenario', () => {
 // ── Worker module tests ──────────────────────────────────────────────────
 describe('worker module', () => {
   it('exports a Worker script that can be required', () => {
-    const workerPath = require.resolve('../src/worker');
+    const workerPath = require.resolve('../src/runner/worker');
     assert.ok(workerPath);
     assert.match(workerPath, /worker\.(ts|js)$/);
   });
