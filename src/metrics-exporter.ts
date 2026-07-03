@@ -1,7 +1,8 @@
 // Prometheus-format metrics exporter for scenario run data and notification delivery stats.
 
 import express from 'express';
-import { getScenarioList, getScenarioHistory, getNotificationMetrics } from './storage';
+import { getNotificationMetrics } from './counters';
+import { getScenarioList, getScenarioHistory } from './storage';
 import { escapePrometheusLabel } from './helpers';
 import { getSettings } from './settings';
 import { DEFAULT_HISTORY_DAYS } from './constants';

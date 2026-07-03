@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
 import * as settingsModule from '../../src/settings';
+import * as countersModule from '../../src/counters';
 import * as storageModule from '../../src/storage';
 import * as telegramModule from '../../src/notifications/telegram';
 import { ScenarioMetrics } from '../../src/types';
@@ -19,7 +20,7 @@ const failMetrics: ScenarioMetrics = { ...metrics, success: false };
 describe('notifyIfStateChanged', () => {
   beforeEach(() => {
     mock.method(telegramModule, 'sendTelegram', () => Promise.resolve());
-    mock.method(storageModule, 'recordNotificationDelivery', () => {});
+    mock.method(countersModule, 'recordNotificationDelivery', () => {});
   });
 
   afterEach(() => {
@@ -56,7 +57,7 @@ describe('notifyIfStateChanged', () => {
       notifications: { telegram: { enabled: true, bot_token: 't', chat_id: 'c' } },
     }));
     mock.method(storageModule, 'getPreviousRunSuccess', () => true);
-    mock.method(storageModule, 'recordNotificationDelivery', () => { recorded = true; });
+    mock.method(countersModule, 'recordNotificationDelivery', () => { recorded = true; });
     const { notifyIfStateChanged } = await import('../../src/notifications/index');
     await notifyIfStateChanged(failMetrics);
     assert.strictEqual(recorded, true);
@@ -68,7 +69,7 @@ describe('notifyIfStateChanged', () => {
       notifications: { telegram: { enabled: true, bot_token: 't', chat_id: 'c' } },
     }));
     mock.method(storageModule, 'getPreviousRunSuccess', () => false);
-    mock.method(storageModule, 'recordNotificationDelivery', () => { recorded = true; });
+    mock.method(countersModule, 'recordNotificationDelivery', () => { recorded = true; });
     const { notifyIfStateChanged } = await import('../../src/notifications/index');
     await notifyIfStateChanged(metrics);
     assert.strictEqual(recorded, true);

@@ -305,19 +305,6 @@ export function purgeOldData(days: number = 7): number {
   return result.changes;
 }
 
-// In-memory counters for notification delivery tracking
-let notificationSuccessCount = 0;
-let notificationFailureCount = 0;
-
-export function recordNotificationDelivery(success: boolean): void {
-  if (success) notificationSuccessCount++;
-  else notificationFailureCount++;
-}
-
-export function getNotificationMetrics(): { success: number; failure: number } {
-  return { success: notificationSuccessCount, failure: notificationFailureCount };
-}
-
 // Returns tags for a specific scenario from the scenario_tags table.
 export function getDbScenarioTags(name: string): string[] | undefined {
   if (!db) return undefined;

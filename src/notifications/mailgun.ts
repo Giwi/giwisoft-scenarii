@@ -1,7 +1,7 @@
 import { EmailConfig } from '../settings';
 import { ScenarioMetrics } from '../types';
 import logger from '../logger';
-import { sendMailgunEmail } from '../email';
+import { sendMailgunEmail } from './email-client';
 
 // Sends a scenario failure/recovery notification via the Mailgun email API.
 export async function sendEmail(

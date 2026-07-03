@@ -1,17 +1,16 @@
 import { parentPort, workerData } from 'worker_threads';
 import { chromium, Page, BrowserContext, Browser } from 'playwright-core';
 import { lightpanda } from '@lightpanda/browser';
-import net from 'net';
 import { ChildProcess } from 'child_process';
 import { Scenario, ScenarioMetrics, StepMetrics, RunOptions, Step } from './types';
 import { executeStep } from './actions/index';
 import { createScenarioMetrics } from './metrics';
 import { getScenarioSettings } from './settings';
+import { waitForPort } from './helpers';
 import logger from './logger';
 import {
   DEFAULT_LIGHTPANDA_PORT, DEFAULT_BROWSER_VIEWPORT, DEFAULT_SCENARIO_TIMEOUT,
-  PORT_WAIT_TIMEOUT, SOCKET_TIMEOUT, SOCKET_RETRY_INTERVAL,
-  PROCESS_EXIT_TIMEOUT, LIGHTPANDA_START_RETRIES, MIN_PORT, PORT_RANGE,
+  PORT_WAIT_TIMEOUT, PROCESS_EXIT_TIMEOUT, LIGHTPANDA_START_RETRIES, MIN_PORT, PORT_RANGE,
 } from './constants';
 
 type WorkerMessage = Record<string, unknown>;
@@ -24,26 +23,6 @@ function send(msg: WorkerMessage): void {
 // Returns a random port within the configured range to avoid collisions.
 function getRandomPort(): number {
   return MIN_PORT + Math.floor(Math.random() * PORT_RANGE);
-}
-
-// Polls a TCP port until it is reachable or the timeout expires.
-function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
-    function tryConnect() {
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`Timeout waiting for ${host}:${port}`));
-        return;
-      }
-      const sock = new net.Socket();
-      sock.setTimeout(SOCKET_TIMEOUT);
-      sock.once('connect', () => { sock.destroy(); resolve(); });
-      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
-      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
-      sock.connect(port, host);
-    }
-    tryConnect();
-  });
 }
 
 // Starts a local Lightpanda process on the given port, retrying on EADDRINUSE.

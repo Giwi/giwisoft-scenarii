@@ -1,8 +1,29 @@
 // Utility functions shared across the server: URL resolution, variable interpolation,
-// JSON path resolution, and various output-formatting helpers (CSV, Prometheus, HTML).
+// JSON path resolution, port polling, and various output-formatting helpers (CSV, Prometheus, HTML).
 
+import net from 'net';
 import { ScenarioMetrics } from './types';
-import { DEFAULT_HISTORY_DAYS, MIN_DAYS, MAX_DAYS } from './constants';
+import { DEFAULT_HISTORY_DAYS, MIN_DAYS, MAX_DAYS, SOCKET_TIMEOUT, SOCKET_RETRY_INTERVAL } from './constants';
+
+// Polls a TCP port until it becomes reachable or the timeout is exceeded.
+export function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    function tryConnect() {
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error(`Timeout waiting for ${host}:${port}`));
+        return;
+      }
+      const sock = new net.Socket();
+      sock.setTimeout(SOCKET_TIMEOUT);
+      sock.once('connect', () => { sock.destroy(); resolve(); });
+      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
+      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, SOCKET_RETRY_INTERVAL); });
+      sock.connect(port, host);
+    }
+    tryConnect();
+  });
+}
 
 // Resolves a URL against an optional base URL. Absolute URLs pass through unchanged.
 export function resolveUrl(base_url: string | undefined, url: string): string {

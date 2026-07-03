@@ -6,7 +6,6 @@ import fs from 'fs';
 import http from 'http';
 import { ChildProcess } from 'child_process';
 import { lightpanda } from '@lightpanda/browser';
-import net from 'net';
 import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
   getScenarioStepNames, getDistinctTags, getDbScenarioTags,
@@ -21,9 +20,9 @@ import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } f
 import { authMiddleware, handleOidcLogin, handleOidcCallback, handleAuthMe, handleLogout } from './auth';
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
 import { metricsAuthMiddleware, handleMetrics } from './metrics-exporter';
-import { escapeCsv, toCsv, parseDaysParam, parseLimitParam } from './helpers';
+import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort } from './helpers';
 import logger from './logger';
-import { DEFAULT_LIMIT } from './constants';
+import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from './constants';
 
 // Module-level state shared across request handlers
 let _scenariosDir: string | undefined;
@@ -36,27 +35,6 @@ let _lightpandaProc: (ChildProcess & { wsEndpoint?: string }) | null = null;
 let _lightpandaPort: number | null = null;
 
 const LIGHTPANDA_PORT = 9222;
-const PORT_WAIT_TIMEOUT = 10000;
-
-// Polls a TCP port until it becomes reachable or the timeout is exceeded.
-function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
-    function tryConnect() {
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`Timeout waiting for ${host}:${port}`));
-        return;
-      }
-      const sock = new net.Socket();
-      sock.setTimeout(2000);
-      sock.once('connect', () => { sock.destroy(); resolve(); });
-      sock.once('error', () => { sock.destroy(); setTimeout(tryConnect, 200); });
-      sock.once('timeout', () => { sock.destroy(); setTimeout(tryConnect, 200); });
-      sock.connect(port, host);
-    }
-    tryConnect();
-  });
-}
 
 // Returns the WebSocket URL of the globally shared Lightpanda instance, if available.
 export function getLightpandaUrl(): string | undefined {

@@ -1,6 +1,5 @@
-import { fetchWithRetry, NOTIFICATION_RETRIES } from './retry';
+import { fetchWithRetry, NOTIFICATION_RETRIES } from '../retry';
 
-// Sends an email via the Mailgun API, one recipient at a time.
 export async function sendMailgunEmail(
   apiKey: string,
   domain: string,

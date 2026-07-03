@@ -1,6 +1,7 @@
 import { getSettings } from '../settings';
 import { ScenarioMetrics } from '../types';
-import { getPreviousRunSuccess, recordNotificationDelivery } from '../storage';
+import { recordNotificationDelivery } from '../counters';
+import { getPreviousRunSuccess } from '../storage';
 import { sendTelegram } from './telegram';
 import { sendEmail } from './mailgun';
 import { sendSlack } from './slack';
