@@ -333,7 +333,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
                 fill: true,
                 tension: 0.3,
                 borderWidth: 1.5,
-                pointRadius: 2,
+                pointRadius: 1,
               },
             ],
           },
@@ -373,7 +373,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
                 fill: true,
                 tension: 0.3,
                 borderWidth: 1.5,
-                pointRadius: 2,
+                pointRadius: 1,
               },
             ],
           },
@@ -420,7 +420,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
             fill: true,
             tension: 0.3,
             borderWidth: 1.5,
-            pointRadius: 1.5,
+            pointRadius: 1,
           };
         });
 
