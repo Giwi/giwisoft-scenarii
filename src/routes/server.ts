@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import http from 'http';
+import crypto from 'crypto';
 import { ChildProcess } from 'child_process';
 import { lightpanda } from '@lightpanda/browser';
 import {
@@ -536,6 +537,13 @@ export function createApp(): express.Application {
   const app = express();
 
   app.use(cors());
+
+  // Per-request CSP nonce for the public status page's inline scripts
+  app.use((req, res, next) => {
+    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+    next();
+  });
+
   app.use(helmet({
     hsts: false,
     contentSecurityPolicy: {
@@ -547,7 +555,7 @@ export function createApp(): express.Application {
         frameAncestors: ["'self'"],
         imgSrc: ["'self'", 'data:'],
         objectSrc: ["'none'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", (req, res) => `'nonce-${(res as express.Response).locals.cspNonce}'`],
         scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
         upgradeInsecureRequests: null,

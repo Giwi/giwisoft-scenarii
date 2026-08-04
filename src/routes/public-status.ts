@@ -38,6 +38,7 @@ export function handlePublicScenarioStatus(req: express.Request, res: express.Re
       lastSuccess: scenario.last_success,
       sla, days, total, passed,
       tagHtml, labelsJson, durationsJson, successJson, hasData,
+      nonce: res.locals.cspNonce || '',
     }));
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to render scenario public status page');
@@ -90,6 +91,7 @@ interface PublicStatusData {
   durationsJson: string;
   successJson: string;
   hasData: boolean;
+  nonce: string;
 }
 
 // Renders the full HTML page for the public scenario status endpoint.
@@ -148,7 +150,7 @@ function publicStatusTemplate(d: PublicStatusData): string {
     <div class="chart-box"><h3>Response Time Trend</h3><canvas id="durationChart"></canvas></div>
     <div class="chart-box"><h3>Success Rate Over Time</h3><canvas id="successChart"></canvas></div>
   </div>
-  <script>
+  <script nonce="${d.nonce}">
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const gridColor = isDark ? '#4a5568' : '#d0d7de';
     const textColor = isDark ? '#8b949e' : '#656d76';
@@ -201,7 +203,7 @@ function publicStatusTemplate(d: PublicStatusData): string {
   </script>` : '<div class="no-data">No runs yet</div>'}
 </div>
 <div class="footer">Scenarii — <a href="https://giwi.fr" style="color:#58a6ff">GiwiSoft</a></div>
-<script>setTimeout(function(){ location.reload(); }, 30000);</script>
+<script nonce="${d.nonce}">setTimeout(function(){ location.reload(); }, 30000);</script>
 </body>
 </html>`;
 }
