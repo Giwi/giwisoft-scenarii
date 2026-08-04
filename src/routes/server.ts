@@ -595,6 +595,13 @@ export function createApp(): express.Application {
   // Serve Angular frontend in production (only if built)
   const frontendDir = path.join(__dirname, '../../frontend/dist/frontend/browser');
   const frontendBuilt = fs.existsSync(path.join(frontendDir, 'index.html'));
+
+  // Self-hosted Chart.js for the public status page (same-origin, CSP-safe). Falls back to the repo copy when the frontend isn't built (dev).
+  app.get('/chart.umd.min.js', (_req, res) => {
+    const file = path.join(frontendDir, 'chart.umd.min.js');
+    res.sendFile(fs.existsSync(file) ? file : path.join(__dirname, '../../frontend/public/chart.umd.min.js'));
+  });
+
   if (frontendBuilt) {
     app.use(express.static(frontendDir));
     app.use((req, res, next) => {

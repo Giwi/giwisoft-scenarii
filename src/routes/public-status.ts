@@ -101,7 +101,7 @@ function publicStatusTemplate(d: PublicStatusData): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(d.name)} — Scenarii Status</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0e14; color: #e6edf3; display: flex; flex-direction: column; min-height: 100vh; }
