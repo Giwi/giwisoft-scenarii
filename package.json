@@ -23,7 +23,7 @@
     "package": "npm run build && sh build-container.sh"
   },
   "dependencies": {
-    "@lightpanda/browser": "^1.2.0",
+    "@lightpanda/browser": "^1.6.0",
     "better-sqlite3": "^13.0.3",
     "commander": "^15.0.0",
     "cors": "^2.8.6",
