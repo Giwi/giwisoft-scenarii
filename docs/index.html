@@ -256,6 +256,7 @@
     <a href="#what">Intro</a>
     <a href="#quickstart">Quickstart</a>
     <a href="#dashboard">Dashboard</a>
+    <a href="#auth">Auth</a>
     <a href="#scenarios">Scenarios</a>
     <a href="#actions">Actions</a>
     <a href="#notifications">Alerts</a>
@@ -306,7 +307,7 @@
   <div class="container">
     <h2>All features</h2>
     <div class="grid">
-      <div class="card"><i class="bi bi-box card-icon"></i><h3>CLI &amp; API</h3><p>Commands: <code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>config</code>. Full REST API with 20+ endpoints.</p></div>
+      <div class="card"><i class="bi bi-box card-icon"></i><h3>CLI &amp; API</h3><p>Commands: <code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>user</code>, <code>config</code>. Full REST API with 30+ endpoints.</p></div>
       <div class="card"><i class="bi bi-lock card-icon"></i><h3>Authentication</h3><p>Every page is private by default: local users with admin/user roles, or OIDC with roles inherited from provider groups. HTTP-only session cookies. API key auth for Prometheus metrics endpoint. </p></div>
       <div class="card"><i class="bi bi-bell card-icon"></i><h3>Notifications</h3><p>Telegram, Slack, Discord, email (Mailgun), generic webhook. State transition triggers with retry and exponential backoff.</p></div>
       <div class="card"><i class="bi bi-bar-chart card-icon"></i><h3>Prometheus metrics</h3><p>Native Prometheus/OpenMetrics export: run count, duration, success rate, step-level metrics, notification delivery stats.</p></div>
@@ -338,7 +339,7 @@ node dist/index.js server
 
 # Or run a scenario once
 node dist/index.js --once scenarios/example.yml</code></pre>
-    <p>Open <a href="http://localhost:3000">http://localhost:3000</a> for the dashboard.</p>
+    <p>Open <a href="http://localhost:3000">http://localhost:3000</a> for the dashboard. Authentication is on by default: the first start prints a generated password for the <code>admin</code> user in the logs, and <code>http://localhost:3000/login</code> shows the landing page with the login form.</p>
 
     <h3>Docker</h3>
     <pre><code>docker pull ghcr.io/giwi/giwisoft-scenarii:latest
@@ -372,9 +373,62 @@ docker run -d \
       <div class="card"><i class="bi bi-graph-up-arrow card-icon"></i><h3>Scenario detail</h3><p>Response time trend chart, success rate chart, SLA gauge, step breakdown, paginated run history, JSON/CSV export.</p></div>
       <div class="card"><i class="bi bi-clock-history card-icon"></i><h3>Live ticker</h3><p>Inline step progress in the toolbar - see exactly which step is executing and its response time in real time.</p></div>
       <div class="card"><i class="bi bi-globe card-icon"></i><h3>Public status</h3><p>Shareable per-scenario pages at <code style="font-size:.8rem;">/public/status/:name</code> with stat cards and charts - no auth required.</p></div>
+      <div class="card"><i class="bi bi-box-arrow-in-right card-icon"></i><h3>Landing &amp; login</h3><p>Product landing page at <code style="font-size:.8rem;">/login</code> with the login form, then a Sign out button and the username in the navbar.</p></div>
+      <div class="card"><i class="bi bi-people card-icon"></i><h3>User management</h3><p>Admins get a <code style="font-size:.8rem;">/users</code> page (navbar link) to add users, promote or demote them, reset passwords, and delete accounts.</p></div>
       <div class="card"><i class="bi bi-crosshair card-icon"></i><h3>SLA tracking</h3><p>7-day SLA gauge per scenario with configurable window. Track pass/fail ratios over time.</p></div>
       <div class="card"><i class="bi bi-arrow-repeat card-icon"></i><h3>Real-time</h3><p>WebSocket push for run completions and step progress. Manual refresh on list and detail pages.</p></div>
     </div>
+  </div>
+</section>
+
+<!-- Authentication -->
+<section id="auth">
+  <div class="container">
+    <h2>Authentication</h2>
+    <p class="intro-text">Authentication is <strong>on by default</strong>. Every page is private except the public status pages, and every API route needs a session cookie except the health, status, metrics, and auth endpoints. Set <code>auth.enabled: false</code> to turn it off entirely.</p>
+
+    <h3>Local users</h3>
+    <p>On first start a default user is created with the <code>admin</code> role and a generated password printed once in the logs:</p>
+    <pre><code>Created default user "admin" with generated password</code></pre>
+    <p>Users have one of two roles: <code>admin</code> manages users, <code>user</code> browses scenarios. Only an admin can add a user, from the <code>/users</code> page, the CLI, or the API.</p>
+
+    <pre><code><span style="color:#6c7086;"># List users with their role</span>
+node dist/index.js user list
+
+<span style="color:#6c7086;"># Add a user (password generated and printed, role defaults to "user")</span>
+node dist/index.js user add bob
+node dist/index.js user add carol my-password admin
+
+<span style="color:#6c7086;"># Reset a password, change a role, delete a user</span>
+node dist/index.js user passwd bob
+node dist/index.js user role bob admin
+node dist/index.js user del bob</code></pre>
+
+    <table>
+      <tr><th>Role</th><th>Can do</th></tr>
+      <tr><td><code>admin</code></td><td>Everything a <code>user</code> can, plus add, promote, demote, and delete users.</td></tr>
+      <tr><td><code>user</code></td><td>Browse scenarios, view history and charts, trigger and pause runs.</td></tr>
+    </table>
+
+    <p>An admin can neither delete their own account nor change their own role, so the last admin cannot be locked out of user management.</p>
+
+    <h3>OIDC</h3>
+    <p>Add an <code>oidc:</code> block and the provider takes over login. Roles are then <strong>inherited from the provider groups</strong> instead of being stored by hand:</p>
+    <pre><code>auth:
+  oidc:
+    issuer_url: "https://accounts.google.com"
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR_CLIENT_SECRET"
+    redirect_uri: "http://localhost:3000/api/auth/callback"
+    username_claim: "preferred_username"   <span style="color:#6c7086;"># claim used as the local username</span>
+    groups_claim: "groups"                 <span style="color:#6c7086;"># claim holding the group memberships</span>
+    admin_group: "scenarii-admins"         <span style="color:#6c7086;"># group granting the admin role</span></code></pre>
+    <ul>
+      <li><code>username_claim</code>: claim used as the local username. Unset, it falls back to <code>preferred_username</code>, then <code>email</code>, then <code>sub</code>.</li>
+      <li><code>groups_claim</code>: claim read as a group list. Arrays, plain strings, and space or comma separated strings are accepted; <code>groups</code> and <code>roles</code> are used as fallbacks.</li>
+      <li><code>admin_group</code>: membership grants the <code>admin</code> role, everyone else gets <code>user</code>. Without it, every OIDC user is a plain user.</li>
+    </ul>
+    <p>The role is re-derived on every login, so adding or removing someone from the group applies on their next sign-in.</p>
   </div>
 </section>
 
@@ -779,6 +833,10 @@ node dist/index.js trigger scenarios/example.yml
 <span style="color:#a6e3a1;"># Show scheduled scenarios and storage status</span>
 node dist/index.js status
 
+<span style="color:#a6e3a1;"># Manage dashboard users</span>
+node dist/index.js user list
+node dist/index.js user add bob <span style="color:#6c7086;"># password generated and printed</span>
+
 <span style="color:#a6e3a1;"># Generate a settings.yaml template</span>
 node dist/index.js config --init</code></pre>
 
@@ -788,6 +846,7 @@ node dist/index.js config --init</code></pre>
       <tr><td><code>validate &lt;file&gt;</code></td><td>Parse a YAML file and validate its structure without executing it.</td></tr>
       <tr><td><code>trigger &lt;file&gt;</code></td><td>Run a scenario file immediately (single run, no scheduling).</td></tr>
       <tr><td><code>status</code></td><td>List all scheduled scenarios and show database connectivity.</td></tr>
+      <tr><td><code>user &lt;action&gt;</code></td><td>Manage dashboard users: <code>list</code>, <code>add</code>, <code>passwd</code>, <code>role</code>, <code>del</code>. See <a href="#auth">Authentication</a>.</td></tr>
       <tr><td><code>config --init</code></td><td>Generate a boilerplate <code>settings.yaml</code> with all notification channels commented out.</td></tr>
     </table>
 

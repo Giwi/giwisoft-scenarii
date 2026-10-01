@@ -1,0 +1,271 @@
+<div class="container py-4 docs">
+  <div class="row g-4">
+    <!-- Sidebar -->
+    <aside class="col-lg-3">
+      <div class="docs-toc">
+        <h2 class="h6 text-uppercase small fw-semibold text-secondary">Scenario reference</h2>
+        <nav class="nav flex-column">
+          <a
+            *ngFor="let s of sections"
+            class="nav-link py-1 px-2"
+            href="javascript:void(0)"
+            (click)="scrollTo(s.id)"
+            >{{ s.label }}</a
+          >
+        </nav>
+        <hr />
+        <a
+          class="btn btn-sm btn-outline-secondary w-100"
+          href="https://github.com/Giwi/giwisoft-scenarii"
+          target="_blank"
+          rel="noopener"
+        >
+          <i class="bi bi-github me-1"></i>Repository
+        </a>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <div class="col-lg-9">
+      <h1 class="h3 mb-2"><i class="bi bi-journal-text me-2"></i>Creating scenarios</h1>
+      <p class="text-secondary mb-4">
+        A scenario is one YAML file dropped in the scenarios directory. The directory is rescanned
+        every 5 seconds, so a new file starts running without a restart. Validate a file before
+        relying on it with <code>node dist/index.js validate &lt;file&gt;</code>.
+      </p>
+
+      <!-- The file -->
+      <section id="file" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">The file</h2>
+        <p class="small text-secondary">
+          Only <code>name</code> and <code>steps</code> are required. Everything else is optional:
+          a scenario without a <code>schedule</code> runs on demand only.
+        </p>
+        <pre><code><span class="key">name</span>: <span class="str">API health check</span>
+<span class="key">description</span>: Verify the API answers every 5 minutes
+<span class="key">schedule</span>: <span class="str">"*/5 * * * *"</span>
+<span class="key">base_url</span>: https://jsonplaceholder.typicode.com
+
+<span class="key">steps</span>:
+  - name: Get post 1
+    action: http.get
+    url: /posts/1
+    expect:
+      status: 200
+      json_path: $.id
+      json_value: 1
+      response_time_under: 2000</code></pre>
+      </section>
+
+      <!-- Header fields -->
+      <section id="header" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Header fields</h2>
+        <table class="table table-sm docs-table">
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let f of headerFields">
+              <td><code>{{ f.name }}</code></td>
+              <td><code class="type">{{ f.type }}</code></td>
+              <td class="text-secondary">{{ f.desc }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Steps -->
+      <section id="steps" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Steps</h2>
+        <p class="small text-secondary">
+          Steps run in order, each one recording its own duration, status, and pass/fail result in
+          the run history. The first failed expectation fails the step; the run fails unless you
+          carry on.
+        </p>
+        <table class="table table-sm docs-table">
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let f of stepFields">
+              <td><code>{{ f.name }}</code></td>
+              <td><code class="type">{{ f.type }}</code></td>
+              <td class="text-secondary">{{ f.desc }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- HTTP actions -->
+      <section id="http" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">HTTP actions</h2>
+        <p class="small text-secondary">
+          Plain HTTP through native fetch, no browser involved. HTTP steps never need the
+          headless browser, so they stay fast.
+        </p>
+        <div class="mb-3">
+          <span class="chip" *ngFor="let a of httpActions">{{ a.action }}</span>
+        </div>
+        <pre><code>- name: Create a post
+  action: http.post
+  url: /posts
+  headers:
+    Content-Type: application/json
+  body:
+    title: foo
+    body: bar
+    userId: 1
+  expect:
+    status: 201</code></pre>
+      </section>
+
+      <!-- Browser actions -->
+      <section id="browser" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Browser actions</h2>
+        <p class="small text-secondary">
+          A headless browser is started automatically as soon as a scenario contains at least one
+          browser step. Steps share one page, so a navigation followed by a click behaves like a
+          session.
+        </p>
+        <div class="mb-3">
+          <span class="chip" *ngFor="let a of browserActions">{{ a.action }}</span>
+        </div>
+        <pre><code>- name: Open the page
+  action: browser.navigate
+  url: /
+
+- name: Wait for the list
+  action: browser.wait_for
+  selector: app-news-article
+  timeout: 5000
+
+- name: Filter by region
+  action: browser.evaluate
+  script: |
+    const select = document.querySelector('select');
+    select.value = 'Bretagne';
+    select.dispatchEvent(new Event('change'));
+
+- name: Search
+  action: browser.fill
+  selector: "#query"
+  value: "Brest"</code></pre>
+      </section>
+
+      <!-- Expectations -->
+      <section id="expect" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Expectations</h2>
+        <h3 class="h6">HTTP steps</h3>
+        <table class="table table-sm docs-table">
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let f of httpExpects">
+              <td><code>{{ f.name }}</code></td>
+              <td><code class="type">{{ f.type }}</code></td>
+              <td class="text-secondary">{{ f.desc }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3 class="h6">Browser steps</h3>
+        <table class="table table-sm docs-table">
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let f of browserExpects">
+              <td><code>{{ f.name }}</code></td>
+              <td><code class="type">{{ f.type }}</code></td>
+              <td class="text-secondary">{{ f.desc }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="small text-secondary">
+          Several expectations can sit in the same <code>expect</code> block: all of them are
+          checked, and the step passes only when all pass.
+        </p>
+      </section>
+
+      <!-- Variables -->
+      <section id="variables" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Variables</h2>
+        <p class="small text-secondary">
+          A step extracts values from its response with <code>variables</code>, and later steps
+          reuse them with <code>{{ mustaches }}</code>. The key is the name you choose, the value is
+          the JSON path to read.
+        </p>
+        <pre><code>- name: Get the post
+  action: http.get
+  url: /posts/1
+  variables:
+    postId: $.id
+
+- name: Get that post again
+  action: http.get
+  url: /posts/{{ mustaches }}
+  expect:
+    status: 200</code></pre>
+        <p class="small text-secondary mb-0">
+          Variables are interpolated into urls, headers, body values, selector values, and expected
+          text.
+        </p>
+      </section>
+
+      <!-- Include -->
+      <section id="include" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Sharing steps</h2>
+        <p class="small text-secondary">
+          An <code>include</code> step inlines the steps of another scenario file, matched on its
+          <code>name</code> or its filename. An optional <code>name</code> prefixes every included
+          step name, which keeps the history readable when the same block is reused twice.
+        </p>
+        <pre><code>steps:
+  - include: login
+  - include: checkout
+    name: checkout
+
+  - name: Place the order
+    action: browser.click
+    selector: "#submit"</code></pre>
+        <p class="small text-secondary mb-0">
+          Circular includes are rejected when the file is parsed.
+        </p>
+      </section>
+
+      <!-- Conditions -->
+      <section id="conditions" class="mb-5">
+        <h2 class="h4 border-bottom pb-2">Conditions</h2>
+        <p class="small text-secondary">
+          A <code>condition</code> skips a step unless a previous step behaved as expected, which
+          lets a scenario branch instead of failing.
+        </p>
+        <pre><code>steps:
+  - name: Open the page
+    action: browser.navigate
+    url: /
+
+  - name: Accept the cookie banner
+    action: browser.click
+    selector: "#cookie-accept"
+    condition:
+      if_step: Open the page
+      if_success: true</code></pre>
+        <p class="small text-secondary mb-0">
+          The skipped step records no result, so a condition never turns a passing scenario into a
+          failing one.
+        </p>
+      </section>
+
+      <footer
+        class="text-secondary small pt-3 border-top"
+        style="border-color: var(--border) !important"
+      >
+        <i class="bi bi-github me-1"></i>
+        <a href="https://github.com/Giwi/giwisoft-scenarii" target="_blank" rel="noopener"
+          >Giwi/giwisoft-scenarii</a
+        >
+      </footer>
+    </div>
+  </div>
+</div>

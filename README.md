@@ -186,6 +186,7 @@ The dashboard provides:
 - **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** - toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** - toggle in the navbar, preference saved to localStorage
+- **In-app documentation** - `/docs` (navbar link): quickstart, scenario syntax, actions and expectations, authentication and roles, user management, alerts, CLI, and the full API list
 - **Dashboard auth** - on by default, local username/password login with an optional OIDC provider; every page is private except the public status pages
 - **Manual refresh** - refresh button on both list and detail pages
 - **Public status** - per-scenario pages at `/public/status/:name` with stat cards and response time / success rate charts; no auth required
