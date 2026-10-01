@@ -652,9 +652,14 @@ export function createApp(): express.Application {
 
   if (frontendBuilt) {
     app.use(express.static(frontendDir));
+    // index.html embeds an inline script (Angular critical-CSS loader). CSP blocks any inline
+    // script without a nonce, so stamp the per-request nonce onto every inline <script> tag
+    // before serving. External scripts stay covered by 'self'.
+    const spaIndex = fs.readFileSync(path.join(frontendDir, 'index.html'), 'utf-8');
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api/')) {
-        res.sendFile(path.join(frontendDir, 'index.html'));
+        res.type('html');
+        res.send(spaIndex.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)/g, `<script nonce="${res.locals.cspNonce as string}"`));
       } else {
         next();
       }
