@@ -41,6 +41,9 @@ function shutdown(server?: http.Server): void {
 
 const program = new Command();
 
+// Version reported by --version, read from package.json so it always tracks the release tag.
+const VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8')).version as string;
+
 // Keep each subcommand's own options (e.g. `server --db`) instead of letting the root
 // program swallow duplicate flags such as --db.
 program.enablePositionalOptions();
@@ -48,7 +51,7 @@ program.enablePositionalOptions();
 program
   .name('scenarii')
   .description('Execute periodic YAML-defined scenarios to test web applications')
-  .version('1.0.0');
+  .version(VERSION);
 
 // Default command: load scenario files and run or schedule them.
 program

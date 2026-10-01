@@ -1,6 +1,6 @@
 {
   "name": "scenarii",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Execute periodic YAML-defined scenarios to test web applications",
   "main": "dist/index.js",
   "bin": {
