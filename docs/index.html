@@ -265,7 +265,6 @@
     <a href="#cli">CLI</a>
     <a href="#api">API</a>
     <a href="#features">Features</a>
-    <a href="#stack">Stack</a>
   </div>
 </nav>
 
@@ -317,6 +316,7 @@
       <div class="card"><i class="bi bi-pause-fill card-icon"></i><h3>Pause / Resume</h3><p>Toggle individual schedules on and off from the dashboard without deleting YAML files.</p></div>
       <div class="card"><i class="bi bi-wrench card-icon"></i><h3>HTTP expectations</h3><p>Check status, status_in, body_contains, body_matches, headers, JSON path, JSON value, and response_time_under.</p></div>
       <div class="card"><i class="bi bi-display card-icon"></i><h3>Browser actions</h3><p>Navigate, click, fill, type, select, check, uncheck, evaluate JS, scroll, wait for elements, screenshot, screenshot comparison against baseline.</p></div>
+      <div class="card"><i class="bi bi-pencil-square card-icon"></i><h3>Scenario editor</h3><p>Create and edit scenarios in the browser with YAML syntax highlighting. New opens a blank editor, Import uploads a <code>.yml</code>/<code>.yaml</code> file and stores it with the others.</p></div>
       <div class="card"><i class="bi bi-journal-code card-icon"></i><h3>All HTTP methods</h3><p>GET, POST, PUT, PATCH, DELETE - all standard methods. Custom headers, JSON body, form data. Native fetch, no Playwright needed.</p></div>
       <div class="card"><i class="bi bi-check-square-fill card-icon"></i><h3>Testing</h3><p>Node built-in test runner. Tests cover execution queue, notification state machine, URL resolution, variable interpolation, YAML parsing, and more.</p></div>
     </div>
@@ -866,6 +866,8 @@ node dist/index.js config --init</code></pre>
     <h2>API reference</h2>
     <pre><code style="color:#a6e3a1;"><span style="color:#6c7086;"># Scenarios</span>
 GET    /api/scenarios                   <span style="color:#6c7086;">?tag=critical</span>
+POST   /api/scenarios/import            <span style="color:#6c7086;">{ "yaml": "..." }</span>
+GET    /api/scenarios/export            <span style="color:#6c7086;">YAML bundle</span>
 GET    /api/scenarios/:name             <span style="color:#6c7086;">?limit=&offset=&days=</span>
 GET    /api/scenarios/:name/history
 POST   /api/scenarios/:name/run
@@ -900,27 +902,6 @@ GET    /api/health
 POST   /api/backup
 GET    /api/tags
 GET    /api/metrics                    <span style="color:#6c7086;">Prometheus format</span></code></pre>
-  </div>
-</section>
-
-<!-- Tech stack -->
-<section id="stack">
-  <div class="container">
-    <h2>Tech stack</h2>
-    <div class="grid">
-      <div class="card"><strong>Runtime</strong><br>Node.js 26 + TypeScript strict</div>
-      <div class="card"><strong>HTTP</strong><br>Native fetch (no Playwright)</div>
-      <div class="card"><strong>Browser</strong><br>Lightpanda headless browser</div>
-      <div class="card"><strong>Database</strong><br>better-sqlite3 (WAL mode)</div>
-      <div class="card"><strong>CLI</strong><br>Commander</div>
-      <div class="card"><strong>Scheduling</strong><br>node-cron</div>
-      <div class="card"><strong>Logging</strong><br>pino (structured JSON)</div>
-      <div class="card"><strong>Security</strong><br>Helmet CSP + local/OIDC auth with roles</div>
-      <div class="card"><strong>Frontend</strong><br>Angular 22 + Chart.js</div>
-      <div class="card"><strong>Container</strong><br>Debian-slim multi-stage, non-root</div>
-      <div class="card"><strong>Notifications</strong><br>Telegram, Slack, Discord, Mailgun, webhook</div>
-      <div class="card"><strong>CI/CD</strong><br>GitHub Actions + GHCR</div>
-    </div>
   </div>
 </section>
 

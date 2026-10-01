@@ -182,7 +182,7 @@ The dashboard provides:
 
 - **Scenario list** - overview of all scenarios with pass/fail status, tag badges, group badges, tag/group filter dropdowns, depends-on column, auto-refreshes via WebSocket
 - **Scenario detail** - response time trend chart, success rate over time, step breakdown, SLA gauge (7-day window), paginated run history, JSON/CSV/YAML export, live ticker (inline step progress in the toolbar), copy public permalink
-- **Scenario editor** - click the pencil icon on the detail page to edit a scenario's YAML directly in the browser; create new scenarios from scratch via the "New" button
+- **Scenario editor** - click the pencil icon on the detail page to edit a scenario's YAML directly in the browser with syntax highlighting (comments, strings, keys, numbers). "New" opens a blank scenario at `/scenario/new`, "Import" uploads a `.yml`/`.yaml` file and stores it with the others
 - **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** - toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** - toggle in the navbar, preference saved to localStorage
@@ -292,7 +292,7 @@ node dist/index.js server
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/scenarios` | List all scenarios with last run status (`?tag=critical`, `?group=api`) |
-| `POST /api/scenarios/import` | Bulk import scenarios from YAML string (`{"yaml":"..."}` - single scenario or array) |
+| `POST /api/scenarios/import` | Import scenario(s) from a YAML string (`{"yaml":"..."}` - single scenario or array). Stored in the scenarios directory, picked up by the scheduler; updates the file when the name already exists (any logged-in user) |
 | `GET /api/scenarios/export` | Download all scenarios as a YAML bundle file |
 | `GET /api/groups` | List all distinct scenario groups |
 | `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |
@@ -316,7 +316,7 @@ node dist/index.js server
 | `POST /api/auth/users` | Create a user (admin only) - generates the password when omitted |
 | `PUT /api/auth/users/password` | Change a user's password (admin only) |
 | `PUT /api/auth/users/role` | Change a user's role (admin only) |
-| `DELETE /api/auth/users/:username` | Delete a user (admin only, last admin protected) |
+| `DELETE /api/auth/users/:username` | Delete a user (admin only - an admin cannot delete their own account) |
 | `POST /api/backup` | Trigger a manual database backup |
 | `GET /api/tags` | List all distinct tags |
 | `GET /api/public/scenario/:name` | Public per-scenario JSON detail (no auth required) |
