@@ -144,6 +144,29 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
   }
 }
 
+// Builds the path of a scenario file from its name. The name comes from user-supplied YAML,
+// so anything that would land outside the scenarios directory is rejected.
+function scenarioFilePath(name: string): string {
+  const dir = path.resolve(_scenariosDir!);
+  const file = path.resolve(path.join(dir, `${name}.yaml`));
+  if (path.dirname(file) !== dir) {
+    throw new Error(`Invalid scenario name: ${name}`);
+  }
+  return file;
+}
+
+// Returns the file holding the scenario with this name, whatever its extension (.yml or .yaml).
+function findScenarioFile(name: string): string | undefined {
+  if (!_scenariosDir) return undefined;
+  try {
+    for (const file of fs.readdirSync(_scenariosDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'))) {
+      const filePath = path.join(_scenariosDir, file);
+      if (loadScenarioFile(filePath).name === name) return filePath;
+    }
+  } catch { /* unreadable or invalid file */ }
+  return undefined;
+}
+
 // Bulk import scenarios from a YAML string containing one or more scenario documents.
 function handleBulkImport(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
@@ -166,20 +189,22 @@ function handleBulkImport(req: express.Request, res: express.Response): void {
     // Parse — may be a single scenario or a YAML array of scenarios
     const parsed = yaml.load(yamlStr);
     const scenarios: Record<string, unknown>[] = Array.isArray(parsed) ? parsed : [parsed as Record<string, unknown>];
-    const results: { name: string; status: string; error?: string }[] = [];
+    const results: { name: string; status: string; file?: string; replaced?: boolean; error?: string }[] = [];
 
     for (const raw of scenarios) {
       try {
         const scenario = parseScenario(yaml.dump(raw));
-        const filePath = path.join(_scenariosDir, `${scenario.name}.yaml`);
+        // Update the existing file when the name is already taken, instead of adding a duplicate.
+        const existing = findScenarioFile(scenario.name);
+        const filePath = existing ?? scenarioFilePath(scenario.name);
         fs.writeFileSync(filePath, yaml.dump(raw, { indent: 2, lineWidth: 120, noRefs: true }), 'utf-8');
-        results.push({ name: scenario.name, status: 'imported' });
+        results.push({ name: scenario.name, status: 'imported', file: path.basename(filePath), replaced: !!existing });
       } catch (err: unknown) {
         results.push({ name: (raw.name as string) || 'unknown', status: 'error', error: err instanceof Error ? err.message : String(err) });
       }
     }
 
-    res.json({ imported: results.length, results });
+    res.json({ imported: results.filter(r => r.status === 'imported').length, results });
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -407,7 +432,8 @@ function handleConfigSave(req: express.Request, res: express.Response): void {
       res.status(400).json({ error: 'Scenario name in YAML does not match URL' });
       return;
     }
-    const filePath = path.join(_scenariosDir, `${name}.yaml`);
+    // Overwrite the file the scenario actually lives in (.yml or .yaml), never create a duplicate.
+    const filePath = findScenarioFile(name) ?? scenarioFilePath(name);
     fs.writeFileSync(filePath, body.yaml, 'utf-8');
     res.json({ status: 'saved', scenario: name, path: filePath });
   } catch (err: unknown) {

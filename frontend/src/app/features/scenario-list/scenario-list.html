@@ -12,6 +12,21 @@
       <option value="">All tags</option>
       <option *ngFor="let t of allTags" [value]="t">{{ t }}</option>
     </select>
+    <a
+      class="btn btn-sm btn-outline-primary"
+      routerLink="/scenario/new"
+      title="Create a new scenario"
+    >
+      <i class="bi bi-plus-lg me-1"></i>New
+    </a>
+    <button
+      class="btn btn-sm btn-outline-primary"
+      (click)="importInput.click()"
+      [disabled]="importing"
+      title="Import a scenario YAML file"
+    >
+      <i class="bi bi-upload me-1"></i>{{ importing ? 'Importing...' : 'Import' }}
+    </button>
     <button
       class="btn btn-sm btn-outline-primary"
       (click)="fetchScenarios()"
@@ -20,7 +35,22 @@
     >
       <i class="bi bi-arrow-clockwise"></i>
     </button>
+    <input
+      #importInput
+      type="file"
+      accept=".yml,.yaml,text/yaml"
+      class="d-none"
+      (change)="importFile($event)"
+    />
   </div>
+</div>
+
+<div [class]="'alert alert-' + importTone + ' py-2 px-3 small'" *ngIf="importMsg">
+  <i
+    class="bi me-1"
+    [class.bi-check-circle]="importTone === 'success'"
+    [class.bi-exclamation-triangle]="importTone !== 'success'"
+  ></i>{{ importMsg }}
 </div>
 
 <div class="row g-3 mb-4" *ngIf="scenarios.length">
@@ -54,7 +84,7 @@
   *ngIf="!loading && scenarios.length === 0"
 >
   <i class="bi bi-inbox fs-2 mb-2 d-block"></i>
-  No scenarios yet. Background runs will appear here.
+  No scenarios yet. Use <strong>Import</strong> to add a scenario YAML file.
 </div>
 
 <div class="card border-0 shadow-sm" *ngIf="scenarios.length">

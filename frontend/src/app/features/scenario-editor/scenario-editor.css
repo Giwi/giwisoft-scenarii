@@ -1,3 +1,90 @@
 :host {
   display: block;
 }
+
+.editor {
+  position: relative;
+  height: 60vh;
+  min-height: 300px;
+  overflow: hidden;
+  resize: vertical;
+}
+
+/* Highlight layer ON TOP of the textarea. It never receives input: clicks and the caret
+   fall through to the transparent-text textarea underneath, whose scrollbar stays visible. */
+.editor-layer,
+.editor-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 1rem;
+  border: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.editor-layer {
+  z-index: 1;
+  pointer-events: none;
+  color: var(--text);
+  background: transparent;
+  scrollbar-width: none;
+}
+
+.editor-layer::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-input {
+  color: transparent;
+  caret-color: var(--text);
+}
+
+.editor-input::selection {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.editor-input:focus {
+  box-shadow: none;
+}
+
+.editor:focus-within {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.tok {
+  white-space: pre-wrap;
+}
+
+.tok.y-cmt {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.tok.y-str {
+  color: #0a7d63;
+}
+
+[data-bs-theme="dark"] .tok.y-str {
+  color: #3fb950;
+}
+
+.tok.y-lit {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tok.y-key {
+  color: var(--accent);
+}
+
+.tok.y-dash {
+  color: var(--text-muted);
+}

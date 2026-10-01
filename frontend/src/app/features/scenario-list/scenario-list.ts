@@ -10,6 +10,13 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from '../../shared/ws';
 
+interface ImportResult {
+  name: string;
+  status: string;
+  file?: string;
+  error?: string;
+}
+
 interface ScenarioInfo {
   name: string;
   last_run: string | null;
@@ -42,6 +49,9 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
   allGroups: string[] = [];
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   fetching = false;
+  importing = false;
+  importMsg = '';
+  importTone: 'success' | 'warning' | 'danger' = 'success';
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -139,6 +149,48 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
       }
     } catch {
       // Ignore
+    }
+  }
+
+  // Imports a scenario YAML file: the server stores it in the scenarios directory, from
+  // where the scheduler picks it up like any other scenario file.
+  async importFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    this.importing = true;
+    this.importMsg = '';
+    this.cdr.detectChanges();
+    try {
+      // Read the text before clearing the input: Chromium invalidates the File afterwards.
+      const yaml = await file.text();
+      input.value = '';
+      const res = await fetch('/api/scenarios/import', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yaml }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Import failed (${res.status})`);
+
+      const ok = data.results.filter((r: ImportResult) => r.status === 'imported');
+      const failed = data.results.filter((r: ImportResult) => r.status !== 'imported');
+      if (failed.length) {
+        this.importTone = ok.length ? 'warning' : 'danger';
+        this.importMsg = failed.map((r: ImportResult) => `${r.name}: ${r.error || r.status}`).join(' - ');
+      } else {
+        this.importTone = 'success';
+        this.importMsg = ok.map((r: ImportResult) => `Imported ${r.name} as ${r.file}`).join(', ');
+      }
+      await this.fetchScenarios();
+    } catch (err: unknown) {
+      this.importTone = 'danger';
+      this.importMsg = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.importing = false;
+      this.cdr.detectChanges();
     }
   }
 }
