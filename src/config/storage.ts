@@ -372,3 +372,9 @@ export function closeStorage(): void {
 export function isStorageReady(): boolean {
   return db !== undefined;
 }
+
+// Returns the raw database handle. Throws when storage is not initialised.
+export function getDb(): Database.Database {
+  if (!db) throw new Error('Database not initialized');
+  return db;
+}

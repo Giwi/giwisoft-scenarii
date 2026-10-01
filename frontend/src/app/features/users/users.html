@@ -1,0 +1,131 @@
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="h4 mb-1"><i class="bi bi-people me-2"></i>Users</h1>
+      <p class="text-secondary small mb-0">
+        Admins can manage users; everyone else only browses scenarios. Roles are
+        <code>admin</code> and <code>user</code>.
+      </p>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary border-0" (click)="load()" title="Refresh">
+      <i class="bi bi-arrow-clockwise"></i>
+    </button>
+  </div>
+
+  <div class="alert alert-danger py-2 small" *ngIf="error" role="alert">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+  </div>
+  <div class="alert alert-success py-2 small" *ngIf="notice" role="alert">
+    <i class="bi bi-check-circle me-1"></i>{{ notice }}
+  </div>
+
+  <!-- Add user -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h2 class="h6 mb-3"><i class="bi bi-person-plus me-2"></i>Add user</h2>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label small text-secondary" for="new-username">Username</label>
+          <input
+            id="new-username"
+            class="form-control form-control-sm"
+            type="text"
+            name="newUsername"
+            [(ngModel)]="newUsername"
+            autocomplete="off"
+          />
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label small text-secondary" for="new-password">Password</label>
+          <input
+            id="new-password"
+            class="form-control form-control-sm"
+            type="text"
+            name="newPassword"
+            [(ngModel)]="newPassword"
+            placeholder="generated if empty"
+            autocomplete="off"
+          />
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small text-secondary" for="new-role">Role</label>
+          <select id="new-role" class="form-select form-select-sm" name="newRole" [(ngModel)]="newRole">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <button
+            class="btn btn-sm btn-primary w-100"
+            (click)="add()"
+            [disabled]="busy === 'add' || !newUsername.trim()"
+          >
+            <i class="bi bi-plus-lg me-1"></i>Add
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User list -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Username</th>
+            <th scope="col">Role</th>
+            <th scope="col">Created</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="loading">
+            <td colspan="4" class="text-center text-secondary py-4">Loading...</td>
+          </tr>
+          <tr *ngIf="!loading && users.length === 0">
+            <td colspan="4" class="text-center text-secondary py-4">No users</td>
+          </tr>
+          <tr *ngFor="let u of users">
+            <td>
+              <i class="bi bi-person-circle me-2 text-secondary"></i>{{ u.username }}
+              <span class="badge text-bg-secondary ms-2" *ngIf="u.username === me">you</span>
+            </td>
+            <td>
+              <select
+                class="form-select form-select-sm w-auto"
+                [ngModel]="u.role"
+                (ngModelChange)="setRole(u, $event)"
+                [disabled]="busy === u.username || u.username === me"
+                [name]="'role-' + u.username"
+                [title]="u.username === me ? 'You cannot change your own role' : 'Change role'"
+              >
+                <option value="user">user</option>
+                <option value="admin">admin</option>
+              </select>
+            </td>
+            <td class="small text-secondary">{{ u.created_at | date: 'yyyy-MM-dd HH:mm' }}</td>
+            <td class="text-end">
+              <button
+                class="btn btn-sm btn-outline-secondary border-0"
+                (click)="resetPassword(u)"
+                [disabled]="busy === u.username"
+                title="Reset password"
+              >
+                <i class="bi bi-key"></i>
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger border-0"
+                (click)="remove(u)"
+                [disabled]="busy === u.username || u.username === me"
+                [title]="u.username === me ? 'You cannot delete your own account' : 'Delete user'"
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

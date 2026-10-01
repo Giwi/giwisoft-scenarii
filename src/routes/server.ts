@@ -18,7 +18,11 @@ import yaml from 'js-yaml';
 import { loadScenarioFile, parseScenario } from '../config/parser';
 import { runScenario, cancelScenario } from '../runner/runner';
 import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from '../runner/scheduler';
-import { authMiddleware, handleOidcLogin, handleOidcCallback, handleAuthMe, handleLogout } from './auth';
+import {
+  authMiddleware, requireAdmin, pageAuthMiddleware, handleLocalLogin, handleOidcLogin,
+  handleOidcCallback, handleAuthMe, handleLogout, handleListUsers, handleCreateUser,
+  handleSetUserPassword, handleSetUserRole, handleDeleteUser,
+} from './auth';
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
 import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
 import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort } from '../utils/helpers';
@@ -566,12 +570,22 @@ export function createApp(): express.Application {
   app.use(requestIdMiddleware);
   app.use(requestLogger);
 
-  // OIDC auth routes (unauthenticated)
-  app.get('/api/auth/login', handleOidcLogin);
+  // Auth routes (unauthenticated)
+  app.post('/api/auth/login', handleLocalLogin);
+  app.get('/api/auth/oidc', handleOidcLogin);
   app.get('/api/auth/callback', handleOidcCallback);
   app.get('/api/auth/me', handleAuthMe);
   app.post('/api/auth/logout', handleLogout);
   app.use(authMiddleware);
+
+  // User management: admin only. With OIDC, users come from the provider groups instead.
+  app.get('/api/auth/users', requireAdmin, handleListUsers);
+  app.post('/api/auth/users', requireAdmin, handleCreateUser);
+  app.put('/api/auth/users/password', requireAdmin, handleSetUserPassword);
+  app.put('/api/auth/users/role', requireAdmin, handleSetUserRole);
+  app.delete('/api/auth/users/:username', requireAdmin, handleDeleteUser);
+  // Pages are private too, except public status pages — guarded before the SPA is served.
+  app.use(pageAuthMiddleware);
 
   // Scenario CRUD and management
   app.get('/api/scenarios', handleScenarioList);

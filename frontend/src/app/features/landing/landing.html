@@ -1,0 +1,153 @@
+<div class="landing">
+  <!-- Hero: pitch on the left, login on the right -->
+  <section class="hero">
+    <div class="container position-relative">
+      <div class="row g-4 g-lg-5 align-items-center">
+        <div class="col-lg-7 text-center text-lg-start">
+          <h1>
+            <i class="bi bi-activity"></i><span>Scenarii</span>
+          </h1>
+          <p class="lead">
+            YAML-defined web test scenarios &mdash; run on a cron schedule through native HTTP or a
+            headless browser, stored in SQLite, tracked on a live dashboard.
+          </p>
+          <div class="badges">
+            <a href="https://github.com/Giwi/giwisoft-scenarii"><i class="bi bi-github"></i> GitHub</a>
+            <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii"><i class="bi bi-box"></i> Container</a>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <!-- Login form -->
+          <div class="login-card" *ngIf="!authenticated().authenticated; else signedIn">
+        <div class="login-head">
+          <i class="bi bi-shield-lock"></i>
+          <h2 class="h5 mb-0">Sign in</h2>
+        </div>
+
+        <form *ngIf="authenticated().provider !== 'oidc'" (ngSubmit)="submit()">
+          <div class="mb-3 text-start">
+            <label class="form-label small text-secondary" for="username">Username</label>
+            <input
+              id="username"
+              class="form-control"
+              type="text"
+              name="username"
+              [(ngModel)]="username"
+              autocomplete="username"
+              autofocus
+              required
+            />
+          </div>
+          <div class="mb-3 text-start">
+            <label class="form-label small text-secondary" for="password">Password</label>
+            <input
+              id="password"
+              class="form-control"
+              type="password"
+              name="password"
+              [(ngModel)]="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+          <div class="alert alert-danger py-2 small mb-3" *ngIf="error" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+          </div>
+          <button class="btn btn-primary w-100" type="submit" [disabled]="busy || !username || !password">
+            <span class="spinner-border spinner-border-sm me-2" *ngIf="busy"></span>
+            <i class="bi bi-box-arrow-in-right me-1" *ngIf="!busy"></i>Sign in
+          </button>
+        </form>
+
+        <div *ngIf="authenticated().provider === 'oidc'">
+          <p class="small text-secondary mb-3">
+            Sign in with your organisation identity provider.
+          </p>
+          <button class="btn btn-primary w-100" type="button" (click)="oidcLogin()">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Continue with SSO
+          </button>
+        </div>
+
+        <p class="small text-secondary mt-3 mb-0" *ngIf="!authenticated().provider">
+          Authentication is disabled &mdash; the dashboard is open.
+          <a routerLink="/scenarios">Open dashboard</a>
+        </p>
+      </div>
+
+      <ng-template #signedIn>
+        <div class="login-card">
+          <div class="login-head">
+            <i class="bi bi-person-check"></i>
+            <h2 class="h5 mb-0">Signed in as {{ authenticated().username }}</h2>
+          </div>
+          <a class="btn btn-primary w-100" routerLink="/scenarios">
+            <i class="bi bi-speedometer2 me-1"></i>Open dashboard
+          </a>
+        </div>
+      </ng-template>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="container">
+      <div class="row g-3">
+        <div class="col-md-6 col-lg-4" *ngFor="let f of features">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <i class="bi" [class]="'bi ' + f.icon"></i>
+              <h3 class="h6 mt-2 mb-1">{{ f.title }}</h3>
+              <p class="small text-secondary mb-0">{{ f.text }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quickstart -->
+  <section class="quickstart">
+    <div class="container">
+      <h2 class="h4 text-center mb-4">Quick start</h2>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h3 class="h6 text-secondary text-uppercase">Write a scenario</h3>
+              <pre><code>name: API health check
+schedule: "*/5 * * * *"
+base_url: https://api.example.com
+
+steps:
+  - name: Health endpoint
+    action: http.get
+    url: /health
+    expect:
+      status: 200
+      response_time_under: 3000</code></pre>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h3 class="h6 text-secondary text-uppercase">Run it</h3>
+              <pre><code># one-off run
+npx scenarii --once scenarios/health.yml
+
+# server + dashboard + scheduler
+npx scenarii server -p 3000</code></pre>
+              <p class="small text-secondary mb-0">
+                The first start prints a generated <code>admin</code> password in the logs.
+                Configure OIDC in <code>settings.yml</code> to sign in with SSO instead.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

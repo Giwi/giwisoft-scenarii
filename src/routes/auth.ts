@@ -1,10 +1,32 @@
 import express from 'express';
 import crypto from 'crypto';
-import { getSettings } from '../config/settings';
+import path from 'path';
+import { getSettings, AuthProvider } from '../config/settings';
+import {
+  verifyCredentials, ensureUser, getUser, listUsers, createUser, setPassword, setRole,
+  deleteUser, generatePassword, normalizeRole, UserRole,
+} from '../config/users';
 import logger from '../utils/logger';
 
-// In-memory session store for OIDC-authenticated users
-const sessions = new Map<string, { createdAt: number }>();
+interface Session {
+  username: string;
+  role: UserRole;
+  provider: AuthProvider;
+  createdAt: number;
+}
+
+// In-memory session store for authenticated users
+const sessions = new Map<string, Session>();
+
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// Returns the active auth provider: OIDC when configured, local password login otherwise.
+// Auth is on by default: an explicit `enabled: false` is the only way to turn it off.
+export function authProvider(): AuthProvider | null {
+  const config = getSettings().auth;
+  if (config?.enabled === false) return null;
+  return config?.oidc ? 'oidc' : 'local';
+}
 
 // Generates a cryptographically random session identifier.
 function generateSessionId(): string {
@@ -28,32 +50,115 @@ function parseCookies(header: string | undefined): Record<string, string> {
 
 const SESSION_COOKIE = 'scenarii-session';
 
-// Express middleware that checks for a valid session cookie on /api/* routes (except public/auth/health endpoints).
+// API paths that never require a session.
+const PUBLIC_API_PATHS = ['/api/auth/', '/api/public/', '/api/health', '/api/status', '/api/metrics'];
+
+// Returns the session attached to the request cookie, or undefined when absent/expired.
+function getSession(req: express.Request): Session | undefined {
+  const sessionId = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+  if (!sessionId) return undefined;
+  const session = sessions.get(sessionId);
+  if (!session) return undefined;
+  if (Date.now() - session.createdAt > SESSION_TTL) {
+    sessions.delete(sessionId);
+    return undefined;
+  }
+  return session;
+}
+
+// Sets the session cookie and returns its value.
+function startSession(res: express.Response, username: string, provider: AuthProvider): void {
+  const sessionId = generateSessionId();
+  sessions.set(sessionId, { username, role: getUser(username)?.role ?? 'user', provider, createdAt: Date.now() });
+  const secure = res.req.secure ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${sessionId}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL / 1000}${secure}`);
+}
+
+// True when the raw request carries a valid session. Used by the WebSocket upgrade check.
+export function isAuthenticatedRequest(req: { headers: { cookie?: string } }): boolean {
+  if (!authProvider()) return true;
+  const header = req.headers.cookie;
+  if (typeof header !== 'string') return false;
+  const sessionId = parseCookies(header)[SESSION_COOKIE];
+  if (!sessionId || !sessions.has(sessionId)) return false;
+  return Date.now() - sessions.get(sessionId)!.createdAt <= SESSION_TTL;
+}
+
+// Express middleware guarding the API: any /api/* path outside PUBLIC_API_PATHS needs a session.
 export function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  const config = getSettings().auth;
-  if (!config?.enabled) return next();
+  if (!authProvider()) return next();
   if (!req.path.startsWith('/api/')) return next();
-  const publicPrefixes = ['/api/auth/', '/api/public/'];
-  if (publicPrefixes.some(p => req.path.startsWith(p)) || req.path === '/api/health' || req.path === '/api/status') return next();
-  const cookies = parseCookies(req.headers.cookie);
-  const sessionId = cookies[SESSION_COOKIE];
-  if (!sessionId || !sessions.has(sessionId)) {
+  if (PUBLIC_API_PATHS.some(p => req.path === p || req.path.startsWith(p))) return next();
+  if (!getSession(req)) {
     res.status(401).json({ error: 'Authentication required' });
     return;
   }
   next();
 }
 
-// Fetches OIDC discovery document to get authorization and token endpoints.
-async function fetchOidcDiscovery(issuerUrl: string): Promise<{ authorization_endpoint: string; token_endpoint: string }> {
+// Guards admin-only API routes: requires a session whose user has the admin role.
+// When auth is disabled every request passes through.
+export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (!authProvider()) return next();
+  const session = getSession(req);
+  if (!session) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+  // Re-read the role so a promotion or demotion takes effect on the next request.
+  const role = getUser(session.username)?.role ?? 'user';
+  if (role !== 'admin') {
+    res.status(403).json({ error: 'Admin role required' });
+    return;
+  }
+  next();
+}
+
+// Guards non-API page requests: unauthenticated visitors are redirected to the landing/login page.
+// Public status pages stay reachable without a session.
+export function pageAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (!authProvider()) return next();
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (req.path.startsWith('/api/') || req.path.startsWith('/public/')) return next();
+  // The landing/login page is where visitors are sent, so it stays reachable.
+  if (req.path === '/login') return next();
+  // Static assets (bundles, fonts, favicon) must load for the landing page to render.
+  if (req.path.startsWith('/assets/') || path.extname(req.path)) return next();
+  if (getSession(req)) return next();
+  res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl)}`);
+}
+
+// Local username/password login. Sets a session cookie on success.
+export function handleLocalLogin(req: express.Request, res: express.Response): void {
+  if (authProvider() !== 'local') {
+    res.status(400).json({ error: 'Password login is disabled' });
+    return;
+  }
+  const { username, password } = req.body as { username?: string; password?: string };
+  const user = verifyCredentials(username ?? '', password ?? '');
+  if (!user) {
+    logger.warn({ username }, 'Failed login attempt');
+    res.status(401).json({ error: 'Invalid username or password' });
+    return;
+  }
+  startSession(res, user, 'local');
+  logger.info({ username: user, role: getUser(user)?.role }, 'User logged in');
+  res.json({ username: user, role: getUser(user)?.role, provider: 'local' });
+}
+
+interface OidcDiscovery {
+  authorization_endpoint: string;
+  token_endpoint: string;
+  userinfo_endpoint?: string;
+}
+
+// Fetches the OIDC discovery document to get authorization, token, and userinfo endpoints.
+async function fetchOidcDiscovery(issuerUrl: string): Promise<OidcDiscovery> {
   const discoveryUrl = `${issuerUrl.replace(/\/$/, '')}/.well-known/openid-configuration`;
   const res = await fetch(discoveryUrl);
   if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status}`);
-  const data = await res.json() as { authorization_endpoint: string; token_endpoint: string };
-  return {
-    authorization_endpoint: data.authorization_endpoint,
-    token_endpoint: data.token_endpoint,
-  };
+  const data = await res.json() as OidcDiscovery;
+  return data;
 }
 
 // In-memory OIDC state store (validated during callback, cleaned every 10 minutes)
@@ -69,32 +174,85 @@ function cleanOidcStates(): void {
 }
 
 // Redirects the user to the OIDC provider's authorization page.
-export function handleOidcLogin(req: express.Request, res: express.Response): void {
-  const config = getSettings().auth;
-  if (!config?.enabled || !config.oidc) {
+export async function handleOidcLogin(_req: express.Request, res: express.Response): Promise<void> {
+  const oidc = getSettings().auth?.oidc;
+  if (authProvider() !== 'oidc' || !oidc) {
     res.status(400).json({ error: 'OIDC not configured' });
     return;
   }
-  const oidc = config.oidc;
   cleanOidcStates();
 
   const state = crypto.randomBytes(16).toString('hex');
   oidcStates.set(state, { createdAt: Date.now() });
 
-  const scopes = encodeURIComponent(oidc.scopes || 'openid profile email');
-  const authUrl = `${oidc.issuer_url.replace(/\/$/, '')}/authorize?response_type=code&client_id=${encodeURIComponent(oidc.client_id)}&redirect_uri=${encodeURIComponent(oidc.redirect_uri)}&scope=${scopes}&state=${state}`;
+  try {
+    const discovery = await fetchOidcDiscovery(oidc.issuer_url);
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: oidc.client_id,
+      redirect_uri: oidc.redirect_uri,
+      scope: oidc.scopes || 'openid profile email',
+      state,
+    });
+    res.redirect(`${discovery.authorization_endpoint}?${params}`);
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'OIDC login redirect failed');
+    res.status(502).json({ error: 'OIDC provider unreachable' });
+  }
+}
 
-  res.redirect(authUrl);
+// Extracts a stable username from OIDC userinfo claims. The claim is configurable
+// (auth.oidc.username_claim); email and sub are used as fallbacks.
+export function usernameFromClaims(claims: Record<string, unknown>, claim?: string): string {
+  const keys = [claim, 'preferred_username', 'email', 'sub'].filter((k): k is string => !!k);
+  for (const key of keys) {
+    const value = claims[key];
+    if (typeof value === 'string' && value) return value;
+  }
+  throw new Error('OIDC claims contain no usable username');
+}
+
+// Extracts group memberships from the configured claim, accepting a string, an array,
+// or a space/comma separated list.
+export function groupsFromClaims(claims: Record<string, unknown>, claim?: string): string[] {
+  const keys = [claim, 'groups', 'roles'].filter((k): k is string => !!k);
+  for (const key of keys) {
+    const value = claims[key];
+    if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string');
+    if (typeof value === 'string') return value.split(/[\s,]+/).filter(Boolean);
+  }
+  return [];
+}
+
+// Derives the local role from the OIDC groups: membership of auth.oidc.admin_group
+// grants admin, everyone else gets a plain user.
+export function roleFromGroups(
+  claims: Record<string, unknown>,
+  config?: { groups_claim?: string; admin_group?: string }
+): UserRole {
+  if (!config?.admin_group) return 'user';
+  const groups = groupsFromClaims(claims, config.groups_claim);
+  return groups.includes(config.admin_group) ? 'admin' : 'user';
+}
+
+// Fetches the authenticated user's claims from the provider's userinfo endpoint.
+async function fetchUserInfo(discovery: OidcDiscovery, accessToken: string): Promise<Record<string, unknown>> {
+  if (!discovery.userinfo_endpoint) throw new Error('OIDC provider has no userinfo_endpoint');
+  const res = await fetch(discovery.userinfo_endpoint, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`userinfo request failed: ${res.status}`);
+  return await res.json() as Record<string, unknown>;
 }
 
 // Handles the OIDC callback, exchanges the code for tokens, and sets a session cookie.
+// Unknown identities are provisioned on the fly (JIT) in the local user DB.
 export async function handleOidcCallback(req: express.Request, res: express.Response): Promise<void> {
-  const config = getSettings().auth;
-  if (!config?.enabled || !config.oidc) {
+  const oidc = getSettings().auth?.oidc;
+  if (authProvider() !== 'oidc' || !oidc) {
     res.status(400).json({ error: 'OIDC not configured' });
     return;
   }
-  const oidc = config.oidc;
   const { code, state } = req.query as { code?: string; state?: string };
 
   if (!code || !state) {
@@ -130,11 +288,14 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
       return;
     }
 
-    const sessionId = generateSessionId();
-    sessions.set(sessionId, { createdAt: Date.now() });
+    const tokens = await tokenRes.json() as { access_token?: string };
+    if (!tokens.access_token) throw new Error('Token response has no access_token');
+    const claims = await fetchUserInfo(discovery, tokens.access_token);
+    const username = ensureUser(usernameFromClaims(claims, oidc.username_claim), roleFromGroups(claims, oidc));
 
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${sessionId}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
-    res.redirect('/');
+    startSession(res, username, 'oidc');
+    logger.info({ username, role: getUser(username)?.role }, 'User logged in via OIDC');
+    res.redirect('/scenarios');
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'OIDC callback failed');
     res.status(500).json({ error: 'OIDC authentication failed' });
@@ -143,25 +304,110 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
 
 // Returns the current authentication status to the client.
 export function handleAuthMe(req: express.Request, res: express.Response): void {
-  const config = getSettings().auth;
-  const configured = !!(config?.enabled && config?.oidc);
-  if (!configured) {
-    res.json({ authenticated: false, configured: false });
+  const provider = authProvider();
+  if (!provider) {
+    res.json({ authenticated: true, username: null, role: null, provider: null });
     return;
   }
-  const cookies = parseCookies(req.headers.cookie);
-  const sessionId = cookies[SESSION_COOKIE];
+  const session = getSession(req);
   res.json({
-    authenticated: !!sessionId && sessions.has(sessionId),
-    configured: true,
+    authenticated: !!session,
+    username: session?.username ?? null,
+    role: session ? getUser(session.username)?.role ?? 'user' : null,
+    provider,
   });
+}
+
+// ── User management (admin only) ────────────────────────────────────────────
+
+// Lists the local users.
+export function handleListUsers(_req: express.Request, res: express.Response): void {
+  res.json({ users: listUsers() });
+}
+
+// Creates a user. Without OIDC, only an admin may do this. The password is generated
+// and returned once when the caller does not supply one.
+export function handleCreateUser(req: express.Request, res: express.Response): void {
+  const { username, password, role } = req.body as { username?: string; password?: string; role?: string };
+  if (!username?.trim()) {
+    res.status(400).json({ error: 'username is required' });
+    return;
+  }
+  if (getUser(username.trim())) {
+    res.status(409).json({ error: 'User already exists' });
+    return;
+  }
+  const generated = !password;
+  const secret = password || generatePassword();
+  const created = createUser(username.trim(), secret, normalizeRole(role));
+  if (!created) {
+    res.status(409).json({ error: 'User already exists' });
+    return;
+  }
+  logger.info({ username, role: normalizeRole(role) }, 'User created');
+  res.status(201).json({ ...getUser(username.trim()), generated_password: generated ? secret : undefined });
+}
+
+// Changes a user's password. When no password is supplied, one is generated and returned once.
+export function handleSetUserPassword(req: express.Request, res: express.Response): void {
+  const { username, password } = req.body as { username?: string; password?: string };
+  if (!username) {
+    res.status(400).json({ error: 'username is required' });
+    return;
+  }
+  if (!getUser(username)) {
+    res.status(404).json({ error: 'Unknown user' });
+    return;
+  }
+  const secret = password || generatePassword();
+  setPassword(username, secret);
+  logger.info({ username }, 'Password updated');
+  res.json({ status: 'updated', generated_password: password ? undefined : secret });
+}
+
+// Changes a user's role. Admins cannot change their own role: that is the surest way to
+// lock the install out of user management.
+export function handleSetUserRole(req: express.Request, res: express.Response): void {
+  const { username, role } = req.body as { username?: string; role?: string };
+  if (!username || !role) {
+    res.status(400).json({ error: 'username and role are required' });
+    return;
+  }
+  if (username === getSession(req)?.username) {
+    res.status(400).json({ error: 'Cannot change your own role' });
+    return;
+  }
+  const next = normalizeRole(role);
+  if (!setRole(username, next)) {
+    res.status(404).json({ error: 'Unknown user' });
+    return;
+  }
+  logger.info({ username, role: next }, 'Role updated');
+  res.json({ status: 'updated', role: next });
+}
+
+// Deletes a user. Your own account is protected: that also makes the last admin
+// undeletable through the API, since the caller is always an admin too.
+export function handleDeleteUser(req: express.Request, res: express.Response): void {
+  const username = String(req.params.username);
+  if (username === getSession(req)?.username) {
+    res.status(400).json({ error: 'Cannot delete your own account' });
+    return;
+  }
+  if (!getUser(username)) {
+    res.status(404).json({ error: 'Unknown user' });
+    return;
+  }
+  deleteUser(username);
+  logger.info({ username }, 'User deleted');
+  res.json({ status: 'deleted' });
 }
 
 // Logs out by deleting the session and clearing the cookie.
 export function handleLogout(req: express.Request, res: express.Response): void {
-  const cookies = parseCookies(req.headers.cookie);
-  const sessionId = cookies[SESSION_COOKIE];
+  const sessionId = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (sessionId) sessions.delete(sessionId);
-  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+  const secure = req.secure ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
   res.json({ status: 'logged_out' });
 }

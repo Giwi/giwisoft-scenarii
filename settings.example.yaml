@@ -4,15 +4,30 @@ api:
     enabled: true
     api_key: "YOUR_API_KEY"
 
-# Dashboard authentication (optional - OIDC)
+# Dashboard authentication (optional)
+#
+# Auth is ON by default with local username/password login. On first start a user named
+# "admin" is created with the role "admin" and a random password printed in the logs.
+# Users have one of two roles: "admin" (can add/edit/delete users) or "user" (read-only
+# dashboard). Only an admin can add a user: `npx scenarii user add <name> [password] [role]`
+# or `POST /api/auth/users`.
+#
+# Add the `oidc` block below to switch to SSO instead. Roles are then inherited from the
+# provider groups: membership of `admin_group` grants admin, everyone else is a plain user.
+# The username claim is configurable, falling back to preferred_username, email, then sub.
 auth:
-  enabled: true
-  oidc:
-    issuer_url: "https://accounts.google.com"
-    client_id: "YOUR_CLIENT_ID"
-    client_secret: "YOUR_CLIENT_SECRET"
-    redirect_uri: "http://localhost:3000/api/auth/callback"
-    scopes: "openid profile email"
+  enabled: true                  # set to false to disable authentication entirely
+  default_user: admin            # name of the auto-created user
+  default_user_role: admin       # admin | user
+  # oidc:
+  #   issuer_url: "https://accounts.google.com"
+  #   client_id: "YOUR_CLIENT_ID"
+  #   client_secret: "YOUR_CLIENT_SECRET"
+  #   redirect_uri: "http://localhost:3000/api/auth/callback"
+  #   scopes: "openid profile email"
+  #   username_claim: "preferred_username"   # claim used as the local username
+  #   groups_claim: "groups"                 # claim holding the group memberships
+  #   admin_group: "scenarii-admins"         # group granting the admin role
 
 # Database storage settings
 storage:

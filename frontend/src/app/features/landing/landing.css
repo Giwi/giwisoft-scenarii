@@ -1,0 +1,200 @@
+:host {
+  display: block;
+}
+
+.landing {
+  margin: -1rem -0.75rem 0;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 3.5rem 0 3rem;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  background-image: url('/hero-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+      to bottom,
+      rgba(15, 15, 25, 0.68) 0%,
+      rgba(15, 15, 25, 0.48) 50%,
+      rgba(15, 15, 25, 0.68) 100%
+    ),
+    radial-gradient(ellipse 640px 400px at 50% -10%, rgba(99, 102, 241, 0.22), transparent),
+    radial-gradient(ellipse 380px 320px at 82% 72%, rgba(168, 85, 247, 0.16), transparent),
+    radial-gradient(ellipse 300px 280px at 18% 82%, rgba(236, 72, 153, 0.12), transparent);
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(127, 127, 160, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 127, 160, 0.06) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 560px 380px at 50% 0%, black, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 560px 380px at 50% 0%, black, transparent 72%);
+}
+
+[data-bs-theme='dark'] .hero::after {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+}
+
+.hero h1 {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  position: relative;
+}
+
+.hero h1 i {
+  color: var(--accent);
+  margin-right: 0.75rem;
+}
+
+.hero h1 span {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.lead {
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 34rem;
+  font-size: 1.05rem;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 2px 24px rgba(10, 10, 20, 0.55);
+}
+
+.login-card {
+  position: relative;
+  width: 100%;
+  padding: 1.5rem;
+  border-radius: 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: var(--card-shadow);
+  text-align: left;
+}
+
+.login-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.login-head i {
+  color: var(--accent);
+  font-size: 1.15rem;
+}
+
+.badges {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.badges a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(127, 127, 160, 0.08);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.badges a:hover {
+  border-color: var(--accent);
+}
+
+.features {
+  padding: 1rem 0 3rem;
+}
+
+.features .card i {
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.features .card p {
+  line-height: 1.55;
+}
+
+.quickstart {
+  padding: 0 0 4rem;
+}
+
+.quickstart h2 {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.quickstart pre {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  background: rgba(127, 127, 160, 0.08);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.quickstart code {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  color: var(--text);
+}
+
+@media (max-width: 991.98px) {
+  .lead {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .badges {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 2.25rem 0 1.5rem;
+  }
+
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .lead {
+    font-size: 1rem;
+  }
+}

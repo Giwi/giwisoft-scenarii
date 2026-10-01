@@ -9,6 +9,10 @@ import { runScenario, RunOptions } from './runner/runner';
 import { scheduleScenario, stopAll, listScheduled, scheduleReport, watchScenarios } from './runner/scheduler';
 import { initStorage, closeStorage, isStorageReady } from './config/storage';
 import { loadSettings, watchSettings } from './config/settings';
+import {
+  ensureDefaultUser, listUsers, createUser, setPassword, setRole, deleteUser,
+  generatePassword, normalizeRole,
+} from './config/users';
 import { createServer, closeLightpanda } from './routes/server';
 import logger from './utils/logger';
 import { DAILY_REPORT_CRON } from './utils/constants';
@@ -36,6 +40,10 @@ function shutdown(server?: http.Server): void {
 }
 
 const program = new Command();
+
+// Keep each subcommand's own options (e.g. `server --db`) instead of letting the root
+// program swallow duplicate flags such as --db.
+program.enablePositionalOptions();
 
 program
   .name('scenarii')
@@ -105,6 +113,7 @@ program
     }
     loadSettings(options.settings);
     watchSettings();
+    ensureDefaultUser();
 
     const scenariosDir = path.resolve(options.scenariosDir);
     let scenarioFiles: string[];
@@ -202,6 +211,91 @@ program
     logger.info({ storageReady: isStorageReady() }, 'Storage status');
   });
 
+// User command: manages the local user DB used for authentication.
+program
+  .command('user')
+  .description('Manage dashboard users')
+  .argument('<action>', 'list | add <username> [password] [role] | passwd <username> [password] | role <username> <role> | del <username>')
+  .argument('[args...]', 'Arguments for the action')
+  .option('--db <path>', 'SQLite database path', 'db/scenarii.db')
+  .action((action: string, args: string[], options) => {
+    try {
+      initStorage(options.db);
+    } catch (err: unknown) {
+      logger.error({ path: options.db, err: err instanceof Error ? err.message : String(err) }, 'Failed to initialize database');
+      process.exit(1);
+    }
+
+    if (action === 'list') {
+      const users = listUsers();
+      for (const u of users) logger.info({ user: u.username, role: u.role, created_at: u.created_at }, 'User');
+      if (users.length === 0) logger.info('No users: start the server once to create the default user');
+      return;
+    }
+
+    if (action === 'add') {
+      const username = args[0];
+      if (!username) {
+        logger.error('Usage: scenarii user add <username> [password] [admin|user]');
+        process.exit(1);
+      }
+      const role = normalizeRole(args[2]);
+      const password = args[1] || generatePassword();
+      if (!createUser(username, password, role)) {
+        logger.error({ user: username }, 'User already exists');
+        process.exit(1);
+      }
+      logger.info({ user: username, role, password }, 'User created');
+      return;
+    }
+
+    if (action === 'passwd') {
+      const username = args[0];
+      if (!username) {
+        logger.error('Usage: scenarii user passwd <username> [password]');
+        process.exit(1);
+      }
+      const password = args[1] || generatePassword();
+      if (!setPassword(username, password)) {
+        logger.error({ user: username }, 'Unknown user');
+        process.exit(1);
+      }
+      logger.info({ user: username }, 'Password updated');
+      return;
+    }
+
+    if (action === 'role') {
+      const [username, role] = args;
+      if (!username || !role) {
+        logger.error('Usage: scenarii user role <username> <admin|user>');
+        process.exit(1);
+      }
+      if (!setRole(username, normalizeRole(role))) {
+        logger.error({ user: username }, 'Unknown user');
+        process.exit(1);
+      }
+      logger.info({ user: username, role: normalizeRole(role) }, 'Role updated');
+      return;
+    }
+
+    if (action === 'del') {
+      const username = args[0];
+      if (!username) {
+        logger.error('Usage: scenarii user del <username>');
+        process.exit(1);
+      }
+      if (!deleteUser(username)) {
+        logger.error({ user: username }, 'Unknown user');
+        process.exit(1);
+      }
+      logger.info({ user: username }, 'User deleted');
+      return;
+    }
+
+    logger.error(`Unknown action "${action}": use list, add, passwd, role, or del`);
+    process.exit(1);
+  });
+
 // Config command: generates a boilerplate settings.yaml file.
 program
   .command('config')
@@ -216,6 +310,25 @@ program
 #   auth:
 #     enabled: true
 #     api_key: your-secret-api-key
+
+# Dashboard authentication: enabled by default, local user DB.
+# The default user is created on first start with an admin role and a generated
+# password printed in the logs. Only admins can add users (API or CLI).
+# Roles: admin | user
+# Add an oidc: block to authenticate through an OIDC provider instead: roles are
+# then derived from the provider groups (admin_group grants admin).
+# auth:
+#   enabled: true
+#   default_user: admin
+#   default_user_role: admin
+#   oidc:
+#     issuer_url: https://accounts.google.com
+#     client_id: your-client-id
+#     client_secret: your-client-secret
+#     redirect_uri: http://localhost:3000/api/auth/callback
+#     username_claim: preferred_username
+#     groups_claim: groups
+#     admin_group: scenarii-admins
 
 # Storage retention (optional, defaults to 7 days)
 # storage:

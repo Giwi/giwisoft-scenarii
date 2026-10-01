@@ -64,10 +64,22 @@ export interface OidcConfig {
   client_secret: string;
   redirect_uri: string;
   scopes?: string;
+  // Claim holding the group memberships, used to derive the user role.
+  groups_claim?: string;
+  // Claim holding the username. Falls back to email then sub when unset.
+  username_claim?: string;
+  // Group membership granting the admin role.
+  admin_group?: string;
 }
 
+export type AuthProvider = 'local' | 'oidc';
+
 export interface AuthConfig {
-  enabled: boolean;
+  enabled?: boolean;
+  provider?: AuthProvider;
+  default_user?: string;
+  // Role granted to the auto-created default user (admin or user).
+  default_user_role?: 'admin' | 'user';
   oidc?: OidcConfig;
 }
 

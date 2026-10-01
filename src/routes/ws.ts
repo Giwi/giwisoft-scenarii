@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, VerifyClientCallbackSync } from 'ws';
+import { isAuthenticatedRequest } from './auth';
 import logger from '../utils/logger';
 
 // Singleton WebSocket server instance
@@ -7,7 +8,8 @@ let wss: WebSocketServer | null = null;
 
 // Attaches a WebSocket server to the given HTTP server on the /ws path.
 export function initWebSocket(server: HttpServer): void {
-  wss = new WebSocketServer({ server, path: '/ws' });
+  const verify: VerifyClientCallbackSync = info => isAuthenticatedRequest(info.req);
+  wss = new WebSocketServer({ server, path: '/ws', verifyClient: verify });
 
   wss.on('connection', (ws) => {
     ws.on('error', (err) => {

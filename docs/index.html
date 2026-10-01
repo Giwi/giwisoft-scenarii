@@ -307,7 +307,7 @@
     <h2>All features</h2>
     <div class="grid">
       <div class="card"><i class="bi bi-box card-icon"></i><h3>CLI &amp; API</h3><p>Commands: <code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>config</code>. Full REST API with 20+ endpoints.</p></div>
-      <div class="card"><i class="bi bi-lock card-icon"></i><h3>Authentication</h3><p>Optional OIDC dashboard auth with HTTP-only session cookies. API key auth for Prometheus metrics endpoint. </p></div>
+      <div class="card"><i class="bi bi-lock card-icon"></i><h3>Authentication</h3><p>Every page is private by default: local users with admin/user roles, or OIDC with roles inherited from provider groups. HTTP-only session cookies. API key auth for Prometheus metrics endpoint. </p></div>
       <div class="card"><i class="bi bi-bell card-icon"></i><h3>Notifications</h3><p>Telegram, Slack, Discord, email (Mailgun), generic webhook. State transition triggers with retry and exponential backoff.</p></div>
       <div class="card"><i class="bi bi-bar-chart card-icon"></i><h3>Prometheus metrics</h3><p>Native Prometheus/OpenMetrics export: run count, duration, success rate, step-level metrics, notification delivery stats.</p></div>
       <div class="card"><i class="bi bi-database card-icon"></i><h3>SQLite storage</h3><p>WAL mode for concurrent reads. Configurable retention (default 7 days). Optional automated daily backups. No external database.</p></div>
@@ -640,11 +640,16 @@ steps:
     <h3>Sample configuration</h3>
     <pre><code><span style="color:#6c7086;"># settings.yaml</span>
 auth:
-  enabled: true                  <span style="color:#6c7086;"># optional dashboard auth</span>
-  oidc:
+  enabled: true                  <span style="color:#6c7086;"># dashboard auth (on by default)</span>
+  default_user: admin            <span style="color:#6c7086;"># generated password in the logs</span>
+  default_user_role: admin       <span style="color:#6c7086;"># admin | user</span>
+  oidc:                          <span style="color:#6c7086;"># optional SSO, roles come from groups</span>
     issuer_url: "https://..."
     client_id: "YOUR_CLIENT_ID"
     client_secret: "YOUR_SECRET"
+    username_claim: "preferred_username"
+    groups_claim: "groups"
+    admin_group: "scenarii-admins"
 
 storage:
   retentionDays: 30              <span style="color:#6c7086;"># data retention (default 7)</span>
@@ -816,10 +821,18 @@ GET    /api/scenarios/:name/export/csv
 GET    /api/scenarios/:name/sla         <span style="color:#6c7086;">?days=7</span>
 
 <span style="color:#6c7086;"># Authentication</span>
-GET    /api/auth/login
+POST   /api/auth/login
+GET    /api/auth/oidc
 GET    /api/auth/callback
 GET    /api/auth/me
 POST   /api/auth/logout
+
+<span style="color:#6c7086;"># Users (admin only)</span>
+GET    /api/auth/users
+POST   /api/auth/users
+PUT    /api/auth/users/password
+PUT    /api/auth/users/role
+DELETE /api/auth/users/:username
 
 <span style="color:#6c7086;"># Public / System</span>
 GET    /api/public/scenario/:name
@@ -843,7 +856,7 @@ GET    /api/metrics                    <span style="color:#6c7086;">Prometheus f
       <div class="card"><strong>CLI</strong><br>Commander</div>
       <div class="card"><strong>Scheduling</strong><br>node-cron</div>
       <div class="card"><strong>Logging</strong><br>pino (structured JSON)</div>
-      <div class="card"><strong>Security</strong><br>Helmet CSP + OIDC auth</div>
+      <div class="card"><strong>Security</strong><br>Helmet CSP + local/OIDC auth with roles</div>
       <div class="card"><strong>Frontend</strong><br>Angular 22 + Chart.js</div>
       <div class="card"><strong>Container</strong><br>Debian-slim multi-stage, non-root</div>
       <div class="card"><strong>Notifications</strong><br>Telegram, Slack, Discord, Mailgun, webhook</div>

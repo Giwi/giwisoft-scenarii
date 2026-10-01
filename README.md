@@ -34,12 +34,14 @@ Open http://localhost:3000 to see the dashboard. Each scenario also has a sharea
 | `validate <file>` | Validate a scenario YAML without running it |
 | `trigger <file>` | Run a scenario immediately |
 | `status` | Show scheduled scenarios and storage status |
+| `user <action>` | Manage dashboard users: `list`, `add`, `passwd`, `role`, `del` (also available in the UI at `/users`, admins only) |
 | `config --init` | Generate a `settings.yaml` template |
 
 ```bash
 node dist/index.js validate scenarios/lusk.yml
 node dist/index.js trigger scenarios/lusk.yml
 node dist/index.js status
+node dist/index.js user list
 node dist/index.js config --init
 ```
 
@@ -184,10 +186,81 @@ The dashboard provides:
 - **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** - toggle scheduled scenarios on/off without deleting files
 - **Dark/light theme** - toggle in the navbar, preference saved to localStorage
-- **Dashboard auth** - optional OIDC-based login (configured in `settings.yaml`); all API routes except `/api/health` and `/api/auth/*` require a session cookie
+- **Dashboard auth** - on by default, local username/password login with an optional OIDC provider; every page is private except the public status pages
 - **Manual refresh** - refresh button on both list and detail pages
 - **Public status** - per-scenario pages at `/public/status/:name` with stat cards and response time / success rate charts; no auth required
 - **Public API** - `GET /api/status` (summary) and `GET /api/public/scenario/:name` (per-scenario detail) - both accessible without auth
+
+## Authentication
+
+Authentication is **enabled by default**; set `auth.enabled: false` to turn it off entirely.
+
+### Local users (no OIDC)
+
+On first start a default user (`admin`) is created with the `admin` role and a generated
+password printed once in the server logs:
+
+```
+Created default user "admin" with generated password
+```
+
+Users have one of two roles:
+
+| Role | Can do |
+| --- | --- |
+| `admin` | everything a `user` can, plus manage users (add / rename role / reset password / delete) |
+| `user` | browse scenarios, view history, trigger and pause runs |
+
+**Only an admin can add a user**, from the dashboard (`/users`, linked in the navbar for admins),
+the CLI, or the API:
+
+```bash
+scenarii user list                              # list users with their role
+scenarii user add bob                           # generate a password, role "user"
+scenarii user add carol my-password admin       # explicit password and role
+scenarii user passwd bob                        # new generated password
+scenarii user role bob admin                    # promote or demote
+scenarii user del bob                           # remove a user
+```
+
+```bash
+curl -X POST http://localhost:3000/api/auth/users \
+  -H 'Content-Type: application/json' \
+  -b cookies.txt -d '{"username":"dave"}'       # admin session required; password returned once
+```
+
+The last remaining admin cannot be deleted: an admin can neither delete their own account nor
+change their own role, which is the surest way to lock an install out of user management.
+
+### OIDC
+
+Add an `oidc:` block to `auth` and the provider takes over login. Roles are **inherited
+from the provider groups** instead of being stored by hand:
+
+```yaml
+auth:
+  oidc:
+    issuer_url: "https://accounts.google.com"
+    client_id: "YOUR_CLIENT_ID"
+    client_secret: "YOUR_CLIENT_SECRET"
+    redirect_uri: "http://localhost:3000/api/auth/callback"
+    username_claim: "preferred_username"   # claim used as the local username
+    groups_claim: "groups"                 # claim holding the group memberships
+    admin_group: "scenarii-admins"         # group granting the admin role
+```
+
+- `username_claim`: the claim used as the local username. When unset, `preferred_username`,
+  then `email`, then `sub` are tried in that order.
+- `groups_claim`: the claim read as a group list. Arrays, plain strings, and
+  space/comma-separated strings are all accepted; `groups` and `roles` are used as
+  fallbacks when unset.
+- `admin_group`: membership of this group grants the `admin` role, everyone else gets
+  `user`. Without it, every OIDC user is a plain `user`.
+
+The role is re-derived on every login, so adding or removing someone from the group takes
+effect on their next sign-in. The local users table is only a mirror of the provider, so
+`POST /api/auth/users` is meant for the local setup: with OIDC, identities and roles come
+from the provider.
 
 <p align="center">
   <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
@@ -233,10 +306,16 @@ node dist/index.js server
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
 | `GET /api/scenarios/:name/sla` | SLA calculation (`?days=7`) - returns `{ sla, total_runs, passed_runs, failed_runs }` |
-| `GET /api/auth/login` | Redirect to OIDC provider (requires `auth.oidc` in settings) |
+| `POST /api/auth/login` | Local login (`{"username","password"}`) - sets the session cookie |
+| `GET /api/auth/oidc` | Redirect to the OIDC provider (requires `auth.oidc` in settings) |
 | `GET /api/auth/callback` | OIDC callback - exchanges code for session cookie |
-| `GET /api/auth/me` | Return `{ authenticated: boolean }` |
+| `GET /api/auth/me` | Return `{ authenticated, username, role, provider }` |
 | `POST /api/auth/logout` | Clear session cookie |
+| `GET /api/auth/users` | List users with roles (admin only) |
+| `POST /api/auth/users` | Create a user (admin only) - generates the password when omitted |
+| `PUT /api/auth/users/password` | Change a user's password (admin only) |
+| `PUT /api/auth/users/role` | Change a user's role (admin only) |
+| `DELETE /api/auth/users/:username` | Delete a user (admin only, last admin protected) |
 | `POST /api/backup` | Trigger a manual database backup |
 | `GET /api/tags` | List all distinct tags |
 | `GET /api/public/scenario/:name` | Public per-scenario JSON detail (no auth required) |
@@ -296,13 +375,18 @@ api:
     api_key: "YOUR_API_KEY"      # protects /api/metrics
 
 auth:
-  enabled: true                  # optional dashboard authentication
-  oidc:                          # OIDC provider configuration
+  enabled: true                  # dashboard authentication (on by default)
+  default_user: admin            # auto-created on first start
+  default_user_role: admin       # admin | user
+  oidc:                          # OIDC provider configuration (optional)
     issuer_url: "https://accounts.google.com"
     client_id: "YOUR_CLIENT_ID"
     client_secret: "YOUR_CLIENT_SECRET"
     redirect_uri: "http://localhost:3000/api/auth/callback"
     scopes: "openid profile email"
+    username_claim: "preferred_username"   # claim used as the local username
+    groups_claim: "groups"                 # claim holding the group memberships
+    admin_group: "scenarii-admins"         # group granting the admin role
 
 storage:
   retentionDays: 30              # data retention period (default 7)
