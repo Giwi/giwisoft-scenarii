@@ -26,6 +26,8 @@ WORKDIR /app
 COPY --from=builder /build/node_modules ./node_modules
 COPY --from=builder /build/dist/ ./dist/
 COPY --from=builder /build/frontend/dist/ ./frontend/dist/
+# package.json is read at runtime (CLI --version) and for settings auto-detection
+COPY --from=builder /build/package.json ./package.json
 
 RUN npm cache clean --force
 
