@@ -50,7 +50,7 @@
     "@types/ws": "^8.18.2",
     "chokidar-cli": "^3.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "optionalDependencies": {
     "@emnapi/core": "^1.11.1",
