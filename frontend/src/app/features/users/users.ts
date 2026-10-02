@@ -1,7 +1,9 @@
 import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
-import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../shared/auth';
+import { I18nService } from '../../shared/i18n';
+import { LangDatePipe } from '../../shared/lang-date.pipe';
 
 interface UserRow {
   username: string;
@@ -13,7 +15,7 @@ interface UserRow {
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [NgFor, NgIf, FormsModule, DatePipe],
+  imports: [NgFor, NgIf, FormsModule, LangDatePipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './users.html',
   styleUrl: './users.css',
@@ -21,6 +23,10 @@ interface UserRow {
 export class UsersComponent implements OnInit {
   private auth = inject(AuthService);
   private cdr = inject(ChangeDetectorRef);
+  readonly i18n = inject(I18nService);
+
+  // Translation helper, exposed so the template can call `t('key')`.
+  readonly t = this.i18n.t;
 
   users: UserRow[] = [];
   loading = true;
@@ -48,12 +54,12 @@ export class UsersComponent implements OnInit {
     try {
       const res = await fetch('/api/auth/users', { credentials: 'include' });
       if (!res.ok) {
-        this.error = (await res.json().catch(() => ({ error: 'Failed to load users' })) as { error?: string }).error ?? 'Failed';
+        this.error = (await res.json().catch(() => ({ error: this.t('common.fail') })) as { error?: string }).error ?? this.t('common.fail');
         return;
       }
       this.users = (await res.json() as { users: UserRow[] }).users;
     } catch {
-      this.error = 'Failed to load users';
+      this.error = this.t('common.fail');
     } finally {
       this.loading = false;
       this.cdr.detectChanges();
@@ -79,10 +85,12 @@ export class UsersComponent implements OnInit {
       });
       const data = await res.json().catch(() => ({})) as { error?: string; generated_password?: string };
       if (!res.ok) {
-        this.error = data.error || 'Failed to create user';
+        this.error = data.error || this.t('common.fail');
         return;
       }
-      if (data.generated_password) this.notice = `Password for ${username}: ${data.generated_password}`;
+      if (data.generated_password) {
+        this.notice = this.t('users.generated_password', { username, password: data.generated_password });
+      }
       this.newUsername = '';
       this.newPassword = '';
       this.newRole = 'user';
@@ -106,7 +114,7 @@ export class UsersComponent implements OnInit {
       });
       const data = await res.json().catch(() => ({})) as { error?: string };
       if (!res.ok) {
-        this.error = data.error || 'Failed to update role';
+        this.error = data.error || this.t('common.fail');
         return;
       }
       u.role = role;
@@ -117,7 +125,7 @@ export class UsersComponent implements OnInit {
   }
 
   async resetPassword(u: UserRow): Promise<void> {
-    const password = window.prompt(`New password for ${u.username} (empty to generate one):`);
+    const password = window.prompt(`${this.t('recover.new_password')} ${u.username} (${this.t('users.password_hint')})`);
     if (password === null) return;
     this.busy = u.username;
     this.error = '';
@@ -131,11 +139,14 @@ export class UsersComponent implements OnInit {
       });
       const data = await res.json().catch(() => ({})) as { error?: string; generated_password?: string };
       if (!res.ok) {
-        this.error = data.error || 'Failed to update password';
+        this.error = data.error || this.t('common.fail');
         return;
       }
-      if (data.generated_password) this.notice = `Password for ${u.username}: ${data.generated_password}`;
-      else this.notice = `Password updated for ${u.username}`;
+      if (data.generated_password) {
+        this.notice = this.t('users.generated_password', { username: u.username, password: data.generated_password });
+      } else {
+        this.notice = this.t('users.password_updated', { username: u.username });
+      }
     } finally {
       this.busy = '';
       this.cdr.detectChanges();
@@ -143,7 +154,7 @@ export class UsersComponent implements OnInit {
   }
 
   async remove(u: UserRow): Promise<void> {
-    if (!window.confirm(`Delete user ${u.username}?`)) return;
+    if (!window.confirm(this.t('users.delete_confirm', { username: u.username }))) return;
     this.busy = u.username;
     this.error = '';
     try {
@@ -153,7 +164,7 @@ export class UsersComponent implements OnInit {
       });
       const data = await res.json().catch(() => ({})) as { error?: string };
       if (!res.ok) {
-        this.error = data.error || 'Failed to delete user';
+        this.error = data.error || this.t('common.fail');
         return;
       }
       this.users = this.users.filter(x => x.username !== u.username);

@@ -1,6 +1,7 @@
 import express from 'express';
 import { getScenarioList, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount } from '../config/storage';
 import { parseDaysParam } from '../utils/helpers';
+import { Lang, langFromAcceptLanguage, t } from '../i18n';
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -12,8 +13,10 @@ export function handlePublicScenarioStatus(req: express.Request, res: express.Re
   try {
     const list = getScenarioList();
     const scenario = list.find(s => s.name === req.params.name);
+    // Public page: no session, so the visitor's Accept-Language header picks the language.
+    const lang = langFromAcceptLanguage(req.headers['accept-language']);
     if (!scenario) {
-      res.status(404).type('html').send('<html><body style="font-family:sans-serif;padding:2rem;background:#0a0e14;color:#e6edf3"><h1>404</h1><p>Scenario not found</p></body></html>');
+      res.status(404).type('html').send(`<html><body style="font-family:sans-serif;padding:2rem;background:#0a0e14;color:#e6edf3"><h1>404</h1><p>${escapeHtml(t('scenario.not_found', lang))}</p></body></html>`);
       return;
     }
 
@@ -39,10 +42,11 @@ export function handlePublicScenarioStatus(req: express.Request, res: express.Re
       sla, days, total, passed,
       tagHtml, labelsJson, durationsJson, successJson, hasData,
       nonce: res.locals.cspNonce || '',
+      lang,
     }));
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to render scenario public status page');
-    res.status(500).type('text').send('Internal server error');
+    res.status(500).type('text').send(t('error.internal', langFromAcceptLanguage(req.headers['accept-language'])));
   }
 }
 
@@ -52,7 +56,7 @@ export function handlePublicScenarioApi(req: express.Request, res: express.Respo
     const list = getScenarioList();
     const scenario = list.find(s => s.name === req.params.name);
     if (!scenario) {
-      res.status(404).json({ error: 'Scenario not found' });
+      res.status(404).json({ error: t('scenario.not_found', langFromAcceptLanguage(req.headers['accept-language'])) });
       return;
     }
     const days = parseDaysParam(req.query.days as string);
@@ -74,7 +78,7 @@ export function handlePublicScenarioApi(req: express.Request, res: express.Respo
     });
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to serve public scenario API');
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: t('error.internal', langFromAcceptLanguage(req.headers['accept-language'])) });
   }
 }
 
@@ -92,17 +96,18 @@ interface PublicStatusData {
   successJson: string;
   hasData: boolean;
   nonce: string;
+  lang: Lang;
 }
 
 // Renders the full HTML page for the public scenario status endpoint.
 // Contains inline CSS and Chart.js-powered graphs for duration and success-rate trends.
 function publicStatusTemplate(d: PublicStatusData): string {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${d.lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(d.name)} — Scenarii Status</title>
+<title>${escapeHtml(t('status.title', d.lang, { name: d.name }))}</title>
 <script src="/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -139,18 +144,18 @@ function publicStatusTemplate(d: PublicStatusData): string {
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     ${escapeHtml(d.name)}
   </h1>
-  <div class="subtitle">${d.tagHtml} &middot; Status page — auto-refreshes every 30s</div>
+  <div class="subtitle">${d.tagHtml} &middot; ${escapeHtml(t('status.auto_refresh', d.lang))}</div>
   <div class="stats">
-    <div class="stat"><div class="stat-value ${d.lastSuccess === 1 ? 'ok' : d.lastSuccess === 0 ? 'fail' : ''}">${d.lastSuccess === 1 ? 'Pass' : d.lastSuccess === 0 ? 'Fail' : '—'}</div><div class="stat-label">Current Status</div></div>
-    <div class="stat"><div class="stat-value ${d.sla >= 99 ? 'ok' : d.sla >= 90 ? '' : 'fail'}">${d.sla}%</div><div class="stat-label">SLA (${d.days}d)</div></div>
-    <div class="stat"><div class="stat-value">${d.total}</div><div class="stat-label">Total Runs</div></div>
-    <div class="stat"><div class="stat-value ok">${d.passed}</div><div class="stat-label">Passed</div></div>
-    <div class="stat"><div class="stat-value fail">${d.total - d.passed}</div><div class="stat-label">Failed</div></div>
+    <div class="stat"><div class="stat-value ${d.lastSuccess === 1 ? 'ok' : d.lastSuccess === 0 ? 'fail' : ''}">${d.lastSuccess === 1 ? escapeHtml(t('status.pass', d.lang)) : d.lastSuccess === 0 ? escapeHtml(t('status.fail', d.lang)) : '—'}</div><div class="stat-label">${escapeHtml(t('status.current', d.lang))}</div></div>
+    <div class="stat"><div class="stat-value ${d.sla >= 99 ? 'ok' : d.sla >= 90 ? '' : 'fail'}">${d.sla}%</div><div class="stat-label">${escapeHtml(t('status.sla', d.lang, { days: d.days }))}</div></div>
+    <div class="stat"><div class="stat-value">${d.total}</div><div class="stat-label">${escapeHtml(t('status.total_runs', d.lang))}</div></div>
+    <div class="stat"><div class="stat-value ok">${d.passed}</div><div class="stat-label">${escapeHtml(t('status.passed', d.lang))}</div></div>
+    <div class="stat"><div class="stat-value fail">${d.total - d.passed}</div><div class="stat-label">${escapeHtml(t('status.failed', d.lang))}</div></div>
   </div>
   ${d.hasData ? `
   <div class="charts">
-    <div class="chart-box"><h3>Response Time Trend</h3><canvas id="durationChart"></canvas></div>
-    <div class="chart-box"><h3>Success Rate Over Time</h3><canvas id="successChart"></canvas></div>
+    <div class="chart-box"><h3>${escapeHtml(t('status.duration_trend', d.lang))}</h3><canvas id="durationChart"></canvas></div>
+    <div class="chart-box"><h3>${escapeHtml(t('status.success_trend', d.lang))}</h3><canvas id="successChart"></canvas></div>
   </div>
   <script nonce="${d.nonce}">
     const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -202,9 +207,9 @@ function publicStatusTemplate(d: PublicStatusData): string {
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 10, font: { size: 10 }, color: textColor }, grid: { color: gridColor } }, y: { min: 0, max: 1, ticks: { font: { size: 10 }, color: textColor, callback: function(v) { return v * 100 + '%'; } }, grid: { color: gridColor } } } }
     });
-  </script>` : '<div class="no-data">No runs yet</div>'}
+  </script>` : `<div class="no-data">${escapeHtml(t('status.no_runs', d.lang))}</div>`}
 </div>
-<div class="footer">Scenarii — <a href="https://giwi.fr" style="color:#58a6ff">GiwiSoft</a></div>
+<div class="footer">${escapeHtml(t('status.footer', d.lang))} — <a href="https://giwi.fr" style="color:#58a6ff">GiwiSoft</a></div>
 <script nonce="${d.nonce}">setTimeout(function(){ location.reload(); }, 30000);</script>
 </body>
 </html>`;

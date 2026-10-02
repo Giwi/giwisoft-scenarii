@@ -1,13 +1,10 @@
 <div class="container py-4">
   <div class="d-flex align-items-center justify-content-between mb-4">
     <div>
-      <h1 class="h4 mb-1"><i class="bi bi-people me-2"></i>Users</h1>
-      <p class="text-secondary small mb-0">
-        Admins can manage users; everyone else only browses scenarios. Roles are
-        <code>admin</code> and <code>user</code>.
-      </p>
+      <h1 class="h4 mb-1"><i class="bi bi-people me-2"></i>{{ t('users.title') }}</h1>
+      <p class="text-secondary small mb-0">{{ t('users.subtitle') }}</p>
     </div>
-    <button class="btn btn-sm btn-outline-secondary border-0" (click)="load()" title="Refresh">
+    <button class="btn btn-sm btn-outline-secondary border-0" (click)="load()" [title]="t('common.refresh')">
       <i class="bi bi-arrow-clockwise"></i>
     </button>
   </div>
@@ -22,10 +19,10 @@
   <!-- Add user -->
   <div class="card mb-4">
     <div class="card-body">
-      <h2 class="h6 mb-3"><i class="bi bi-person-plus me-2"></i>Add user</h2>
+      <h2 class="h6 mb-3"><i class="bi bi-person-plus me-2"></i>{{ t('users.add') }}</h2>
       <div class="row g-2 align-items-end">
         <div class="col-12 col-md-4">
-          <label class="form-label small text-secondary" for="new-username">Username</label>
+          <label class="form-label small text-secondary" for="new-username">{{ t('users.username') }}</label>
           <input
             id="new-username"
             class="form-control form-control-sm"
@@ -36,22 +33,22 @@
           />
         </div>
         <div class="col-12 col-md-4">
-          <label class="form-label small text-secondary" for="new-password">Password</label>
+          <label class="form-label small text-secondary" for="new-password">{{ t('users.password') }}</label>
           <input
             id="new-password"
             class="form-control form-control-sm"
             type="text"
             name="newPassword"
             [(ngModel)]="newPassword"
-            placeholder="generated if empty"
+            [placeholder]="t('users.password_hint')"
             autocomplete="off"
           />
         </div>
         <div class="col-6 col-md-2">
-          <label class="form-label small text-secondary" for="new-role">Role</label>
+          <label class="form-label small text-secondary" for="new-role">{{ t('users.role') }}</label>
           <select id="new-role" class="form-select form-select-sm" name="newRole" [(ngModel)]="newRole">
-            <option value="user">user</option>
-            <option value="admin">admin</option>
+            <option value="user">{{ t('users.role_user') }}</option>
+            <option value="admin">{{ t('users.role_admin') }}</option>
           </select>
         </div>
         <div class="col-6 col-md-2">
@@ -60,7 +57,7 @@
             (click)="add()"
             [disabled]="busy === 'add' || !newUsername.trim()"
           >
-            <i class="bi bi-plus-lg me-1"></i>Add
+            <i class="bi bi-plus-lg me-1"></i>{{ t('users.add_action') }}
           </button>
         </div>
       </div>
@@ -73,23 +70,23 @@
       <table class="table table-hover align-middle mb-0">
         <thead>
           <tr>
-            <th scope="col">Username</th>
-            <th scope="col">Role</th>
-            <th scope="col">Created</th>
-            <th scope="col" class="text-end">Actions</th>
+            <th scope="col">{{ t('users.username') }}</th>
+            <th scope="col">{{ t('users.role') }}</th>
+            <th scope="col">{{ t('users.created') }}</th>
+            <th scope="col" class="text-end">{{ t('users.actions') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngIf="loading">
-            <td colspan="4" class="text-center text-secondary py-4">Loading...</td>
+            <td colspan="4" class="text-center text-secondary py-4">{{ t('common.loading') }}</td>
           </tr>
           <tr *ngIf="!loading && users.length === 0">
-            <td colspan="4" class="text-center text-secondary py-4">No users</td>
+            <td colspan="4" class="text-center text-secondary py-4">{{ t('users.empty') }}</td>
           </tr>
           <tr *ngFor="let u of users">
             <td>
               <i class="bi bi-person-circle me-2 text-secondary"></i>{{ u.username }}
-              <span class="badge text-bg-secondary ms-2" *ngIf="u.username === me">you</span>
+              <span class="badge text-bg-secondary ms-2" *ngIf="u.username === me">{{ t('users.you') }}</span>
             </td>
             <td>
               <select
@@ -98,19 +95,19 @@
                 (ngModelChange)="setRole(u, $event)"
                 [disabled]="busy === u.username || u.username === me"
                 [name]="'role-' + u.username"
-                [title]="u.username === me ? 'You cannot change your own role' : 'Change role'"
+                [title]="u.username === me ? t('users.own_role') : t('users.change_role')"
               >
-                <option value="user">user</option>
-                <option value="admin">admin</option>
+                <option value="user">{{ t('users.role_user') }}</option>
+                <option value="admin">{{ t('users.role_admin') }}</option>
               </select>
             </td>
-            <td class="small text-secondary">{{ u.created_at | date: 'yyyy-MM-dd HH:mm' }}</td>
+            <td class="small text-secondary">{{ u.created_at | langDate: 'numeric' }}</td>
             <td class="text-end">
               <button
                 class="btn btn-sm btn-outline-secondary border-0"
                 (click)="resetPassword(u)"
                 [disabled]="busy === u.username"
-                title="Reset password"
+                [title]="t('users.reset_password')"
               >
                 <i class="bi bi-key"></i>
               </button>
@@ -118,7 +115,7 @@
                 class="btn btn-sm btn-outline-danger border-0"
                 (click)="remove(u)"
                 [disabled]="busy === u.username || u.username === me"
-                [title]="u.username === me ? 'You cannot delete your own account' : 'Delete user'"
+                [title]="u.username === me ? t('users.own_delete') : t('users.delete_user')"
               >
                 <i class="bi bi-trash"></i>
               </button>

@@ -12,14 +12,15 @@
     "build:frontend": "cd frontend && npx ng build",
     "start": "node dist/index.js",
     "start:server": "node dist/index.js server",
-    "dev": "npx concurrently -n server,frontend -c blue,green \"ts-node src/index.ts server\" \"cd frontend && npx ng serve --proxy-config proxy.conf.json\"",
-    "dev:server": "ts-node src/index.ts server",
+    "dev": "npx concurrently -n server,frontend -c blue,green \"tsx src/index.ts server\" \"cd frontend && npx ng serve --proxy-config proxy.conf.json\"",
+    "dev:server": "tsx src/index.ts server",
     "dev:frontend": "cd frontend && npx ng serve --proxy-config proxy.conf.json",
-    "dev:once": "ts-node src/index.ts --once scenarios/lusk.yml",
-    "dev:scenario": "npx chokidar 'scenarios/**/*.yml' -c 'npx ts-node src/index.ts --once {path}'",
+    "dev:once": "tsx src/index.ts --once scenarios/lusk.yml",
+    "dev:scenario": "npx chokidar 'scenarios/**/*.yml' -c 'npx tsx src/index.ts --once {path}'",
     "lint": "tsc --noEmit",
+    "check:i18n": "node scripts/check-i18n-keys.mjs",
     "test": "npm run build:backend && tsc -p tests/tsconfig.json && node --experimental-test-module-mocks --test 'dist-test/tests/**/*.test.js'",
-    "screenshots": "ts-node take-screenshots.ts",
+    "screenshots": "tsx take-screenshots.ts",
     "package": "npm run build && sh build-container.sh"
   },
   "dependencies": {
@@ -34,12 +35,10 @@
     "picocolors": "^1.1.1",
     "pino": "^10.3.1",
     "playwright-core": "^1.63.0",
+    "qrcode": "^1.5.4",
     "ws": "^8.22.0"
   },
   "devDependencies": {
-    "@emnapi/core": "^1.11.3",
-    "@emnapi/runtime": "^1.11.3",
-    "@emnapi/wasi-threads": "^2.1.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -47,14 +46,15 @@
     "@types/node": "^26.6.3",
     "@types/node-cron": "^3.0.11",
     "@types/pino": "^7.0.4",
+    "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.2",
     "chokidar-cli": "^3.0.0",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {
-    "@emnapi/core": "^1.11.1",
-    "@emnapi/runtime": "^1.11.1",
-    "@emnapi/wasi-threads": "^2.0.0"
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
+    "@emnapi/wasi-threads": "^2.1.0"
   }
 }

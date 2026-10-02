@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, ChangeDetectionStrategy, inject } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { NgIf, NgFor } from '@angular/common';
 import Chart from 'chart.js/auto';
+import { I18nService } from '../../shared/i18n';
 
 function areaGradient(color: string, alphaTop = 0.25, alphaBottom = 0.02) {
   return (ctx: any) => {
@@ -53,6 +54,9 @@ export class PublicStatusComponent implements OnInit, OnDestroy {
   private charts: Chart[] = [];
   private scenarioName = '';
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Translation helper, exposed so the template can call `t('key')`.
+  readonly t = inject(I18nService).t;
 
   constructor(
     private route: ActivatedRoute,

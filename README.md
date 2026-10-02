@@ -263,6 +263,42 @@ effect on their next sign-in. The local users table is only a mirror of the prov
 `POST /api/auth/users` is meant for the local setup: with OIDC, identities and roles come
 from the provider.
 
+With OIDC the identity provider owns the second factor, so **TOTP is not offered**: the
+profile page hides the section and the endpoints refuse the call. Use the provider's own
+MFA policy instead.
+
+### Profile, two-factor and recovery
+
+Every user has a profile page (`/profile`, from the navbar avatar) holding:
+
+- **Avatar**: uploaded image, cropped and scaled to a square in the browser. Without an
+  upload the avatar comes from Gravatar, derived from the profile email address.
+- **Email**: used for Gravatar and for password recovery links.
+- **Colour scheme**: light, dark or match the operating system.
+- **Language**: `en`, `fr`, `es` or `de`. It applies to the interface *and* to the messages
+  the server returns, so a French user reads French errors.
+- **Two-factor authentication (TOTP)**: Authy, Google Authenticator, 1Password and
+  anything else speaking `otpauth://`. Ten single-use recovery codes are shown once at
+  setup. Turning 2FA off requires the password *and* a current code or recovery code.
+- **Password**: changing it requires the current password.
+
+**Password recovery** (`Forgot your password?` on the login page) emails a single-use link
+valid for one hour. It needs an email channel; without one the link is written to the
+server logs:
+
+```yaml
+notifications:
+  email:
+    enabled: true
+    mailgun:
+      api_key: "key-..."        # or MAILGUN_API_KEY
+      domain: "mg.example.com"
+      from: "scenarii@example.com"
+```
+
+The reply is the same whether or not the account exists, so it cannot be used to discover
+usernames. Requests are throttled to 5 per hour per IP.
+
 <p align="center">
   <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
   <img src="frontend/public/screenshots/scenario-list-dark.png" width="45%" alt="Scenario list (dark)">
@@ -307,16 +343,28 @@ node dist/index.js server
 | `GET /api/scenarios/:name/export/json` | Download all history as JSON |
 | `GET /api/scenarios/:name/export/csv` | Download all history as CSV |
 | `GET /api/scenarios/:name/sla` | SLA calculation (`?days=7`) - returns `{ sla, total_runs, passed_runs, failed_runs }` |
-| `POST /api/auth/login` | Local login (`{"username","password"}`) - sets the session cookie |
+| `POST /api/auth/login` | Local login (`{"username","password"}`) - sets the session cookie, or returns `{requires_2fa, challenge}` when 2FA is on |
+| `POST /api/auth/login/2fa` | Second login step (`{"challenge","code"}`) - accepts a TOTP or recovery code, then sets the session cookie |
+| `POST /api/auth/password/forgot` | Request a recovery link (`{"identifier"}` = username or email) - same answer either way |
+| `POST /api/auth/password/reset` | Apply a recovery token (`{"token","password"}`) - single use |
 | `GET /api/auth/oidc` | Redirect to the OIDC provider (requires `auth.oidc` in settings) |
 | `GET /api/auth/callback` | OIDC callback - exchanges code for session cookie |
-| `GET /api/auth/me` | Return `{ authenticated, username, role, provider }` |
+| `GET /api/auth/me` | Return `{ authenticated, username, role, provider, lang, color_scheme, avatar_url }` |
 | `POST /api/auth/logout` | Clear session cookie |
 | `GET /api/auth/users` | List users with roles (admin only) |
 | `POST /api/auth/users` | Create a user (admin only) - generates the password when omitted |
 | `PUT /api/auth/users/password` | Change a user's password (admin only) |
 | `PUT /api/auth/users/role` | Change a user's role (admin only) |
 | `DELETE /api/auth/users/:username` | Delete a user (admin only - an admin cannot delete their own account) |
+| `GET /api/profile` | Profile of the current user: email, language, colour scheme, avatar URL, 2FA state |
+| `PUT /api/profile` | Update email, language or colour scheme |
+| `GET /api/profile/avatar/:username` | Serve a stored avatar (public: the navbar renders it) |
+| `POST /api/profile/avatar` | Upload a cropped avatar (`{"image": "data:image/png;base64,..."}`, 512 kB max) |
+| `DELETE /api/profile/avatar` | Drop the avatar, falling back to Gravatar |
+| `POST /api/profile/password` | Change the current user's password (`{"current_password","new_password"}`) |
+| `POST /api/profile/totp/setup` | Start 2FA setup: returns the secret, `otpauth://` URI and QR code |
+| `POST /api/profile/totp/enable` | Confirm setup (`{"code"}`) - enables 2FA, returns the recovery codes once |
+| `POST /api/profile/totp/disable` | Turn 2FA off (`{"password","code"}` - password plus code or recovery code) |
 | `POST /api/backup` | Trigger a manual database backup |
 | `GET /api/tags` | List all distinct tags |
 | `GET /api/public/scenario/:name` | Public per-scenario JSON detail (no auth required) |

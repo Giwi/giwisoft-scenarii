@@ -4,10 +4,13 @@ import {
   OnDestroy,
   ChangeDetectorRef,
   ChangeDetectionStrategy,
+  inject,
 } from '@angular/core';
-import { DatePipe, NgFor, NgIf } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { I18nService } from '../../shared/i18n';
+import { LangDatePipe } from '../../shared/lang-date.pipe';
 import { onScenarioRun, removeScenarioRunListener, ScenarioRunEvent } from '../../shared/ws';
 
 interface ImportResult {
@@ -33,12 +36,17 @@ interface ScenarioInfo {
 @Component({
   selector: 'app-scenario-list',
   standalone: true,
-  imports: [NgFor, NgIf, FormsModule, DatePipe, RouterModule],
+  imports: [NgFor, NgIf, FormsModule, RouterModule, LangDatePipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './scenario-list.html',
   styleUrl: './scenario-list.css',
 })
 export class ScenarioListComponent implements OnInit, OnDestroy {
+  readonly i18n = inject(I18nService);
+
+  // Bound so the template can call `t('key')`.
+  readonly t = this.i18n.t;
+
   scenarios: ScenarioInfo[] = [];
   loading = true;
   running = '';
@@ -173,16 +181,19 @@ export class ScenarioListComponent implements OnInit, OnDestroy {
         body: JSON.stringify({ yaml }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Import failed (${res.status})`);
+      if (!res.ok) throw new Error(data.error || this.t('list.import_failed', { error: res.status }));
 
       const ok = data.results.filter((r: ImportResult) => r.status === 'imported');
       const failed = data.results.filter((r: ImportResult) => r.status !== 'imported');
       if (failed.length) {
         this.importTone = ok.length ? 'warning' : 'danger';
-        this.importMsg = failed.map((r: ImportResult) => `${r.name}: ${r.error || r.status}`).join(' - ');
+        // Per-file details stay untouched: scenario names and errors come from the server.
+        this.importMsg = this.t('list.import_failed', {
+          error: failed.map((r: ImportResult) => `${r.name}: ${r.error || r.status}`).join(' - '),
+        });
       } else {
         this.importTone = 'success';
-        this.importMsg = ok.map((r: ImportResult) => `Imported ${r.name} as ${r.file}`).join(', ');
+        this.importMsg = this.t('list.imported', { count: ok.length });
       }
       await this.fetchScenarios();
     } catch (err: unknown) {

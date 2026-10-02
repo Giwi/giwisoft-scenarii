@@ -16,6 +16,10 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  /* The section pins Bootstrap's dark colour mode (see the attribute in landing.html),
+     so bare text here must resolve its body colour in this subtree rather than inherit
+     the lighter one applied on <body>. */
+  color: var(--bs-body-color);
 }
 
 .hero::before {
@@ -39,18 +43,14 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(127, 127, 160, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(127, 127, 160, 0.06) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: radial-gradient(ellipse 560px 380px at 50% 0%, black, transparent 72%);
-  -webkit-mask-image: radial-gradient(ellipse 560px 380px at 50% 0%, black, transparent 72%);
-}
-
-[data-bs-theme='dark'] .hero::after {
+  /* The hero is always dark (see the data-bs-theme attribute), so the grid is always
+     the pale one and the old light/dark split no longer applies. */
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 560px 380px at 50% 0%, black, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 560px 380px at 50% 0%, black, transparent 72%);
 }
 
 .hero h1 {

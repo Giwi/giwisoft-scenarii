@@ -4,8 +4,12 @@ import path from 'path';
 import { getSettings, AuthProvider } from '../config/settings';
 import {
   verifyCredentials, ensureUser, getUser, listUsers, createUser, setPassword, setRole,
-  deleteUser, generatePassword, normalizeRole, UserRole,
+  deleteUser, generatePassword, normalizeRole, UserRole, getProfile, getPasswordHash,
+  getTotpSecret, useRecoveryCode, verifyPassword,
 } from '../config/users';
+import { verifyTotp } from '../utils/totp';
+import { avatarUrlFor } from '../config/avatar';
+import { DEFAULT_LANG, Lang, langFromAcceptLanguage, normalizeLang, t } from '../i18n';
 import logger from '../utils/logger';
 
 interface Session {
@@ -66,6 +70,19 @@ function getSession(req: express.Request): Session | undefined {
   return session;
 }
 
+// The username of the request's session, or undefined when unauthenticated.
+export function sessionUsername(req: express.Request): string | undefined {
+  return getSession(req)?.username;
+}
+
+// The language a response should use: the signed-in user's profile choice, and for
+// anonymous visitors (login page, public status page) the Accept-Language header.
+export function requestLang(req: express.Request): Lang {
+  const session = getSession(req);
+  if (session) return getProfile(session.username).lang;
+  return langFromAcceptLanguage(req.headers['accept-language']);
+}
+
 // Sets the session cookie and returns its value.
 function startSession(res: express.Response, username: string, provider: AuthProvider): void {
   const sessionId = generateSessionId();
@@ -90,7 +107,7 @@ export function authMiddleware(req: express.Request, res: express.Response, next
   if (!req.path.startsWith('/api/')) return next();
   if (PUBLIC_API_PATHS.some(p => req.path === p || req.path.startsWith(p))) return next();
   if (!getSession(req)) {
-    res.status(401).json({ error: 'Authentication required' });
+    res.status(401).json({ error: t('auth.required', requestLang(req)) });
     return;
   }
   next();
@@ -102,13 +119,13 @@ export function requireAdmin(req: express.Request, res: express.Response, next: 
   if (!authProvider()) return next();
   const session = getSession(req);
   if (!session) {
-    res.status(401).json({ error: 'Authentication required' });
+    res.status(401).json({ error: t('auth.required', requestLang(req)) });
     return;
   }
   // Re-read the role so a promotion or demotion takes effect on the next request.
   const role = getUser(session.username)?.role ?? 'user';
   if (role !== 'admin') {
-    res.status(403).json({ error: 'Admin role required' });
+    res.status(403).json({ error: t('auth.admin_required', requestLang(req)) });
     return;
   }
   next();
@@ -128,22 +145,91 @@ export function pageAuthMiddleware(req: express.Request, res: express.Response, 
   res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl)}`);
 }
 
-// Local username/password login. Sets a session cookie on success.
+// Local username/password login. Sets a session cookie on success. When the account has
+// two-factor authentication enabled the response asks for a code instead of logging in,
+// and the session is only created once that code checks out.
 export function handleLocalLogin(req: express.Request, res: express.Response): void {
+  const lang = requestLang(req);
   if (authProvider() !== 'local') {
-    res.status(400).json({ error: 'Password login is disabled' });
+    res.status(400).json({ error: t('auth.password_login_disabled', lang) });
     return;
   }
   const { username, password } = req.body as { username?: string; password?: string };
   const user = verifyCredentials(username ?? '', password ?? '');
   if (!user) {
     logger.warn({ username }, 'Failed login attempt');
-    res.status(401).json({ error: 'Invalid username or password' });
+    res.status(401).json({ error: t('auth.invalid_credentials', lang) });
     return;
   }
-  startSession(res, user, 'local');
-  logger.info({ username: user, role: getUser(user)?.role }, 'User logged in');
-  res.json({ username: user, role: getUser(user)?.role, provider: 'local' });
+  if (getProfile(user).totp_enabled) {
+    const challenge = createChallenge(user);
+    res.json({ requires_2fa: true, challenge, message: t('auth.totp_required', lang) });
+    return;
+  }
+  finishLogin(res, user);
+}
+
+// Second step of the login: exchanges a challenge for a session once the code (or a
+// recovery code) is verified. Challenges are single use and expire quickly.
+const CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface LoginChallenge {
+  username: string;
+  attempts: number;
+  expiresAt: number;
+}
+
+const challenges = new Map<string, LoginChallenge>();
+
+// Passwords only, no 2FA: shared by the first login step and the challenge exchange.
+function finishLogin(res: express.Response, username: string, lang: Lang = DEFAULT_LANG): void {
+  startSession(res, username, 'local');
+  logger.info({ username, role: getUser(username)?.role }, 'User logged in');
+  res.json({ username, role: getUser(username)?.role, provider: 'local', lang });
+}
+
+// Issues a short-lived challenge id for a user that passed the password step.
+function createChallenge(username: string): string {
+  pruneChallenges();
+  const id = crypto.randomBytes(24).toString('hex');
+  challenges.set(id, { username, attempts: 0, expiresAt: Date.now() + CHALLENGE_TTL });
+  return id;
+}
+
+// Completes a two-factor login. A wrong code is retried a few times, then the challenge
+// is dropped so the password has to be entered again.
+const MAX_CHALLENGE_ATTEMPTS = 3;
+
+export function handleTwoFactorLogin(req: express.Request, res: express.Response): void {
+  const lang = requestLang(req);
+  const { challenge, code } = req.body as { challenge?: string; code?: string };
+  const pending = challenge ? challenges.get(challenge) : undefined;
+  if (!pending || pending.expiresAt < Date.now()) {
+    if (challenge) challenges.delete(challenge);
+    res.status(400).json({ error: t('auth.totp_required', lang) });
+    return;
+  }
+  if (pending.attempts >= MAX_CHALLENGE_ATTEMPTS) {
+    challenges.delete(challenge!);
+    res.status(429).json({ error: t('auth.rate_limited', lang) });
+    return;
+  }
+  pending.attempts++;
+  const secret = getTotpSecret(pending.username);
+  const supplied = String(code ?? '').trim();
+  if (!secret || !(verifyTotp(secret, supplied) || useRecoveryCode(pending.username, supplied))) {
+    logger.warn({ username: pending.username }, 'Failed two-factor attempt');
+    res.status(401).json({ error: t('auth.totp_invalid', lang) });
+    return;
+  }
+  challenges.delete(challenge!);
+  finishLogin(res, pending.username, lang);
+}
+
+// Drops login challenges whose window has passed. Called whenever a new one is issued.
+export function pruneChallenges(): void {
+  const now = Date.now();
+  for (const [id, pending] of challenges) if (pending.expiresAt < now) challenges.delete(id);
 }
 
 interface OidcDiscovery {
@@ -174,10 +260,10 @@ function cleanOidcStates(): void {
 }
 
 // Redirects the user to the OIDC provider's authorization page.
-export async function handleOidcLogin(_req: express.Request, res: express.Response): Promise<void> {
+export async function handleOidcLogin(req: express.Request, res: express.Response): Promise<void> {
   const oidc = getSettings().auth?.oidc;
   if (authProvider() !== 'oidc' || !oidc) {
-    res.status(400).json({ error: 'OIDC not configured' });
+    res.status(400).json({ error: t('auth.oidc_not_configured', requestLang(req)) });
     return;
   }
   cleanOidcStates();
@@ -197,7 +283,7 @@ export async function handleOidcLogin(_req: express.Request, res: express.Respon
     res.redirect(`${discovery.authorization_endpoint}?${params}`);
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'OIDC login redirect failed');
-    res.status(502).json({ error: 'OIDC provider unreachable' });
+    res.status(502).json({ error: t('auth.oidc_unreachable', requestLang(req)) });
   }
 }
 
@@ -250,19 +336,19 @@ async function fetchUserInfo(discovery: OidcDiscovery, accessToken: string): Pro
 export async function handleOidcCallback(req: express.Request, res: express.Response): Promise<void> {
   const oidc = getSettings().auth?.oidc;
   if (authProvider() !== 'oidc' || !oidc) {
-    res.status(400).json({ error: 'OIDC not configured' });
+    res.status(400).json({ error: t('auth.oidc_not_configured', requestLang(req)) });
     return;
   }
   const { code, state } = req.query as { code?: string; state?: string };
 
   if (!code || !state) {
-    res.status(400).json({ error: 'Missing code or state parameter' });
+    res.status(400).json({ error: t('auth.oidc_missing_code', requestLang(req)) });
     return;
   }
 
   cleanOidcStates();
   if (!oidcStates.has(state)) {
-    res.status(400).json({ error: 'Invalid or expired state parameter' });
+    res.status(400).json({ error: t('auth.oidc_invalid_state', requestLang(req)) });
     return;
   }
   oidcStates.delete(state);
@@ -284,7 +370,7 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
       logger.error({ status: tokenRes.status, body: errText }, 'OIDC token exchange failed');
-      res.status(500).json({ error: 'Token exchange failed' });
+      res.status(500).json({ error: t('auth.oidc_token_failed', requestLang(req)) });
       return;
     }
 
@@ -298,23 +384,28 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
     res.redirect('/scenarios');
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'OIDC callback failed');
-    res.status(500).json({ error: 'OIDC authentication failed' });
+    res.status(500).json({ error: t('auth.oidc_failed', requestLang(req)) });
   }
 }
 
-// Returns the current authentication status to the client.
+// Returns the current authentication status to the client. The language comes from the
+// Accept-Language header so the login page can pick one before there is a session.
 export function handleAuthMe(req: express.Request, res: express.Response): void {
   const provider = authProvider();
   if (!provider) {
-    res.json({ authenticated: true, username: null, role: null, provider: null });
+    res.json({ authenticated: true, username: null, role: null, provider: null, lang: requestLang(req) });
     return;
   }
   const session = getSession(req);
+  const profile = session ? getProfile(session.username) : undefined;
   res.json({
     authenticated: !!session,
     username: session?.username ?? null,
     role: session ? getUser(session.username)?.role ?? 'user' : null,
     provider,
+    lang: profile?.lang ?? requestLang(req),
+    color_scheme: profile?.color_scheme ?? 'light',
+    avatar_url: session ? avatarUrlFor(session.username) : null,
   });
 }
 
@@ -330,18 +421,18 @@ export function handleListUsers(_req: express.Request, res: express.Response): v
 export function handleCreateUser(req: express.Request, res: express.Response): void {
   const { username, password, role } = req.body as { username?: string; password?: string; role?: string };
   if (!username?.trim()) {
-    res.status(400).json({ error: 'username is required' });
+    res.status(400).json({ error: t('auth.username_required', requestLang(req)) });
     return;
   }
   if (getUser(username.trim())) {
-    res.status(409).json({ error: 'User already exists' });
+    res.status(409).json({ error: t('auth.user_exists', requestLang(req)) });
     return;
   }
   const generated = !password;
   const secret = password || generatePassword();
   const created = createUser(username.trim(), secret, normalizeRole(role));
   if (!created) {
-    res.status(409).json({ error: 'User already exists' });
+    res.status(409).json({ error: t('auth.user_exists', requestLang(req)) });
     return;
   }
   logger.info({ username, role: normalizeRole(role) }, 'User created');
@@ -352,11 +443,11 @@ export function handleCreateUser(req: express.Request, res: express.Response): v
 export function handleSetUserPassword(req: express.Request, res: express.Response): void {
   const { username, password } = req.body as { username?: string; password?: string };
   if (!username) {
-    res.status(400).json({ error: 'username is required' });
+    res.status(400).json({ error: t('auth.username_required', requestLang(req)) });
     return;
   }
   if (!getUser(username)) {
-    res.status(404).json({ error: 'Unknown user' });
+    res.status(404).json({ error: t('auth.unknown_user', requestLang(req)) });
     return;
   }
   const secret = password || generatePassword();
@@ -370,16 +461,16 @@ export function handleSetUserPassword(req: express.Request, res: express.Respons
 export function handleSetUserRole(req: express.Request, res: express.Response): void {
   const { username, role } = req.body as { username?: string; role?: string };
   if (!username || !role) {
-    res.status(400).json({ error: 'username and role are required' });
+    res.status(400).json({ error: t('auth.role_required', requestLang(req)) });
     return;
   }
   if (username === getSession(req)?.username) {
-    res.status(400).json({ error: 'Cannot change your own role' });
+    res.status(400).json({ error: t('auth.own_role', requestLang(req)) });
     return;
   }
   const next = normalizeRole(role);
   if (!setRole(username, next)) {
-    res.status(404).json({ error: 'Unknown user' });
+    res.status(404).json({ error: t('auth.unknown_user', requestLang(req)) });
     return;
   }
   logger.info({ username, role: next }, 'Role updated');
@@ -391,11 +482,11 @@ export function handleSetUserRole(req: express.Request, res: express.Response): 
 export function handleDeleteUser(req: express.Request, res: express.Response): void {
   const username = String(req.params.username);
   if (username === getSession(req)?.username) {
-    res.status(400).json({ error: 'Cannot delete your own account' });
+    res.status(400).json({ error: t('auth.own_delete', requestLang(req)) });
     return;
   }
   if (!getUser(username)) {
-    res.status(404).json({ error: 'Unknown user' });
+    res.status(404).json({ error: t('auth.unknown_user', requestLang(req)) });
     return;
   }
   deleteUser(username);

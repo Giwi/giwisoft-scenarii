@@ -8,6 +8,7 @@ import {
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { I18nService } from '../../shared/i18n';
 
 // One highlighted chunk of the YAML, rendered as a span over the textarea.
 interface YamlPart {
@@ -57,6 +58,10 @@ export class ScenarioEditorComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
+  private i18n = inject(I18nService);
+
+  // Translation helper, exposed so the template can call `t('key')`.
+  readonly t = this.i18n.t;
 
   ngOnInit(): void {
     // Both /scenario/new and /scenario/:name/edit use this component, so re-init on every

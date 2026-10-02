@@ -105,7 +105,7 @@ export async function runScenario(
       fs.existsSync(workerPath) ? workerPath : path.join(__dirname, 'worker.ts'),
       {
         workerData: { scenario, options },
-        execArgv: fs.existsSync(workerPath) ? [] : ['-r', 'ts-node/register'],
+        execArgv: fs.existsSync(workerPath) ? [] : ['--import', 'tsx'],
       },
     );
 

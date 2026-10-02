@@ -2,23 +2,23 @@
   <a
     [routerLink]="isNew ? '/scenarios' : '/scenario/' + scenarioName"
     class="btn btn-sm btn-outline-secondary"
-    title="Back"
+    [title]="t('editor.back_title')"
   >
     <i class="bi bi-arrow-left"></i>
   </a>
-  <h1 class="h5 mb-0">{{ isNew ? 'New scenario' : 'Edit: ' + scenarioName }}</h1>
+  <h1 class="h5 mb-0">{{ isNew ? t('editor.new_title') : t('editor.edit_title', { name: scenarioName }) }}</h1>
   <div class="ms-auto d-flex gap-2">
-    <a class="btn btn-sm btn-outline-primary" routerLink="/scenario/new" title="New scenario">
-      <i class="bi bi-plus-lg"></i> New
+    <a *ngIf="isNew" class="btn btn-sm btn-outline-primary" routerLink="/scenarios" [title]="t('editor.back_to_scenarios')">
+      <i class="bi bi-list-ul"></i> {{ t('list.title') }}
     </a>
     <button class="btn btn-sm btn-success" (click)="save()" [disabled]="saving">
-      <i class="bi bi-floppy me-1"></i>{{ saving ? 'Saving...' : isNew ? 'Create' : 'Save' }}
+      <i class="bi bi-floppy me-1"></i>{{ saving ? t('common.saving') : isNew ? t('editor.create') : t('common.save') }}
     </button>
   </div>
 </div>
 
 <div class="alert alert-success" *ngIf="saved" role="alert">
-  <i class="bi bi-check-circle me-1"></i> Scenario saved successfully.
+  <i class="bi bi-check-circle me-1"></i> {{ t('editor.saved') }}
 </div>
 <div class="alert alert-danger" *ngIf="error" role="alert">
   <i class="bi bi-exclamation-triangle me-1"></i> {{ error }}
@@ -49,5 +49,5 @@
 
 <p class="small text-secondary mt-2 mb-0">
   <i class="bi bi-info-circle me-1"></i>
-  YAML syntax is highlighted. The name becomes the filename on disk, so keep it unique.
+  {{ t('editor.hint') }}
 </p>

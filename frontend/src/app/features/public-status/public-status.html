@@ -1,11 +1,11 @@
 <div *ngIf="error" class="text-center py-5 text-secondary">
   <i class="bi bi-search fs-2 mb-2 d-block"></i>
-  Scenario not found.
+  {{ t('detail.not_found') }}
 </div>
 
 <div class="text-center py-5 text-secondary" *ngIf="!scenario && !error">
   <i class="bi bi-hourglass-split fs-2 mb-2 d-block"></i>
-  Loading...
+  {{ t('common.loading') }}
 </div>
 
 <div *ngIf="scenario">
@@ -16,7 +16,7 @@
     </span>
   </div>
   <div class="small text-secondary mb-4">
-    Status page — auto-refreshes every 30s
+    {{ t('status.auto_refresh') }}
   </div>
 
   <div class="row g-3 mb-4">
@@ -26,8 +26,8 @@
           [class.text-success]="scenario.last_success === 1"
           [class.text-danger]="scenario.last_success === 0"
           [class.text-secondary]="scenario.last_success === null"
-        >{{ scenario.last_success === 1 ? 'Pass' : scenario.last_success === 0 ? 'Fail' : '—' }}</div>
-        <div class="small text-secondary text-uppercase">Current Status</div>
+        >{{ scenario.last_success === 1 ? t('common.pass') : scenario.last_success === 0 ? t('common.fail') : '—' }}</div>
+        <div class="small text-secondary text-uppercase">{{ t('status.current') }}</div>
       </div>
     </div>
     <div class="col">
@@ -37,25 +37,25 @@
           [class.text-warning]="scenario.sla >= 90 && scenario.sla < 99"
           [class.text-danger]="scenario.sla < 90"
         >{{ scenario.sla }}%</div>
-        <div class="small text-secondary text-uppercase">SLA (7d)</div>
+        <div class="small text-secondary text-uppercase">{{ t('status.sla', { days: 7 }) }}</div>
       </div>
     </div>
     <div class="col">
       <div class="card border-0 shadow-sm text-center p-3">
         <div class="fs-2 fw-bold">{{ scenario.total_runs }}</div>
-        <div class="small text-secondary text-uppercase">Total Runs</div>
+        <div class="small text-secondary text-uppercase">{{ t('status.total_runs') }}</div>
       </div>
     </div>
     <div class="col">
       <div class="card border-0 shadow-sm text-center p-3">
         <div class="fs-2 fw-bold text-success">{{ scenario.passed_runs }}</div>
-        <div class="small text-secondary text-uppercase">Passed</div>
+        <div class="small text-secondary text-uppercase">{{ t('status.passed') }}</div>
       </div>
     </div>
     <div class="col">
       <div class="card border-0 shadow-sm text-center p-3">
         <div class="fs-2 fw-bold text-danger">{{ scenario.failed_runs }}</div>
-        <div class="small text-secondary text-uppercase">Failed</div>
+        <div class="small text-secondary text-uppercase">{{ t('status.failed') }}</div>
       </div>
     </div>
   </div>
@@ -64,7 +64,7 @@
     <div class="col-md-6">
       <div class="card border-0 shadow-sm">
         <div class="card-body">
-          <h3 class="card-title small text-secondary text-uppercase">Response Time Trend</h3>
+          <h3 class="card-title small text-secondary text-uppercase">{{ t('status.duration_trend') }}</h3>
           <div class="chart-wrapper"><canvas id="durationChart"></canvas></div>
         </div>
       </div>
@@ -72,7 +72,7 @@
     <div class="col-md-6">
       <div class="card border-0 shadow-sm">
         <div class="card-body">
-          <h3 class="card-title small text-secondary text-uppercase">Success Rate Over Time</h3>
+          <h3 class="card-title small text-secondary text-uppercase">{{ t('status.success_trend') }}</h3>
           <div class="chart-wrapper"><canvas id="successChart"></canvas></div>
         </div>
       </div>

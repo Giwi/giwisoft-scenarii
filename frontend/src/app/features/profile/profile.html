@@ -1,0 +1,326 @@
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="h4 mb-1"><i class="bi bi-person-circle me-2"></i>{{ t('profile.title') }}</h1>
+      <p class="text-secondary small mb-0">{{ t('profile.subtitle') }}</p>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary border-0" (click)="load()" [title]="t('common.refresh')">
+      <i class="bi bi-arrow-clockwise"></i>
+    </button>
+  </div>
+
+  <div class="alert alert-danger py-2 small" *ngIf="error" role="alert">
+    <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+  </div>
+  <div class="alert alert-success py-2 small" *ngIf="notice" role="alert">
+    <i class="bi bi-check-circle me-1"></i>{{ notice }}
+  </div>
+  <div class="text-secondary small" *ngIf="loading">
+    <i class="bi bi-arrow-repeat me-1"></i>{{ t('common.loading') }}
+  </div>
+
+  <ng-container *ngIf="profile && !loading">
+    <!-- Recovery codes are shown once, right after enabling 2FA. -->
+    <div class="card mb-4 border-warning" *ngIf="recoveryCodes">
+      <div class="card-body">
+        <h2 class="h6 mb-2">
+          <i class="bi bi-shield-exclamation me-2"></i>{{ t('profile.recovery_codes') }}
+        </h2>
+        <p class="small text-secondary">{{ t('profile.recovery_codes_help') }}</p>
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-5 g-2 mb-3">
+          <div class="col" *ngFor="let code of recoveryCodes">
+            <code class="recovery-code">{{ code }}</code>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" (click)="copyRecoveryCodes()">
+            <i class="bi bi-clipboard me-1"></i>{{ t('common.copy') }}
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" (click)="recoveryCodes = null">
+            {{ t('common.close') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Avatar -->
+      <div class="col-12 col-lg-4">
+        <div class="card h-100">
+          <div class="card-body text-center">
+            <h2 class="h6 mb-3"><i class="bi bi-image me-2"></i>{{ t('profile.avatar') }}</h2>
+            <img
+              *ngIf="profile.avatar_url; else avatarFallback"
+              [src]="profile.avatar_url"
+              class="avatar-preview mb-3"
+              [alt]="t('profile.avatar')"
+            />
+            <ng-template #avatarFallback>
+              <div class="avatar-preview avatar-placeholder mb-3">
+                <i class="bi bi-person"></i>
+              </div>
+            </ng-template>
+            <p class="small text-secondary">{{ t('profile.avatar_help') }}</p>
+            <input
+              #fileInput
+              type="file"
+              class="d-none"
+              accept="image/png,image/jpeg,image/webp"
+              (change)="onFileSelected($event)"
+            />
+            <button class="btn btn-sm btn-outline-primary w-100 mb-2" (click)="pickFile()">
+              <i class="bi bi-upload me-1"></i>{{ t('profile.avatar_change') }}
+            </button>
+            <button
+              class="btn btn-sm btn-outline-secondary w-100"
+              *ngIf="profile.has_avatar"
+              (click)="removeAvatar()"
+            >
+              <i class="bi bi-arrow-counterclockwise me-1"></i>{{ t('profile.avatar_remove') }}
+            </button>
+            <p class="small text-secondary mt-3 mb-0">{{ t('profile.avatar_gravatar_note') }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-8">
+        <!-- Account -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <h2 class="h6 mb-3"><i class="bi bi-person-gear me-2"></i>{{ t('profile.identity') }}</h2>
+            <dl class="row mb-3 small">
+              <dt class="col-sm-3">{{ t('profile.signed_in_as', { username: profile.username }) }}</dt>
+              <dd class="col-sm-9 mb-1">
+                <code>{{ profile.username }}</code>
+                <span class="badge bg-secondary ms-2">{{ profile.role }}</span>
+              </dd>
+            </dl>
+            <label class="form-label" for="profile-email">{{ t('profile.email') }}</label>
+            <input
+              id="profile-email"
+              type="email"
+              class="form-control form-control-sm mb-1"
+              style="max-width: 26rem"
+              [(ngModel)]="email"
+              name="email"
+              autocomplete="email"
+            />
+            <div class="form-text">{{ t('profile.email_help') }}</div>
+            <button
+              class="btn btn-sm btn-primary mt-3"
+              (click)="saveProfile()"
+              [disabled]="savingProfile"
+            >
+              <i class="bi bi-floppy me-1"></i>{{ savingProfile ? t('common.saving') : t('common.save') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <h2 class="h6 mb-3"><i class="bi bi-palette me-2"></i>{{ t('profile.appearance') }}</h2>
+            <div class="row g-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="profile-scheme">{{ t('nav.theme') }}</label>
+                <select
+                  id="profile-scheme"
+                  class="form-select form-select-sm"
+                  [ngModel]="theme.scheme()"
+                  (ngModelChange)="setScheme($event)"
+                >
+                  <option *ngFor="let s of schemes" [value]="s">{{ t(schemeLabels[s]) }}</option>
+                </select>
+                <div class="form-text">{{ t('profile.appearance_help') }}</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="profile-lang">{{ t('profile.language') }}</label>
+                <select
+                  id="profile-lang"
+                  class="form-select form-select-sm"
+                  [ngModel]="i18n.lang()"
+                  (ngModelChange)="setLang($event)"
+                >
+                  <option *ngFor="let l of langs" [value]="l">{{ langNames[l] }}</option>
+                </select>
+                <div class="form-text">{{ t('profile.language_help') }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <h2 class="h6 mb-3"><i class="bi bi-key me-2"></i>{{ t('profile.password_change') }}</h2>
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label class="form-label" for="pw-current">{{ t('profile.current_password') }}</label>
+                <input
+                  id="pw-current"
+                  type="password"
+                  class="form-control form-control-sm"
+                  autocomplete="current-password"
+                  [(ngModel)]="currentPassword"
+                />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label" for="pw-new">{{ t('profile.new_password') }}</label>
+                <input
+                  id="pw-new"
+                  type="password"
+                  class="form-control form-control-sm"
+                  autocomplete="new-password"
+                  [(ngModel)]="newPassword"
+                />
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label" for="pw-confirm">{{ t('profile.confirm_password') }}</label>
+                <input
+                  id="pw-confirm"
+                  type="password"
+                  class="form-control form-control-sm"
+                  autocomplete="new-password"
+                  [(ngModel)]="confirmPassword"
+                />
+              </div>
+            </div>
+            <div class="form-text">{{ t('profile.password_help') }}</div>
+            <button
+              class="btn btn-sm btn-primary mt-3"
+              (click)="changePassword()"
+              [disabled]="savingPassword"
+            >
+              <i class="bi bi-floppy me-1"></i>{{ savingPassword ? t('common.saving') : t('profile.password_change') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Two-factor: hidden entirely when OIDC owns the second factor. -->
+        <div class="card" *ngIf="profile.totp_available">
+          <div class="card-body">
+            <h2 class="h6 mb-2"><i class="bi bi-shield-lock me-2"></i>{{ t('profile.two_factor') }}</h2>
+            <p class="small text-secondary">{{ t('profile.two_factor_help') }}</p>
+
+            <div *ngIf="profile.totp_enabled && !setup">
+              <div class="alert alert-success py-2 small">
+                <i class="bi bi-check-circle me-1"></i>{{ t('profile.two_factor_active') }}
+              </div>
+              <p class="small text-secondary">{{ t('profile.two_factor_disable_help') }}</p>
+              <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="totp-pw">{{ t('profile.current_password') }}</label>
+                  <input
+                    id="totp-pw"
+                    type="password"
+                    class="form-control form-control-sm"
+                    autocomplete="current-password"
+                    [(ngModel)]="totpPassword"
+                  />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label" for="totp-off-code">{{ t('profile.two_factor_disable_code') }}</label>
+                  <input
+                    id="totp-off-code"
+                    type="text"
+                    class="form-control form-control-sm"
+                    autocomplete="one-time-code"
+                    [(ngModel)]="totpCode"
+                  />
+                </div>
+                <div class="col-12 col-md-4">
+                  <button
+                    class="btn btn-sm btn-outline-danger w-100"
+                    (click)="disableTwoFactor()"
+                    [disabled]="busy2fa"
+                  >
+                    <i class="bi bi-shield-slash me-1"></i>{{ t('profile.two_factor_disable') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="!profile.totp_enabled && !setup">
+              <button class="btn btn-sm btn-outline-primary" (click)="startTwoFactor()" [disabled]="busy2fa">
+                <i class="bi bi-shield-plus me-1"></i>{{ t('profile.two_factor_enable') }}
+              </button>
+            </div>
+
+            <!-- QR code and secret, shown until confirmed with a code. -->
+            <div class="mt-3" *ngIf="setup">
+              <p class="small">{{ t('profile.two_factor_scan') }}</p>
+              <div class="d-flex flex-wrap align-items-center gap-3">
+                <img [src]="setup.qr_code" class="totp-qr" [alt]="t('profile.two_factor')" />
+                <div>
+                  <label class="form-label small" for="totp-code">{{ t('profile.two_factor_code') }}</label>
+                  <input
+                    id="totp-code"
+                    type="text"
+                    class="form-control form-control-sm totp-input"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength="6"
+                    [(ngModel)]="totpCode"
+                  />
+                </div>
+              </div>
+              <p class="small text-secondary mt-3 mb-1">{{ t('profile.two_factor_secret') }}</p>
+              <code class="totp-secret">{{ setup.secret }}</code>
+              <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-sm btn-primary" (click)="confirmTwoFactor()" [disabled]="busy2fa || !totpCode">
+                  <i class="bi bi-check-lg me-1"></i>{{ t('profile.two_factor_confirm') }}
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" (click)="cancelTwoFactorSetup()">
+                  {{ t('profile.two_factor_cancel') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>
+
+<!-- Avatar crop dialog: drag to reposition, slider to zoom. -->
+<div class="crop-backdrop" *ngIf="cropping()" (click)="cancelCrop()">
+  <div class="crop-dialog" (click)="$event.stopPropagation()">
+    <h2 class="h6 mb-3"><i class="bi bi-crop me-2"></i>{{ t('profile.crop_title') }}</h2>
+    <canvas
+      #cropCanvas
+      class="crop-canvas"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp()"
+      (pointercancel)="onPointerUp()"
+    ></canvas>
+    <div class="d-flex align-items-center gap-2 mt-3">
+      <button class="btn btn-sm btn-outline-secondary" (click)="zoom(1 / 1.25)" [title]="t('profile.avatar_zoom_out')">
+        <i class="bi bi-dash-lg"></i>
+      </button>
+      <input
+        type="range"
+        class="form-range flex-grow-1"
+        min="1"
+        max="4"
+        step="0.01"
+        [ngModel]="zoomLevel"
+        (ngModelChange)="setZoomLevel($event)"
+      />
+      <button class="btn btn-sm btn-outline-secondary" (click)="zoom(1.25)" [title]="t('profile.avatar_zoom_in')">
+        <i class="bi bi-plus-lg"></i>
+      </button>
+    </div>
+    <button class="btn btn-sm btn-outline-primary w-100 mt-2" (click)="autoscale()">
+      <i class="bi bi-aspect-ratio me-1"></i>{{ t('profile.avatar_autoscale') }}
+    </button>
+    <div class="d-flex gap-2 mt-3">
+      <button class="btn btn-sm btn-primary flex-grow-1" (click)="applyCrop()" [disabled]="uploading">
+        {{ uploading ? t('profile.avatar_uploading') : t('profile.crop_apply') }}
+      </button>
+      <button class="btn btn-sm btn-outline-secondary" (click)="cancelCrop()">
+        {{ t('profile.crop_cancel') }}
+      </button>
+    </div>
+  </div>
+</div>

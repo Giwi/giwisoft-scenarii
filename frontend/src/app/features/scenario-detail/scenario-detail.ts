@@ -4,11 +4,14 @@ import {
   OnDestroy,
   ChangeDetectorRef,
   ChangeDetectionStrategy,
+  inject,
 } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { NgFor, NgIf, DatePipe } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import Chart from 'chart.js/auto';
 import { onScenarioRun, removeScenarioRunListener, onStepProgress, removeStepProgressListener } from '../../shared/ws';
+import { I18nService } from '../../shared/i18n';
+import { LangDatePipe } from '../../shared/lang-date.pipe';
 
 function areaGradient(color: string, alphaTop = 0.25, alphaBottom = 0.02) {
   return (ctx: any) => {
@@ -65,7 +68,7 @@ interface ScenarioDetail {
 @Component({
   selector: 'app-scenario-detail',
   standalone: true,
-  imports: [NgFor, NgIf, DatePipe, RouterModule],
+  imports: [NgFor, NgIf, RouterModule, LangDatePipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './scenario-detail.html',
   styleUrl: './scenario-detail.css',
@@ -86,6 +89,11 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   scenarioName = '';
   pageSize = 15;
   currentPage = 1;
+
+  readonly i18n = inject(I18nService);
+
+  // Translation helper, exposed so the template can call `t('key')`.
+  readonly t = this.i18n.t;
 
   get totalPages(): number {
     return Math.max(1, Math.ceil(Math.min(this.detail?.info.total_runs ?? 0, this.detail?.history.length ?? 0) / this.pageSize));

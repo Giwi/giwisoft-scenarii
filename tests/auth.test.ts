@@ -52,7 +52,10 @@ describe('API authentication', () => {
   it('reports the auth status as unauthenticated', async () => {
     const res = await req('/api/auth/me');
     assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(await res.json(), { authenticated: false, username: null, role: null, provider: 'local' });
+    assert.deepStrictEqual(await res.json(), {
+      authenticated: false, username: null, role: null, provider: 'local', lang: 'en',
+      color_scheme: 'light', avatar_url: null,
+    });
   });
 
   it('rejects a wrong password', async () => {
@@ -80,7 +83,7 @@ describe('API authentication', () => {
       body: JSON.stringify({ username: 'admin', password: adminPassword }),
     });
     assert.strictEqual(res.status, 200);
-    assert.deepStrictEqual(await res.json(), { username: 'admin', role: 'admin', provider: 'local' });
+    assert.deepStrictEqual(await res.json(), { username: 'admin', role: 'admin', provider: 'local', lang: 'en' });
     const cookie = res.headers.get('set-cookie')!;
     assert.match(cookie, /scenarii-session=/);
     assert.match(cookie, /HttpOnly/);
@@ -96,7 +99,10 @@ describe('API authentication', () => {
     const cookie = login.headers.get('set-cookie')!.split(';')[0];
 
     const me = await req('/api/auth/me', { headers: { cookie } });
-    assert.deepStrictEqual(await me.json(), { authenticated: true, username: 'admin', role: 'admin', provider: 'local' });
+    assert.deepStrictEqual(await me.json(), {
+      authenticated: true, username: 'admin', role: 'admin', provider: 'local',
+      lang: 'en', color_scheme: 'light', avatar_url: null,
+    });
 
     // /api/scenarios needs storage-backed data, so a non-401 proves the session passed.
     const scenarios = await req('/api/scenarios', { headers: { cookie } });

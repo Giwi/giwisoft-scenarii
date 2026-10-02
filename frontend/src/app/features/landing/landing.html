@@ -1,91 +1,210 @@
 <div class="landing">
-  <!-- Hero: pitch on the left, login on the right -->
-  <section class="hero">
+  <!-- Hero: always dark, whatever the colour scheme, so the pitch reads identically for
+       every visitor and the card behind the login form stays high-contrast. -->
+  <section class="hero" data-bs-theme="dark">
     <div class="container position-relative">
       <div class="row g-4 g-lg-5 align-items-center">
         <div class="col-lg-7 text-center text-lg-start">
           <h1>
             <i class="bi bi-activity"></i><span>Scenarii</span>
           </h1>
-          <p class="lead">
-            YAML-defined web test scenarios &mdash; run on a cron schedule through native HTTP or a
-            headless browser, stored in SQLite, tracked on a live dashboard.
-          </p>
+          <p class="lead">{{ t('login.tagline') }}</p>
           <div class="badges">
-            <a href="https://github.com/Giwi/giwisoft-scenarii"><i class="bi bi-github"></i> GitHub</a>
-            <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii"><i class="bi bi-box"></i> Container</a>
+            <a href="https://github.com/Giwi/giwisoft-scenarii"><i class="bi bi-github"></i> {{ t('login.github') }}</a>
+            <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii"><i class="bi bi-box"></i> {{ t('login.container') }}</a>
           </div>
         </div>
 
         <div class="col-lg-5">
-          <!-- Login form -->
           <div class="login-card" *ngIf="!authenticated().authenticated; else signedIn">
-        <div class="login-head">
-          <i class="bi bi-shield-lock"></i>
-          <h2 class="h5 mb-0">Sign in</h2>
-        </div>
+            <!-- Alerts shared by every step -->
+            <div class="alert alert-danger py-2 small" *ngIf="error" role="alert">
+              <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
+            </div>
+            <div class="alert alert-success py-2 small" *ngIf="notice" role="alert">
+              <i class="bi bi-check-circle me-1"></i>{{ notice }}
+            </div>
 
-        <form *ngIf="authenticated().provider !== 'oidc'" (ngSubmit)="submit()">
-          <div class="mb-3 text-start">
-            <label class="form-label small text-secondary" for="username">Username</label>
-            <input
-              id="username"
-              class="form-control"
-              type="text"
-              name="username"
-              [(ngModel)]="username"
-              autocomplete="username"
-              autofocus
-              required
-            />
-          </div>
-          <div class="mb-3 text-start">
-            <label class="form-label small text-secondary" for="password">Password</label>
-            <input
-              id="password"
-              class="form-control"
-              type="password"
-              name="password"
-              [(ngModel)]="password"
-              autocomplete="current-password"
-              required
-            />
-          </div>
-          <div class="alert alert-danger py-2 small mb-3" *ngIf="error" role="alert">
-            <i class="bi bi-exclamation-triangle me-1"></i>{{ error }}
-          </div>
-          <button class="btn btn-primary w-100" type="submit" [disabled]="busy || !username || !password">
-            <span class="spinner-border spinner-border-sm me-2" *ngIf="busy"></span>
-            <i class="bi bi-box-arrow-in-right me-1" *ngIf="!busy"></i>Sign in
-          </button>
-        </form>
+            <!-- Credentials -->
+            <ng-container *ngIf="step === 'login'">
+              <div class="login-head">
+                <i class="bi bi-shield-lock"></i>
+                <h2 class="h5 mb-0">{{ t('login.title') }}</h2>
+              </div>
 
-        <div *ngIf="authenticated().provider === 'oidc'">
-          <p class="small text-secondary mb-3">
-            Sign in with your organisation identity provider.
-          </p>
-          <button class="btn btn-primary w-100" type="button" (click)="oidcLogin()">
-            <i class="bi bi-box-arrow-in-right me-1"></i>Continue with SSO
-          </button>
-        </div>
+              <form *ngIf="authenticated().provider !== 'oidc'" (ngSubmit)="submit()">
+                <div class="mb-3 text-start">
+                  <label class="form-label small text-secondary" for="username">{{ t('login.username') }}</label>
+                  <input
+                    id="username"
+                    class="form-control"
+                    type="text"
+                    name="username"
+                    [(ngModel)]="username"
+                    autocomplete="username"
+                    autofocus
+                    required
+                  />
+                </div>
+                <div class="mb-3 text-start">
+                  <label class="form-label small text-secondary" for="password">{{ t('login.password') }}</label>
+                  <input
+                    id="password"
+                    class="form-control"
+                    type="password"
+                    name="password"
+                    [(ngModel)]="password"
+                    autocomplete="current-password"
+                    required
+                  />
+                </div>
+                <button class="btn btn-primary w-100" type="submit" [disabled]="busy || !username || !password">
+                  <span class="spinner-border spinner-border-sm me-2" *ngIf="busy"></span>
+                  <i class="bi bi-box-arrow-in-right me-1" *ngIf="!busy"></i>{{ t('login.submit') }}
+                </button>
+                <div class="text-end mt-2">
+                  <button type="button" class="btn btn-link btn-sm p-0 small" (click)="step = 'forgot'">
+                    {{ t('login.forgot') }}
+                  </button>
+                </div>
+              </form>
 
-        <p class="small text-secondary mt-3 mb-0" *ngIf="!authenticated().provider">
-          Authentication is disabled &mdash; the dashboard is open.
-          <a routerLink="/scenarios">Open dashboard</a>
-        </p>
-      </div>
+              <div *ngIf="authenticated().provider === 'oidc'">
+                <div class="login-head">
+                  <i class="bi bi-shield-lock"></i>
+                  <h2 class="h5 mb-0">{{ t('login.title') }}</h2>
+                </div>
+                <p class="small text-secondary mb-3">{{ t('login.sso_intro') }}</p>
+                <button class="btn btn-primary w-100" type="button" (click)="oidcLogin()">
+                  <i class="bi bi-box-arrow-in-right me-1"></i>{{ t('login.sso') }}
+                </button>
+              </div>
 
-      <ng-template #signedIn>
-        <div class="login-card">
-          <div class="login-head">
-            <i class="bi bi-person-check"></i>
-            <h2 class="h5 mb-0">Signed in as {{ authenticated().username }}</h2>
+              <p class="small text-secondary mt-3 mb-0" *ngIf="!authenticated().provider">
+                {{ t('login.open_disabled') }}
+                <a routerLink="/scenarios">{{ t('login.open_dashboard') }}</a>
+              </p>
+            </ng-container>
+
+            <!-- Second factor -->
+            <ng-container *ngIf="step === 'two-factor'">
+              <div class="login-head">
+                <i class="bi bi-phone"></i>
+                <h2 class="h5 mb-0">{{ t('login.2fa_title') }}</h2>
+              </div>
+              <p class="small text-secondary">{{ t('login.2fa_hint') }}</p>
+              <form (ngSubmit)="submitTwoFactor()">
+                <div class="mb-3 text-start">
+                  <label class="form-label small text-secondary" for="code">{{ t('login.2fa_code') }}</label>
+                  <input
+                    id="code"
+                    class="form-control"
+                    type="text"
+                    name="code"
+                    [(ngModel)]="code"
+                    autocomplete="one-time-code"
+                    inputmode="numeric"
+                    autofocus
+                  />
+                </div>
+                <button class="btn btn-primary w-100" type="submit" [disabled]="busy || !code">
+                  <span class="spinner-border spinner-border-sm me-2" *ngIf="busy"></span>
+                  {{ t('login.2fa_submit') }}
+                </button>
+                <div class="text-end mt-2">
+                  <button type="button" class="btn btn-link btn-sm p-0 small" (click)="backToLogin()">
+                    {{ t('login.2fa_back') }}
+                  </button>
+                </div>
+              </form>
+            </ng-container>
+
+            <!-- Recovery request -->
+            <ng-container *ngIf="step === 'forgot'">
+              <div class="login-head">
+                <i class="bi bi-envelope"></i>
+                <h2 class="h5 mb-0">{{ t('recover.title') }}</h2>
+              </div>
+              <p class="small text-secondary">{{ t('recover.help') }}</p>
+              <form (ngSubmit)="submitForgot()">
+                <div class="mb-3 text-start">
+                  <label class="form-label small text-secondary" for="identifier">{{ t('recover.identifier') }}</label>
+                  <input
+                    id="identifier"
+                    class="form-control"
+                    type="text"
+                    name="identifier"
+                    [(ngModel)]="identifier"
+                    autocomplete="username"
+                    autofocus
+                  />
+                </div>
+                <button class="btn btn-primary w-100" type="submit" [disabled]="busy || !identifier">
+                  <span class="spinner-border spinner-border-sm me-2" *ngIf="busy"></span>
+                  {{ busy ? t('recover.sending') : t('recover.send') }}
+                </button>
+                <div class="text-end mt-2">
+                  <button type="button" class="btn btn-link btn-sm p-0 small" (click)="backToLogin()">
+                    {{ t('recover.back_to_login') }}
+                  </button>
+                </div>
+              </form>
+            </ng-container>
+
+            <!-- Token from a recovery link -->
+            <ng-container *ngIf="step === 'reset'">
+              <div class="login-head">
+                <i class="bi bi-key"></i>
+                <h2 class="h5 mb-0">{{ t('recover.title') }}</h2>
+              </div>
+              <form (ngSubmit)="submitReset()">
+                <div class="mb-3 text-start">
+                  <label class="form-label small text-secondary" for="new-password">{{ t('recover.new_password') }}</label>
+                  <input
+                    id="new-password"
+                    class="form-control"
+                    type="password"
+                    name="newPassword"
+                    [(ngModel)]="newPassword"
+                    autocomplete="new-password"
+                    autofocus
+                  />
+                </div>
+                <div class="mb-3 text-start">
+                  <label class="form-label small text-secondary" for="confirm-password">{{ t('recover.confirm_password') }}</label>
+                  <input
+                    id="confirm-password"
+                    class="form-control"
+                    type="password"
+                    name="confirmPassword"
+                    [(ngModel)]="confirmPassword"
+                    autocomplete="new-password"
+                  />
+                </div>
+                <button class="btn btn-primary w-100" type="submit" [disabled]="busy || !newPassword">
+                  <span class="spinner-border spinner-border-sm me-2" *ngIf="busy"></span>
+                  {{ t('recover.submit') }}
+                </button>
+                <div class="text-end mt-2">
+                  <button type="button" class="btn btn-link btn-sm p-0 small" (click)="backToLogin()">
+                    {{ t('recover.back_to_login') }}
+                  </button>
+                </div>
+              </form>
+            </ng-container>
           </div>
-          <a class="btn btn-primary w-100" routerLink="/scenarios">
-            <i class="bi bi-speedometer2 me-1"></i>Open dashboard
-          </a>
-        </div>
-      </ng-template>
+
+          <ng-template #signedIn>
+            <div class="login-card">
+              <div class="login-head">
+                <i class="bi bi-person-check"></i>
+                <h2 class="h5 mb-0">{{ t('nav.signed_in_as', { username: authenticated().username || '' }) }}</h2>
+              </div>
+              <a class="btn btn-primary w-100" routerLink="/scenarios">
+                <i class="bi bi-speedometer2 me-1"></i>{{ t('login.open_dashboard') }}
+              </a>
+            </div>
+          </ng-template>
         </div>
       </div>
     </div>
@@ -99,8 +218,8 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
               <i class="bi" [class]="'bi ' + f.icon"></i>
-              <h3 class="h6 mt-2 mb-1">{{ f.title }}</h3>
-              <p class="small text-secondary mb-0">{{ f.text }}</p>
+              <h3 class="h6 mt-2 mb-1">{{ t(f.title) }}</h3>
+              <p class="small text-secondary mb-0">{{ t(f.text) }}</p>
             </div>
           </div>
         </div>
@@ -111,12 +230,12 @@
   <!-- Quickstart -->
   <section class="quickstart">
     <div class="container">
-      <h2 class="h4 text-center mb-4">Quick start</h2>
+      <h2 class="h4 text-center mb-4">{{ t('login.quickstart') }}</h2>
       <div class="row g-3">
         <div class="col-lg-6">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
-              <h3 class="h6 text-secondary text-uppercase">Write a scenario</h3>
+              <h3 class="h6 text-secondary text-uppercase">{{ t('login.quickstart_write') }}</h3>
               <pre><code>name: API health check
 schedule: "*/5 * * * *"
 base_url: https://api.example.com
@@ -134,16 +253,13 @@ steps:
         <div class="col-lg-6">
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
-              <h3 class="h6 text-secondary text-uppercase">Run it</h3>
+              <h3 class="h6 text-secondary text-uppercase">{{ t('login.quickstart_run') }}</h3>
               <pre><code># one-off run
 npx scenarii --once scenarios/health.yml
 
 # server + dashboard + scheduler
 npx scenarii server -p 3000</code></pre>
-              <p class="small text-secondary mb-0">
-                The first start prints a generated <code>admin</code> password in the logs.
-                Configure OIDC in <code>settings.yml</code> to sign in with SSO instead.
-              </p>
+              <p class="small text-secondary mb-0">{{ t('login.quickstart_note') }}</p>
             </div>
           </div>
         </div>

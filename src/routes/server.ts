@@ -19,11 +19,17 @@ import { loadScenarioFile, parseScenario } from '../config/parser';
 import { runScenario, cancelScenario } from '../runner/runner';
 import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from '../runner/scheduler';
 import {
-  authMiddleware, requireAdmin, pageAuthMiddleware, handleLocalLogin, handleOidcLogin,
-  handleOidcCallback, handleAuthMe, handleLogout, handleListUsers, handleCreateUser,
-  handleSetUserPassword, handleSetUserRole, handleDeleteUser,
+  authMiddleware, requireAdmin, pageAuthMiddleware, handleLocalLogin, handleTwoFactorLogin,
+  handleOidcLogin, handleOidcCallback, handleAuthMe, handleLogout, handleListUsers,
+  handleCreateUser, handleSetUserPassword, handleSetUserRole, handleDeleteUser, requestLang,
 } from './auth';
+import {
+  handleGetProfile, handleUpdateProfile, handleUploadAvatar, handleDeleteAvatar, handleGetAvatar,
+  handleChangePassword, handleForgotPassword, handleResetPassword,
+  handleTotpSetup, handleTotpEnable, handleTotpDisable,
+} from './profile';
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
+import { t } from '../i18n';
 import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
 import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort } from '../utils/helpers';
 import logger from '../utils/logger';
@@ -77,7 +83,7 @@ function requestLogger(req: express.Request, res: express.Response, next: expres
 
 function sendError(res: express.Response, status: number, err: unknown): void {
   logger.error({ requestId: res.locals.requestId, status, err: err instanceof Error ? err.message : String(err) }, 'Request failed');
-  res.status(status).json({ error: 'Internal server error' });
+  res.status(status).json({ error: t('error.internal', requestLang(res.req)) });
 }
 
 // ──────────────────────────────────────────
@@ -170,7 +176,7 @@ function findScenarioFile(name: string): string | undefined {
 // Bulk import scenarios from a YAML string containing one or more scenario documents.
 function handleBulkImport(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
-    res.status(400).json({ error: 'Server not configured for import' });
+    res.status(400).json({ error: t('error.import_unconfigured', requestLang(req)) });
     return;
   }
   try {
@@ -182,7 +188,7 @@ function handleBulkImport(req: express.Request, res: express.Response): void {
       yamlStr = body.scenarios;
     }
     if (!yamlStr) {
-      res.status(400).json({ error: 'YAML content required in "yaml" or "scenarios" field' });
+      res.status(400).json({ error: t('error.yaml_field_required', requestLang(req)) });
       return;
     }
 
@@ -213,7 +219,7 @@ function handleBulkImport(req: express.Request, res: express.Response): void {
 // Bulk export all scenarios as a YAML array bundle.
 function handleBulkExport(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
-    res.status(400).json({ error: 'Server not configured for export' });
+    res.status(400).json({ error: t('error.export_unconfigured', requestLang(req)) });
     return;
   }
   try {
@@ -308,7 +314,7 @@ function handleScenarioHistory(req: express.Request, res: express.Response): voi
 function handleRunNow(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (!_scenariosDir) {
-    res.status(400).json({ error: 'Server not configured for manual runs' });
+    res.status(400).json({ error: t('error.run_unconfigured', requestLang(req)) });
     return;
   }
   try {
@@ -322,7 +328,7 @@ function handleRunNow(req: express.Request, res: express.Response): void {
         return;
       }
     }
-    res.status(404).json({ error: 'Scenario not found' });
+    res.status(404).json({ error: t('scenario.not_found', requestLang(req)) });
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -334,7 +340,7 @@ function handleCancel(req: express.Request, res: express.Response): void {
   if (cancelScenario(name)) {
     res.json({ status: 'cancelled', scenario: name });
   } else {
-    res.status(404).json({ error: 'Scenario not currently running' });
+    res.status(404).json({ error: t('error.not_running', requestLang(req)) });
   }
 }
 
@@ -343,7 +349,7 @@ function handlePause(req: express.Request, res: express.Response): void {
   if (pauseScenario(name)) {
     res.json({ status: 'paused', scenario: name });
   } else {
-    res.status(404).json({ error: 'Scenario not found or not scheduled' });
+    res.status(404).json({ error: t('error.not_scheduled', requestLang(req)) });
   }
 }
 
@@ -352,7 +358,7 @@ function handleResume(req: express.Request, res: express.Response): void {
   if (resumeScenario(name)) {
     res.json({ status: 'resumed', scenario: name });
   } else {
-    res.status(404).json({ error: 'Scenario not found or not scheduled' });
+    res.status(404).json({ error: t('error.not_scheduled', requestLang(req)) });
   }
 }
 
@@ -360,7 +366,7 @@ function handleResume(req: express.Request, res: express.Response): void {
 function handleConfigExport(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
   if (!_scenariosDir) {
-    res.status(400).json({ error: 'Server not configured for config export' });
+    res.status(400).json({ error: t('error.config_export_unconfigured', requestLang(req)) });
     return;
   }
   try {
@@ -408,7 +414,7 @@ function handleConfigExport(req: express.Request, res: express.Response): void {
         return;
       }
     }
-    res.status(404).json({ error: 'Scenario not found' });
+    res.status(404).json({ error: t('scenario.not_found', requestLang(req)) });
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -417,19 +423,19 @@ function handleConfigExport(req: express.Request, res: express.Response): void {
 // Saves a new YAML definition for an existing scenario, validating the submitted content.
 function handleConfigSave(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
-    res.status(400).json({ error: 'Server not configured for config save' });
+    res.status(400).json({ error: t('error.config_save_unconfigured', requestLang(req)) });
     return;
   }
   try {
     const name = req.params.name as string;
     const body = req.body as { yaml?: string };
     if (!body.yaml) {
-      res.status(400).json({ error: 'YAML content required' });
+      res.status(400).json({ error: t('error.yaml_required', requestLang(req)) });
       return;
     }
     const scenario = parseScenario(body.yaml);
     if (scenario.name !== name) {
-      res.status(400).json({ error: 'Scenario name in YAML does not match URL' });
+      res.status(400).json({ error: t('error.name_mismatch', requestLang(req)) });
       return;
     }
     // Overwrite the file the scenario actually lives in (.yml or .yaml), never create a duplicate.
@@ -444,7 +450,7 @@ function handleConfigSave(req: express.Request, res: express.Response): void {
 // Deletes a scenario's YAML file from disk.
 function handleConfigDelete(req: express.Request, res: express.Response): void {
   if (!_scenariosDir) {
-    res.status(400).json({ error: 'Server not configured for config delete' });
+    res.status(400).json({ error: t('error.config_delete_unconfigured', requestLang(req)) });
     return;
   }
   try {
@@ -459,7 +465,7 @@ function handleConfigDelete(req: express.Request, res: express.Response): void {
         return;
       }
     }
-    res.status(404).json({ error: 'Scenario not found' });
+    res.status(404).json({ error: t('scenario.not_found', requestLang(req)) });
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -583,7 +589,8 @@ export function createApp(): express.Application {
         fontSrc: ["'self'", 'https:', 'data:'],
         formAction: ["'self'"],
         frameAncestors: ["'self'"],
-        imgSrc: ["'self'", 'data:'],
+        // Gravatar is the default avatar when a user has not uploaded one.
+        imgSrc: ["'self'", 'data:', 'https://www.gravatar.com', 'https://secure.gravatar.com'],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'", (req, res) => `'nonce-${(res as express.Response).locals.cspNonce}'`],
         scriptSrcAttr: ["'unsafe-inline'"],
@@ -592,16 +599,23 @@ export function createApp(): express.Application {
       },
     },
   }));
-  app.use(express.json());
+  // 2 MB: an avatar is a cropped base64 PNG and an import can carry a whole YAML bundle.
+  app.use(express.json({ limit: '2mb' }));
   app.use(requestIdMiddleware);
   app.use(requestLogger);
 
   // Auth routes (unauthenticated)
   app.post('/api/auth/login', handleLocalLogin);
+  app.post('/api/auth/login/2fa', handleTwoFactorLogin);
+  app.post('/api/auth/password/forgot', handleForgotPassword);
+  app.post('/api/auth/password/reset', handleResetPassword);
   app.get('/api/auth/oidc', handleOidcLogin);
   app.get('/api/auth/callback', handleOidcCallback);
   app.get('/api/auth/me', handleAuthMe);
   app.post('/api/auth/logout', handleLogout);
+  // Avatars are public: the navbar renders one before any profile request, and Gravatar
+  // is a third-party fetch anyway.
+  app.get('/api/profile/avatar/:username', handleGetAvatar);
   app.use(authMiddleware);
 
   // User management: admin only. With OIDC, users come from the provider groups instead.
@@ -610,6 +624,17 @@ export function createApp(): express.Application {
   app.put('/api/auth/users/password', requireAdmin, handleSetUserPassword);
   app.put('/api/auth/users/role', requireAdmin, handleSetUserRole);
   app.delete('/api/auth/users/:username', requireAdmin, handleDeleteUser);
+
+  // Profile, avatar, password and two-factor settings of the current user (the public
+  // avatar image is served above, next to the other unauthenticated routes).
+  app.get('/api/profile', handleGetProfile);
+  app.put('/api/profile', handleUpdateProfile);
+  app.post('/api/profile/avatar', handleUploadAvatar);
+  app.delete('/api/profile/avatar', handleDeleteAvatar);
+  app.post('/api/profile/password', handleChangePassword);
+  app.post('/api/profile/totp/setup', handleTotpSetup);
+  app.post('/api/profile/totp/enable', handleTotpEnable);
+  app.post('/api/profile/totp/disable', handleTotpDisable);
   // Pages are private too, except public status pages — guarded before the SPA is served.
   app.use(pageAuthMiddleware);
 

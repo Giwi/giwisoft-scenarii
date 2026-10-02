@@ -1,3 +1,11 @@
 :host {
   display: contents;
 }
+
+/* Navbar avatar: same circle everywhere, sized to sit in a small button. */
+.nav-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}

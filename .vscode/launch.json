@@ -2,10 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Backend (ts-node)",
+      "name": "Backend (tsx)",
       "type": "node",
       "request": "launch",
-      "runtimeArgs": ["-r", "ts-node/register"],
+      "runtimeArgs": ["--import", "tsx"],
       "args": ["${workspaceFolder}/src/index.ts", "server"],
       "cwd": "${workspaceFolder}",
       "skipFiles": ["<node_internals>/**"],

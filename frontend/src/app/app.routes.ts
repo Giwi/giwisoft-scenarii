@@ -6,6 +6,7 @@ import { PublicStatusComponent } from './features/public-status/public-status';
 import { LandingComponent } from './features/landing/landing';
 import { UsersComponent } from './features/users/users';
 import { DocsComponent } from './features/docs/docs';
+import { ProfileComponent } from './features/profile/profile';
 import { authGuard, adminGuard } from './shared/auth.guard';
 
 export const routes: Routes = [
@@ -13,6 +14,7 @@ export const routes: Routes = [
   { path: 'scenarios', component: ScenarioListComponent, canActivate: [authGuard] },
   { path: 'users', component: UsersComponent, canActivate: [adminGuard] },
   { path: 'docs', component: DocsComponent, canActivate: [authGuard] },
+  { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },
   { path: 'scenario/new', component: ScenarioEditorComponent, canActivate: [authGuard] },
   { path: 'scenario/:name', component: ScenarioDetailComponent, canActivate: [authGuard] },
   { path: 'scenario/:name/edit', component: ScenarioEditorComponent, canActivate: [authGuard] },
