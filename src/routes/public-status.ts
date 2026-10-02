@@ -117,9 +117,11 @@ function publicStatusTemplate(d: PublicStatusData): string {
   .ok { color: #3fb950; }
   .fail { color: #f85149; }
   .muted { color: #8b949e; }
-  .chart-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; height: 280px; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+  .chart-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; height: 280px; min-width: 0; }
   .chart-box h3 { font-size: .75rem; text-transform: uppercase; color: #8b949e; margin-bottom: .75rem; }
-  .chart-box canvas { width: 100% !important; height: calc(100% - 1.5rem) !important; }
+  .chart-box canvas { display: block; width: 100% !important; height: calc(100% - 1.5rem) !important; }
+  @media (max-width: 700px) { .charts { grid-template-columns: 1fr; } }
   .tag { display: inline-block; padding: .1em .5em; border-radius: 999px; font-size: .7rem; background: rgba(88,166,255,.12); color: #58a6ff; margin-right: .25rem; }
   .footer { margin-top: auto; text-align: center; padding: 1.5rem; color: #484f58; font-size: .8rem; border-top: 1px solid #21262d; }
   .no-data { text-align: center; padding: 3rem; color: #484f58; }
@@ -146,7 +148,7 @@ function publicStatusTemplate(d: PublicStatusData): string {
     <div class="stat"><div class="stat-value fail">${d.total - d.passed}</div><div class="stat-label">Failed</div></div>
   </div>
   ${d.hasData ? `
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:2rem">
+  <div class="charts">
     <div class="chart-box"><h3>Response Time Trend</h3><canvas id="durationChart"></canvas></div>
     <div class="chart-box"><h3>Success Rate Over Time</h3><canvas id="successChart"></canvas></div>
   </div>
