@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../shared/auth';
@@ -31,18 +31,107 @@ interface TotpSetup {
   account: string;
 }
 
-// Crop state for the avatar picker: the loaded image plus the square window over it.
-interface CropState {
-  image: HTMLImageElement;
-  // Top-left corner of the crop window, in image pixels.
-  x: number;
-  y: number;
-  // Visible width of the crop window, in image pixels. Smaller means more zoom.
-  size: number;
+// ── Manual square crop, ported from the Cookie-challenge ImageCropper ────────
+// The framing is described by two numbers only: a zoom (>= 1, 1 means the image just
+// covers the frame) and a pan normalized to [-1, 1] (1 means shifted as far as possible
+// while still covering). That frame is independent of the canvas size, so the on-screen
+// preview and the exported avatar share exactly the same rectangle (see cropRect).
+
+interface CropView {
+  zoom: number;
+  pan: { x: number; y: number };
 }
 
-const OUTPUT_SIZE = 256; // avatars are rendered at most 256px
-const CROP_BOX = 280; // rendered crop window, in CSS pixels
+// The decoded picture: an ImageBitmap on modern browsers, an <img> as a fallback.
+type CropImage = HTMLImageElement | ImageBitmap;
+
+interface CropState {
+  image: CropImage;
+  view: CropView;
+}
+
+const sizeOf = (image: CropImage): { width: number; height: number } =>
+  image instanceof HTMLImageElement
+    ? { width: image.naturalWidth, height: image.naturalHeight }
+    : { width: image.width, height: image.height };
+
+// A live pointer gesture: one pointer drags, two pointers pinch (zoom + recentre).
+interface Gesture {
+  count: number;
+  x: number;
+  y: number;
+  dist?: number;
+}
+
+const OUTPUT_SIZE = 256; // avatar export, in pixels
+const FRAME = 288; // preview frame, in CSS pixels (mirrors ImageCropper)
+const MAX_ZOOM = 4; // mirrors lib/image.js
+const ZOOM_STEP = 1.25;
+const CENTER = { x: 0.5, y: 0.5 }; // frame point kept fixed while zooming with the buttons
+
+const clampZoom = (zoom: number): number => Math.max(1, Math.min(MAX_ZOOM, zoom));
+
+const clampPan = (x: number, y: number): { x: number; y: number } => ({
+  x: Math.max(-1, Math.min(1, x)),
+  y: Math.max(-1, Math.min(1, y)),
+});
+
+// The image's rectangle inside a `size`-px square, in canvas coordinates: centred, then
+// shifted by the normalized pan. Both the preview and the export call this.
+function cropRect(image: CropImage, size: number, zoom: number, pan: { x: number; y: number }) {
+  const { width, height } = sizeOf(image);
+  const base = Math.max(size / width, size / height);
+  const w = width * base * zoom;
+  const h = height * base * zoom;
+  return {
+    x: (size - w) / 2 + (pan.x * (w - size)) / 2,
+    y: (size - h) / 2 + (pan.y * (h - size)) / 2,
+    w,
+    h,
+  };
+}
+
+// Zooms while keeping the image pixel under `point` (frame fractions 0..1) fixed. Used by
+// the wheel, the pinch and the slider so the zoom always happens where the eye is.
+function zoomAtPointer(image: CropImage, zoom: number, pan: { x: number; y: number }, nextZoom: number, point: { x: number; y: number }): CropView {
+  const { width, height } = sizeOf(image);
+  const ratio = width / height;
+  const span = (z: number): [number, number] => (ratio >= 1 ? [ratio * z, z] : [z, z / ratio]);
+  const [rx, ry] = span(zoom);
+  const [nx, ny] = span(nextZoom);
+  const cx = 0.5 + (pan.x * (rx - 1)) / 2;
+  const cy = 0.5 + (pan.y * (ry - 1)) / 2;
+  const ux = (point.x - (cx - rx / 2)) / rx;
+  const uy = (point.y - (cy - ry / 2)) / ry;
+  const ncx = point.x + nx * (0.5 - ux);
+  const ncy = point.y + ny * (0.5 - uy);
+  return {
+    zoom: nextZoom,
+    pan: clampPan(
+      nx === 1 ? 0 : (2 * (ncx - 0.5)) / (nx - 1),
+      ny === 1 ? 0 : (2 * (ncy - 0.5)) / (ny - 1),
+    ),
+  };
+}
+
+// Decodes the picked file. The bytes are read into a data: URL (allowed by the img-src
+// CSP) and decoded with an <img> element: universal, and avoids the createImageBitmap
+// quirk where picker-provided File objects sometimes refuse to decode.
+async function loadImage(file: File): Promise<CropImage> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('file read failed'));
+    reader.readAsDataURL(file);
+  });
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('image decode failed'));
+    image.src = dataUrl;
+  });
+}
+
 const MIN_PASSWORD_LENGTH = 8;
 
 @Component({
@@ -73,8 +162,17 @@ export class ProfileComponent implements OnInit {
   // Translation helper, exposed so the template can call `t('key')`.
   readonly t = this.i18n.t;
 
+  // Preview frame size in CSS pixels, bound onto the dialog (the #cropFrame template
+  // reference carries the element, so the constant lives under a different name).
+  readonly frameSize = FRAME;
+  readonly maxZoom = MAX_ZOOM;
+  readonly zoomStep = ZOOM_STEP;
+  // Kept as a property: a bare object literal in a template is parsed as ICU syntax.
+  readonly center = CENTER;
+
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
   @ViewChild('cropCanvas') cropCanvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('cropFrame') cropFrame?: ElementRef<HTMLDivElement>;
 
   profile: Profile | null = null;
   loading = true;
@@ -102,8 +200,25 @@ export class ProfileComponent implements OnInit {
   readonly cropping = signal(false);
   crop: CropState | null = null;
   uploading = false;
-  // Pointer drag state, in image pixels.
-  private dragging: { pointerX: number; pointerY: number; originX: number; originY: number } | null = null;
+  cropLoading = false; // decoding the picked file
+  cropError = '';
+  // Zoom shown on the slider, mirrored from the view so tiny drags don't re-render.
+  private lastZoomUI = 1;
+  // Live pointers and the gesture they describe (one = pan, two = pinch).
+  private pointers = new Map<number, { x: number; y: number }>();
+  private gesture: Gesture | null = null;
+  private wheelTarget: Element | null = null;
+
+  // Repaints the preview and re-attaches the wheel listener once the dialog is in the
+  // DOM: the canvas only exists while `cropping()` is true, so a plain call at file
+  // selection would otherwise draw into nothing (the old bug: blank preview).
+  private readonly cropDialog = effect(() => {
+    if (!this.cropping()) return;
+    requestAnimationFrame(() => {
+      this.paint();
+      this.attachWheel();
+    });
+  });
 
   async ngOnInit(): Promise<void> {
     await this.auth.load();
@@ -264,116 +379,189 @@ export class ProfileComponent implements OnInit {
     this.fileInput?.nativeElement.click();
   }
 
-  // Loads the chosen file into the crop dialog.
+  // Loads the chosen file into the crop dialog, starting from the full cover view.
   async onFileSelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = ''; // allow picking the same file again after cancelling
     if (!file) return;
     this.error = '';
+    this.cropError = '';
+    this.cropLoading = true;
+    this.cropping.set(true);
     try {
-      const url = URL.createObjectURL(file);
-      const image = new Image();
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = () => reject(new Error(this.i18n.t('profile.avatar_change')));
-        image.src = url;
-      });
-      URL.revokeObjectURL(url);
-      // Start fully zoomed out (the whole image fits) and centred.
-      this.crop = { image, x: 0, y: 0, size: Math.min(image.naturalWidth, image.naturalHeight) };
-      this.cropping.set(true);
-      this.autoscale();
-    } catch {
-      this.error = this.i18n.t('profile.avatar_change');
+      const image = await loadImage(file);
+      this.crop = { image, view: { zoom: 1, pan: { x: 0, y: 0 } } };
+      this.lastZoomUI = 1;
+    } catch (err) {
+      console.error('Avatar crop: image decode failed', err);
+      this.cropError = this.i18n.t('profile.crop_decode_error');
+    } finally {
+      this.cropLoading = false;
+      this.refresh();
     }
-    this.refresh();
   }
 
-  // The zoom level as a slider value: 1 is fully zoomed out, higher is closer.
+  // Slider value == the current zoom.
   get zoomLevel(): number {
-    if (!this.crop) return 1;
-    return this.fullSize / this.crop.size;
+    return this.crop?.view.zoom ?? 1;
   }
 
-  setZoomLevel(value: number): void {
-    this.zoom(value);
+  // Slider input: zoom to the requested level, keeping the centre fixed.
+  zoomTo(zoom: number): void {
+    const state = this.crop;
+    if (!state) return;
+    this.zoomBy(clampZoom(zoom) / state.view.zoom, CENTER);
   }
 
-  // Zooms to the smallest square that covers the image, i.e. fits the frame.
-  autoscale(): void {
-    if (!this.crop) return;
-    this.crop.size = this.fullSize;
-    this.centerCrop();
-    this.drawCrop();
+  // Multiplies the zoom by a factor, anchored on a frame point (0..1).
+  zoomBy(factor: number, point: { x: number; y: number }): void {
+    const state = this.crop;
+    if (!state) return;
+    this.setView(zoomAtPointer(state.image, state.view.zoom, state.view.pan, clampZoom(state.view.zoom * factor), point));
   }
 
-  // Nudges the crop window by a fraction of its own size, keeping it inside the image.
-  pan(fractionX: number, fractionY: number): void {
-    if (!this.crop) return;
-    const dx = fractionX * this.crop.size;
-    const dy = fractionY * this.crop.size;
-    this.crop.x = Math.min(Math.max(0, this.crop.x + dx), this.crop.image.naturalWidth - this.crop.size);
-    this.crop.y = Math.min(Math.max(0, this.crop.y + dy), this.crop.image.naturalHeight - this.crop.size);
-    this.drawCrop();
+  // Back to the full cover view: image centred at zoom 1.
+  resetCrop(): void {
+    const state = this.crop;
+    if (state) this.setView({ zoom: 1, pan: { x: 0, y: 0 } });
   }
 
-  // Multiplies the zoom level, keeping the centre of the window where it is.
-  zoom(factor: number): void {
-    if (!this.crop) return;
-    const previous = this.crop.size;
-    const next = Math.min(Math.max(previous / factor, this.fullSize / 10), this.fullSize);
-    const cx = this.crop.x + previous / 2;
-    const cy = this.crop.y + previous / 2;
-    this.crop.size = next;
-    this.crop.x = Math.min(Math.max(0, cx - next / 2), this.crop.image.naturalWidth - next);
-    this.crop.y = Math.min(Math.max(0, cy - next / 2), this.crop.image.naturalHeight - next);
-    this.drawCrop();
+  // Moves the image by `dx`/`dy` frame pixels (the image follows the pointer).
+  private panBy(dx: number, dy: number): void {
+    const state = this.crop;
+    if (!state) return;
+    const { zoom, pan } = state.view;
+    const rect = cropRect(state.image, FRAME, zoom, pan);
+    const next = clampPan(
+      pan.x + dx / Math.max(1, (rect.w - FRAME) / 2),
+      pan.y + dy / Math.max(1, (rect.h - FRAME) / 2),
+    );
+    this.setView({ zoom, pan: next });
   }
 
-  // Drag to reposition: pointer coordinates map to image pixels through the crop scale.
+  // Position of a clientX/clientY inside the frame, as fractions (0..1).
+  private framePoint(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.cropFrame?.nativeElement.getBoundingClientRect();
+    if (!rect || rect.width === 0) return { ...CENTER };
+    return { x: (clientX - rect.left) / rect.width, y: (clientY - rect.top) / rect.height };
+  }
+
+  // One pointer drags (pan), a second one added pinches (zoom anchored on the midpoint).
   onPointerDown(event: PointerEvent): void {
     if (!this.crop) return;
+    event.currentTarget as HTMLElement;
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
-    this.dragging = { pointerX: event.clientX, pointerY: event.clientY, originX: this.crop.x, originY: this.crop.y };
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    this.gesture = this.readGesture();
   }
 
   onPointerMove(event: PointerEvent): void {
-    if (!this.crop || !this.dragging) return;
-    const perPixel = this.crop.size / CROP_BOX;
-    this.crop.x = Math.min(Math.max(0, this.dragging.originX + (event.clientX - this.dragging.pointerX) * perPixel),
-      this.crop.image.naturalWidth - this.crop.size);
-    this.crop.y = Math.min(Math.max(0, this.dragging.originY + (event.clientY - this.dragging.pointerY) * perPixel),
-      this.crop.image.naturalHeight - this.crop.size);
-    this.drawCrop();
+    if (!this.crop || !this.pointers.has(event.pointerId)) return;
+    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const previous = this.gesture;
+    const now = this.readGesture();
+    this.gesture = now;
+    if (!now || !previous) return;
+    if (now.count === 2 && previous.count === 2 && previous.dist && previous.dist > 0) {
+      this.zoomBy(now.dist! / previous.dist, this.framePoint(now.x, now.y));
+    } else if (now.count === 1 && previous.count === 1) {
+      this.panBy(now.x - previous.x, now.y - previous.y);
+    }
   }
 
-  onPointerUp(): void {
-    this.dragging = null;
+  onPointerUp(event: PointerEvent): void {
+    this.pointers.delete(event.pointerId);
+    this.gesture = this.readGesture();
+  }
+
+  // The gesture a set of pointers describes: pan with one, pinch with two.
+  private readGesture(): Gesture | null {
+    const points = [...this.pointers.values()];
+    if (points.length === 0) return null;
+    if (points.length === 1) return { count: 1, x: points[0].x, y: points[0].y };
+    const [a, b] = points;
+    return {
+      count: 2,
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2,
+      dist: Math.hypot(a.x - b.x, a.y - b.y),
+    };
+  }
+
+  // Wheel = zoom at the cursor. Attached natively because Angular binds wheel events as
+  // passive, which would make preventDefault (and blocking the page scroll behind the
+  // dialog) a no-op.
+  private attachWheel(): void {
+    const frame = this.cropFrame?.nativeElement;
+    if (!frame || frame === this.wheelTarget) return;
+    this.wheelTarget?.removeEventListener('wheel', this.onWheel);
+    frame.addEventListener('wheel', this.onWheel, { passive: false });
+    this.wheelTarget = frame;
+  }
+
+  private readonly onWheel = (event: Event): void => {
+    const wheel = event as WheelEvent;
+    event.preventDefault();
+    const point = this.framePoint(wheel.clientX, wheel.clientY);
+    this.zoomBy(wheel.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, point);
+  };
+
+  // Keyboard: arrows nudge the image (the image follows the key direction), +/− zoom,
+  // Enter applies, Escape closes. The frame is made focusable from the template.
+  onCropKey(event: KeyboardEvent): void {
+    const nudge = event.shiftKey ? 24 : 8;
+    const moves: Record<string, [number, number]> = {
+      ArrowLeft: [-nudge, 0],
+      ArrowRight: [nudge, 0],
+      ArrowUp: [0, -nudge],
+      ArrowDown: [0, nudge],
+    };
+    if (moves[event.key]) {
+      event.preventDefault();
+      this.panBy(moves[event.key][0], moves[event.key][1]);
+    } else if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      this.zoomBy(ZOOM_STEP, CENTER);
+    } else if (event.key === '-') {
+      event.preventDefault();
+      this.zoomBy(1 / ZOOM_STEP, CENTER);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      void this.applyCrop();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      this.cancelCrop();
+    }
   }
 
   cancelCrop(): void {
     this.cropping.set(false);
     this.crop = null;
-    this.dragging = null;
+    this.cropError = '';
+    this.pointers.clear();
+    this.gesture = null;
   }
 
-  // Renders the crop window to a square PNG and uploads it.
+  // Exports the current view to a square avatar and uploads it. The export goes through
+  // the same cropRect as the preview, so what the user sees is what gets saved.
   async applyCrop(): Promise<void> {
-    if (!this.crop) return;
-    const { image, x, y, size } = this.crop;
+    const state = this.crop;
+    if (!state || this.uploading) return;
     const canvas = document.createElement('canvas');
     canvas.width = OUTPUT_SIZE;
     canvas.height = OUTPUT_SIZE;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const rect = cropRect(state.image, OUTPUT_SIZE, state.view.zoom, state.view.pan);
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(image, x, y, size, size, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+    ctx.drawImage(state.image, rect.x, rect.y, rect.w, rect.h);
+    const image = canvas.toDataURL('image/webp', 0.85);
 
     this.uploading = true;
     this.error = '';
     try {
-      const body = await this.post<ProfileUpdate>('/api/profile/avatar', { image: canvas.toDataURL('image/png') });
+      const body = await this.post<ProfileUpdate>('/api/profile/avatar', { image });
       this.apply({ ...body, has_avatar: true });
       this.cancelCrop();
       await this.auth.reload();
@@ -407,12 +595,6 @@ export class ProfileComponent implements OnInit {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  // The largest square the source image can offer, i.e. the fully zoomed-out window.
-  private get fullSize(): number {
-    const image = this.crop?.image;
-    return image ? Math.min(image.naturalWidth, image.naturalHeight) : 1;
-  }
-
   // Folds an API response into the page state. The confirmation comes from the server,
   // already translated, so the notice follows the interface language for free.
   private apply(update: ProfileUpdate): void {
@@ -434,29 +616,37 @@ export class ProfileComponent implements OnInit {
     return res.json() as Promise<T>;
   }
 
-  // Draws the scaled crop window; the canvas shows exactly what will be saved.
-  private drawCrop(): void {
+  // Draws the current view with the device-pixel ratio, so the preview is crisp on
+  // retina screens while the export below still renders at exactly OUTPUT_SIZE.
+  private paint(): void {
     const canvas = this.cropCanvas?.nativeElement;
-    if (!canvas || !this.crop) return;
-    const scale = CROP_BOX / this.crop.size;
-    canvas.width = CROP_BOX;
-    canvas.height = CROP_BOX;
+    const state = this.crop;
+    if (!canvas || !state) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const px = Math.round(FRAME * dpr);
+    if (canvas.width !== px) {
+      canvas.width = px;
+      canvas.height = px;
+    }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, CROP_BOX, CROP_BOX);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, FRAME, FRAME);
+    const rect = cropRect(state.image, FRAME, state.view.zoom, state.view.pan);
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(
-      this.crop.image,
-      this.crop.x * scale, this.crop.y * scale,
-      this.crop.size * scale, this.crop.size * scale,
-      0, 0, CROP_BOX, CROP_BOX,
-    );
+    ctx.drawImage(state.image, rect.x, rect.y, rect.w, rect.h);
   }
 
-  private centerCrop(): void {
+  // Applies a view, repaints immediately (drag at 60fps) and only re-renders the slider
+  // when the zoom actually moved.
+  private setView(next: CropView): void {
     if (!this.crop) return;
-    this.crop.x = (this.crop.image.naturalWidth - this.crop.size) / 2;
-    this.crop.y = (this.crop.image.naturalHeight - this.crop.size) / 2;
+    this.crop.view = next;
+    this.paint();
+    if (Math.abs(next.zoom - this.lastZoomUI) >= 0.001) {
+      this.lastZoomUI = next.zoom;
+      this.refresh();
+    }
   }
 
   // The API returns messages already translated server-side, so show them verbatim.

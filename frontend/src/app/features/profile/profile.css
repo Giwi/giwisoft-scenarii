@@ -67,16 +67,79 @@
   box-shadow: var(--bs-box-shadow-lg);
 }
 
-.crop-canvas {
-  width: 280px;
-  height: 280px;
-  max-width: 100%;
-  border-radius: 0.5rem;
-  cursor: grab;
-  touch-action: none;
+.crop-frame {
+  position: relative;
+  margin: 0 auto;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid var(--bs-border-color);
   background: var(--bs-secondary-bg);
+  touch-action: none;
+  cursor: grab;
 }
 
-.crop-canvas:active {
+.crop-frame:active {
   cursor: grabbing;
+}
+
+.crop-frame:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.crop-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Rule-of-thirds guides over the preview. */
+.crop-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.crop-guides span {
+  position: absolute;
+  background: rgb(255 255 255 / 0.35);
+}
+
+.crop-guides span:nth-child(1) { left: 33.333%; top: 0; bottom: 0; width: 1px; }
+.crop-guides span:nth-child(2) { left: 66.666%; top: 0; bottom: 0; width: 1px; }
+.crop-guides span:nth-child(3) { top: 33.333%; left: 0; right: 0; height: 1px; }
+.crop-guides span:nth-child(4) { top: 66.666%; left: 0; right: 0; height: 1px; }
+
+/* Decode spinner / decode failure on top of the frame. */
+.crop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1rem;
+  font-size: 0.8rem;
+  text-align: center;
+  color: #fff;
+  background: rgb(0 0 0 / 0.45);
+}
+/* Field rows (password change, 2FA disable): the label may wrap to any number of
+   lines, so each column is a flex stack that pins its control to the bottom. That way
+   every input in the row shares the same baseline whatever the label length. */
+.field-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-stack .form-label {
+  margin-bottom: 0.4rem;
+}
+
+.field-stack > .form-control,
+.field-stack > .form-select,
+.field-stack > .btn {
+  margin-top: auto;
 }

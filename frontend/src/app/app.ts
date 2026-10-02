@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, effect, inject, untracked } from '@angular/core';
 import { Router, RouterOutlet, RouterLink } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { AuthService } from './shared/auth';
@@ -26,12 +26,23 @@ export class App implements OnInit {
   // Bound so the template can call `t('key')`.
   readonly t = this.i18n.t;
 
+  // The profile owns appearance and language. They are re-applied every time the session
+  // becomes known, not just at boot: the shell starts anonymous (light by default), so a
+  // login that happens later must land on the choice stored in the profile.
+  private readonly applyProfilePreferences = effect(() => {
+    const status = this.auth.status();
+    if (!status.authenticated) return;
+    // setScheme reads the scheme signal internally; without untracked, that silent read
+    // would make this effect depend on the scheme itself and fight the profile page's
+    // live preview every time the user picks a colour.
+    untracked(() => {
+      this.theme.setScheme(normalizeColorScheme(status.color_scheme));
+      this.i18n.setLang(normalizeLang(status.lang));
+    });
+  });
+
   async ngOnInit() {
     await this.auth.load();
-    // The profile owns appearance and language: apply both as soon as the session is known.
-    const status = this.auth.status();
-    this.theme.setScheme(normalizeColorScheme(status.color_scheme));
-    this.i18n.setLang(normalizeLang(status.lang));
   }
 
   async logout() {

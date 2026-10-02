@@ -154,7 +154,7 @@
           <div class="card-body">
             <h2 class="h6 mb-3"><i class="bi bi-key me-2"></i>{{ t('profile.password_change') }}</h2>
             <div class="row g-3">
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-4 field-stack">
                 <label class="form-label" for="pw-current">{{ t('profile.current_password') }}</label>
                 <input
                   id="pw-current"
@@ -164,7 +164,7 @@
                   [(ngModel)]="currentPassword"
                 />
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-4 field-stack">
                 <label class="form-label" for="pw-new">{{ t('profile.new_password') }}</label>
                 <input
                   id="pw-new"
@@ -174,7 +174,7 @@
                   [(ngModel)]="newPassword"
                 />
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-4 field-stack">
                 <label class="form-label" for="pw-confirm">{{ t('profile.confirm_password') }}</label>
                 <input
                   id="pw-confirm"
@@ -207,8 +207,8 @@
                 <i class="bi bi-check-circle me-1"></i>{{ t('profile.two_factor_active') }}
               </div>
               <p class="small text-secondary">{{ t('profile.two_factor_disable_help') }}</p>
-              <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-4">
+              <div class="row g-3">
+                <div class="col-12 col-md-4 field-stack">
                   <label class="form-label" for="totp-pw">{{ t('profile.current_password') }}</label>
                   <input
                     id="totp-pw"
@@ -218,7 +218,7 @@
                     [(ngModel)]="totpPassword"
                   />
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-4 field-stack">
                   <label class="form-label" for="totp-off-code">{{ t('profile.two_factor_disable_code') }}</label>
                   <input
                     id="totp-off-code"
@@ -228,7 +228,7 @@
                     [(ngModel)]="totpCode"
                   />
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-4 field-stack">
                   <button
                     class="btn btn-sm btn-outline-danger w-100"
                     (click)="disableTwoFactor()"
@@ -282,40 +282,78 @@
   </ng-container>
 </div>
 
-<!-- Avatar crop dialog: drag to reposition, slider to zoom. -->
+<!-- Avatar crop dialog: drag to pan, wheel or pinch to zoom, slider for fine zoom.
+     The preview canvas and the exported avatar share the same crop rectangle. -->
 <div class="crop-backdrop" *ngIf="cropping()" (click)="cancelCrop()">
   <div class="crop-dialog" (click)="$event.stopPropagation()">
-    <h2 class="h6 mb-3"><i class="bi bi-crop me-2"></i>{{ t('profile.crop_title') }}</h2>
-    <canvas
-      #cropCanvas
-      class="crop-canvas"
+    <h2 class="h6 mb-1"><i class="bi bi-crop me-2"></i>{{ t('profile.crop_title') }}</h2>
+    <p class="small text-secondary mb-3">{{ t('profile.crop_sub') }}</p>
+
+    <div
+      #cropFrame
+      class="crop-frame"
+      role="group"
+      tabindex="0"
+      [style.width.px]="frameSize"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
-      (pointerup)="onPointerUp()"
-      (pointercancel)="onPointerUp()"
-    ></canvas>
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+      (keydown)="onCropKey($event)"
+    >
+      <canvas #cropCanvas class="crop-canvas"></canvas>
+      <!-- Rule-of-thirds guides, purely decorative. -->
+      <div class="crop-guides" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="crop-overlay" *ngIf="cropLoading">
+        <span class="spinner-border spinner-border-sm me-2"></span>{{ t('common.loading') }}
+      </div>
+      <div class="crop-overlay" *ngIf="cropError">
+        <i class="bi bi-image me-1"></i>{{ cropError }}
+      </div>
+    </div>
+
     <div class="d-flex align-items-center gap-2 mt-3">
-      <button class="btn btn-sm btn-outline-secondary" (click)="zoom(1 / 1.25)" [title]="t('profile.avatar_zoom_out')">
+      <span class="small text-secondary me-auto">{{ t('profile.crop_zoom') }}</span>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        (click)="zoomBy(1 / zoomStep, center)"
+        [disabled]="!crop || cropLoading"
+        [title]="t('profile.avatar_zoom_out')"
+        aria-label="zoom out"
+      >
         <i class="bi bi-dash-lg"></i>
       </button>
       <input
         type="range"
         class="form-range flex-grow-1"
         min="1"
-        max="4"
+        [max]="maxZoom"
         step="0.01"
         [ngModel]="zoomLevel"
-        (ngModelChange)="setZoomLevel($event)"
+        (ngModelChange)="zoomTo($event)"
+        [disabled]="!crop || cropLoading"
+        aria-label="zoom"
       />
-      <button class="btn btn-sm btn-outline-secondary" (click)="zoom(1.25)" [title]="t('profile.avatar_zoom_in')">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        (click)="zoomBy(zoomStep, center)"
+        [disabled]="!crop || cropLoading"
+        [title]="t('profile.avatar_zoom_in')"
+        aria-label="zoom in"
+      >
         <i class="bi bi-plus-lg"></i>
       </button>
+      <button type="button" class="btn btn-sm btn-link text-decoration-none" (click)="resetCrop()" [disabled]="!crop || cropLoading">
+        {{ t('profile.crop_reset') }}
+      </button>
     </div>
-    <button class="btn btn-sm btn-outline-primary w-100 mt-2" (click)="autoscale()">
-      <i class="bi bi-aspect-ratio me-1"></i>{{ t('profile.avatar_autoscale') }}
-    </button>
+
     <div class="d-flex gap-2 mt-3">
-      <button class="btn btn-sm btn-primary flex-grow-1" (click)="applyCrop()" [disabled]="uploading">
+      <button class="btn btn-sm btn-primary flex-grow-1" (click)="applyCrop()" [disabled]="!crop || uploading || cropLoading">
         {{ uploading ? t('profile.avatar_uploading') : t('profile.crop_apply') }}
       </button>
       <button class="btn btn-sm btn-outline-secondary" (click)="cancelCrop()">
