@@ -55,6 +55,6 @@
   "optionalDependencies": {
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
-    "@emnapi/wasi-threads": "^2.1.0"
+    "@emnapi/wasi-threads": "^2.2.0"
   }
 }
