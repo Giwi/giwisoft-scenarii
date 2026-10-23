@@ -1,348 +1,635 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scenarii - YAML web test scenarios</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 16 16'%3E%3Cpath fill='%236366f1' d='M6 2a.5.5 0 0 1 .47.33L10 12.36l1.53-4.03A.5.5 0 0 1 12 8h3a.5.5 0 0 1 0 1h-2.72l-1.81 4.77a.5.5 0 0 1-.94.01L5 3.64 3.53 7.67A.5.5 0 0 1 3 8H0a.5.5 0 0 1 0-1h2.72l1.81-4.77A.5.5 0 0 1 5 2z'/%3E%3C/svg%3E">
-  <link rel="icon" type="image/svg+xml" media="(prefers-color-scheme: dark)" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 16 16'%3E%3Cpath fill='%2300d4ff' d='M6 2a.5.5 0 0 1 .47.33L10 12.36l1.53-4.03A.5.5 0 0 1 12 8h3a.5.5 0 0 1 0 1h-2.72l-1.81 4.77a.5.5 0 0 1-.94.01L5 3.64 3.53 7.67A.5.5 0 0 1 3 8H0a.5.5 0 0 1 0-1h2.72l1.81-4.77A.5.5 0 0 1 5 2z'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <style>
-    :root {
-      --bg: #0f0f1a;
-      --card-bg: rgba(255, 255, 255, .04);
-      --card-border: rgba(255, 255, 255, .06);
-      --text: #e2e8f0;
-      --text-muted: #8892a4;
-      --accent: #6366f1;
-      --accent2: #a855f7;
-      --accent-gradient: linear-gradient(135deg, #6366f1, #a855f7);
-      --success: #10b981;
-      --danger: #f43f5e;
-      --code-bg: #1a1b2e;
-      --code-border: rgba(255,255,255,.06);
-      --hero-from: #1e1b4b;
-      --hero-to: #0f0f1a;
-      --nav-bg: rgba(15, 15, 26, .85);
-      --navbar-shadow: 0 1px 3px rgba(0,0,0,.3);
-      --card-shadow: 0 1px 2px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.15), 0 12px 32px rgba(0,0,0,.1);
-      --card-hover-shadow: 0 2px 4px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.2), 0 16px 48px rgba(0,0,0,.15);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-padding-top: 60px; }
-    body {
-      font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: -1;
-      background:
-        radial-gradient(ellipse at 15% 0%, rgba(99,102,241,.08) 0%, transparent 50%),
-        radial-gradient(ellipse at 85% 100%, rgba(168,85,247,.06) 0%, transparent 50%);
-    }
-    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-
-    ::selection { background: rgba(99,102,241,.3); }
-
-    /* Nav */
-    .page-nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: var(--nav-bg);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--card-border);
-      box-shadow: var(--navbar-shadow);
-    }
-    .page-nav .container {
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      padding-top: 0;
-      padding-bottom: 0;
-    }
-    .page-nav .container::-webkit-scrollbar { display: none; }
-    .page-nav .brand {
-      font-weight: 700;
-      font-size: .95rem;
-      color: var(--text);
-      text-decoration: none;
-      white-space: nowrap;
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      flex-shrink: 0;
-    }
-    .page-nav a:not(.brand) {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: .8rem;
-      font-weight: 500;
-      padding: 16px 0;
-      white-space: nowrap;
-      border-bottom: 2px solid transparent;
-      transition: color .2s, border-color .2s;
-    }
-    .page-nav a:not(.brand):hover {
-      color: var(--text);
-      border-color: var(--accent);
-    }
-
-    /* Hero */
-    .hero {
-      position: relative;
-      padding: 80px 0 60px;
-      text-align: center;
-      border-bottom: 1px solid var(--card-border);
-      background: var(--bg);
-      overflow: hidden;
-    }
-    .hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 700px 450px at 50% -10%, rgba(99,102,241,.2), transparent),
-        radial-gradient(ellipse 400px 350px at 80% 70%, rgba(168,85,247,.12), transparent),
-        radial-gradient(ellipse 300px 300px at 20% 80%, rgba(236,72,153,.08), transparent);
-      pointer-events: none;
-    }
-    .hero::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-      background-size: 48px 48px;
-      pointer-events: none;
-      mask-image: radial-gradient(ellipse 600px 400px at 50% 0%, black, transparent 70%);
-      -webkit-mask-image: radial-gradient(ellipse 600px 400px at 50% 0%, black, transparent 70%);
-    }
-    .hero .container { position: relative; z-index: 1; }
-    .hero h1 { font-size: 3rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: 8px; }
-    .hero h1 span {
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .hero p { font-size: 1.2rem; color: var(--text-muted); max-width: 640px; margin: 0 auto; }
-    .hero-badges { margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .hero-badges a {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 20px; border-radius: 999px;
-      background: rgba(255,255,255,.06); color: var(--text);
-      text-decoration: none; font-size: .875rem; font-weight: 600;
-      border: 1px solid rgba(255,255,255,.08);
-      transition: background .2s, border-color .2s;
-    }
-    .hero-badges a:hover { background: rgba(255,255,255,.1); border-color: var(--accent); }
-
-    /* Sections */
-    section { padding: 64px 0; }
-    section:nth-child(even) { background: rgba(255,255,255,.015); }
-    h2 {
-      font-size: 1.8rem; font-weight: 700;
-      margin-bottom: 24px;
-      background: var(--accent-gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    h3 { font-size: 1.2rem; font-weight: 600; margin: 24px 0 8px; color: var(--text); }
-
-    /* Cards */
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: var(--card-shadow);
-      transition: box-shadow .2s, transform .2s;
-      backdrop-filter: blur(4px);
-    }
-    .card:hover { box-shadow: var(--card-hover-shadow); transform: translateY(-1px); }
-    .card h3 { margin-top: 0; font-size: 1rem; }
-    .card p { color: var(--text-muted); font-size: .9rem; }
-    .card-icon { font-size: 1.5rem; margin-bottom: 8px; display: block; }
-    .card strong { color: var(--accent); }
-
-    /* Screenshots */
-    .screenshots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
-    .screenshots img {
-      width: 100%; border-radius: 10px;
-      border: 1px solid var(--card-border);
-      box-shadow: var(--card-shadow);
-    }
-
-    /* Code blocks */
-    pre {
-      background: var(--code-bg);
-      border: 1px solid var(--code-border);
-      color: #cdd6f4;
-      padding: 16px 20px;
-      border-radius: 10px;
-      overflow-x: auto;
-      font-size: .82rem;
-      line-height: 1.55;
-      margin: 12px 0;
-      box-shadow: var(--card-shadow);
-    }
-    code { font-family: 'JetBrains Mono','Fira Code','Cascadia Code',monospace; }
-
-    .tag {
-      display: inline-block; padding: 2px 10px; border-radius: 999px;
-      font-size: .7rem; font-weight: 700; letter-spacing: .03em;
-      text-transform: uppercase;
-    }
-    .tag.http { background: rgba(99,102,241,.15); color: #818cf8; }
-    .tag.browser { background: rgba(244,63,94,.15); color: #fb7185; }
-    .tag.mixed { background: rgba(251,191,36,.12); color: #fbbf24; }
-
-    /* Footer */
-    footer { text-align: center; padding: 32px 0; color: var(--text-muted); font-size: .875rem; border-top: 1px solid var(--card-border); }
-    footer a { color: var(--accent); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
-
-    /* Misc */
-    .intro-text { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 20px; }
-    a { color: var(--accent); }
-
-    table {
-      width: 100%; border-collapse: collapse;
-      background: var(--card-bg); border-radius: 10px;
-      border: 1px solid var(--card-border);
-      margin: 12px 0; font-size: .85rem;
-      box-shadow: var(--card-shadow);
-    }
-    th, td { padding: 10px 14px; text-align: left; }
-    th { font-weight: 600; color: var(--accent); border-bottom: 1px solid var(--card-border); }
-    td { border-bottom: 1px solid rgba(255,255,255,.04); }
-    tr:last-child td { border-bottom: none; }
-    td code { font-size: .78rem; white-space: nowrap; }
-
-    @media (max-width: 640px) {
-      html { scroll-padding-top: 52px; }
-      .page-nav .container { gap: 14px; }
-      .page-nav a:not(.brand) { font-size: .74rem; }
-      .hero h1 { font-size: 2rem; }
-      .hero p { font-size: 1rem; }
-      .screenshots { grid-template-columns: 1fr; }
-      table { font-size: .78rem; }
-      th, td { padding: 6px 8px; }
-      td code { font-size: .7rem; }
-    }
-  </style>
+  <title>Scenarii - YAML web tests on a schedule</title>
+  <meta name="description" content="Self-hosted web testing on cron. Write YAML, run HTTP or browser checks, store results in SQLite, and get alerted when something breaks.">
+  <meta name="theme-color" content="#07080a">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:title" content="Scenarii - YAML web tests on a schedule">
+  <meta property="og:description" content="Write YAML. Run HTTP or browser checks on cron. Get alerted when something breaks.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="screenshots/scenario-list-dark.png">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2307080a'/%3E%3Cpath d='M3 12h3.4l2-5.4 3.3 11 2.4-7.2 1.5 1.6H21' fill='none' stroke='%23c6ff3d' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/site.css">
+  <script>
+    document.documentElement.classList.add("js");
+  </script>
 </head>
-<body>
+<body id="top">
+  <a class="skip-link" href="#main">Skip to content</a>
 
-<nav class="page-nav">
-  <div class="container">
-    <a href="#" class="brand"><i class="bi bi-activity" style="margin-right:6px"></i>Scenarii</a>
-    <a href="#what">Intro</a>
-    <a href="#quickstart">Quickstart</a>
-    <a href="#dashboard">Dashboard</a>
-    <a href="#auth">Auth</a>
-    <a href="#scenarios">Scenarios</a>
-    <a href="#actions">Actions</a>
-    <a href="#notifications">Alerts</a>
-    <a href="#realtime">Real-time</a>
-    <a href="#metrics">Metrics</a>
-    <a href="#cli">CLI</a>
-    <a href="#api">API</a>
-    <a href="#features">Features</a>
-  </div>
-</nav>
+  <header class="site-header" id="site-header">
+    <div class="shell nav">
+      <a class="brand" href="#top" aria-label="Scenarii home">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M2.5 12h3.8l2-5.4 3.4 11 2.4-7.2 1.5 1.6h4.9" fill="none" stroke="var(--signal)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-word">Scenarii</span>
+      </a>
 
-<!-- Hero -->
-<div class="hero" id="hero">
-  <div class="container">
-    <h1><i class="bi bi-activity" style="color:var(--accent);margin-right:12px"></i><span>Scenarii</span></h1>
-    <p>YAML-defined web test scenarios - run periodically via a headless browser or native HTTP, stored in SQLite, monitored via a modern Dashboard.</p>
-    <div class="hero-badges">
-      <a href="https://github.com/Giwi/giwisoft-scenarii"><i class="bi bi-github"></i> GitHub</a>
-      <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii"><i class="bi bi-box"></i> Packages</a>
-      <a href="https://github.com/Giwi/giwisoft-scenarii/actions"><i class="bi bi-arrow-repeat"></i> CI</a>
+      <nav class="nav-links" id="nav-links" aria-label="Primary">
+        <a href="#capabilities">Product</a>
+        <a href="#how">How it works</a>
+        <a href="#scenarios">Scenarios</a>
+        <a href="#dashboard">Dashboard</a>
+        <a href="#docs">Docs</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a class="btn btn-ghost btn-sm" href="https://github.com/Giwi/giwisoft-scenarii">GitHub <span aria-hidden="true">&#8599;</span></a>
+        <a class="btn btn-primary btn-sm" href="#install">Install</a>
+        <button class="menu-btn" id="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+      </div>
     </div>
-  </div>
-</div>
+  </header>
 
-<!-- What is Scenarii -->
-<section id="what">
-  <div class="container">
-    <h2>What is Scenarii?</h2>
-    <p class="intro-text">
-      Scenarii lets you write web test scenarios as simple YAML files, run them on a cron schedule
-      via a headless browser or native HTTP, and track results over time on a dashboard.
-      Get alerted on failures via Telegram, Slack, Discord, email, or a generic webhook.
-    </p>
-    <div class="grid">
-      <div class="card"><i class="bi bi-file-text card-icon"></i><h3>YAML-defined</h3><p>Scenarios are plain YAML files - no code. Define HTTP requests or browser interactions with step-by-step expectations.</p></div>
-      <div class="card"><i class="bi bi-clock card-icon"></i><h3>Cron scheduling</h3><p>Run every 5 minutes, hourly, daily - any cron expression. Built-in scheduler with pause/resume from the dashboard.</p></div>
-      <div class="card"><i class="bi bi-database card-icon"></i><h3>SQLite storage</h3><p>All metrics persisted in SQLite with WAL mode. Configurable retention and optional automated daily backups.</p></div>
-      <div class="card"><i class="bi bi-laptop card-icon"></i><h3>Dashboard</h3><p>Full dashboard with dark/light mode, response time charts, success rate, SLA gauge, run history, JSON/CSV export, and public status pages.</p></div>
-      <div class="card"><i class="bi bi-bell card-icon"></i><h3>Multi-channel alerts</h3><p>State transition notifications (pass -> fail, fail -> pass) via Telegram, Slack, Discord, email, or custom webhook with retry logic.</p></div>
-      <div class="card"><i class="bi bi-globe2 card-icon"></i><h3>Browser + HTTP</h3><p>Native fetch for API monitoring (no browser needed) or Lightpanda headless browser for full page interaction with retry and screenshots.</p></div>
-    </div>
-  </div>
-</section>
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <p class="kicker"><span class="live-dot" aria-hidden="true"></span> Self-hosted &middot; open source</p>
+          <h1 id="hero-title">Your web tests,<br><span class="accent">on a schedule.</span></h1>
+          <p class="lede">Write YAML. Run HTTP or browser checks on cron. Get alerted when something breaks.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#install">Install in one line</a>
+            <a class="btn btn-ghost" href="#how">See how it works</a>
+          </div>
+        </div>
 
-<!-- Features -->
-<section id="features">
-  <div class="container">
-    <h2>All features</h2>
-    <div class="grid">
-      <div class="card"><i class="bi bi-box card-icon"></i><h3>CLI &amp; API</h3><p>Commands: <code>validate</code>, <code>trigger</code>, <code>server</code>, <code>status</code>, <code>user</code>, <code>config</code>. Full REST API with 30+ endpoints.</p></div>
-      <div class="card"><i class="bi bi-lock card-icon"></i><h3>Authentication</h3><p>Every page is private by default: local users with admin/user roles, or OIDC with roles inherited from provider groups. HTTP-only session cookies. API key auth for Prometheus metrics endpoint. </p></div>
-      <div class="card"><i class="bi bi-bell card-icon"></i><h3>Notifications</h3><p>Telegram, Slack, Discord, email (Mailgun), generic webhook. State transition triggers with retry and exponential backoff.</p></div>
-      <div class="card"><i class="bi bi-bar-chart card-icon"></i><h3>Prometheus metrics</h3><p>Native Prometheus/OpenMetrics export: run count, duration, success rate, step-level metrics, notification delivery stats.</p></div>
-      <div class="card"><i class="bi bi-database card-icon"></i><h3>SQLite storage</h3><p>WAL mode for concurrent reads. Configurable retention (default 7 days). Optional automated daily backups. No external database.</p></div>
-      <div class="card"><i class="bi bi-box-seam card-icon"></i><h3>Container</h3><p>Multi-arch images (linux/amd64 + arm64). HEALTHCHECK, non-root user, dumb-init. Published to GitHub Container Registry on each push.</p></div>
-      <div class="card"><i class="bi bi-arrow-clockwise card-icon"></i><h3>Hot-reload</h3><p>Settings YAML watched and reloaded automatically. Scenario directory scanned every 5s - add, remove, or rename <code>.yml</code> files without restarting.</p></div>
-      <div class="card"><i class="bi bi-pause-fill card-icon"></i><h3>Pause / Resume</h3><p>Toggle individual schedules on and off from the dashboard without deleting YAML files.</p></div>
-      <div class="card"><i class="bi bi-wrench card-icon"></i><h3>HTTP expectations</h3><p>Check status, status_in, body_contains, body_matches, headers, JSON path, JSON value, and response_time_under.</p></div>
-      <div class="card"><i class="bi bi-display card-icon"></i><h3>Browser actions</h3><p>Navigate, click, fill, type, select, check, uncheck, evaluate JS, scroll, wait for elements, screenshot, screenshot comparison against baseline.</p></div>
-      <div class="card"><i class="bi bi-pencil-square card-icon"></i><h3>Scenario editor</h3><p>Create and edit scenarios in the browser with YAML syntax highlighting. New opens a blank editor, Import uploads a <code>.yml</code>/<code>.yaml</code> file and stores it with the others.</p></div>
-      <div class="card"><i class="bi bi-journal-code card-icon"></i><h3>All HTTP methods</h3><p>GET, POST, PUT, PATCH, DELETE - all standard methods. Custom headers, JSON body, form data. Native fetch, no Playwright needed.</p></div>
-      <div class="card"><i class="bi bi-check-square-fill card-icon"></i><h3>Testing</h3><p>Node built-in test runner. Tests cover execution queue, notification state machine, URL resolution, variable interpolation, YAML parsing, and more.</p></div>
-    </div>
-  </div>
-</section>
+        <div class="hero-visual">
+          <div class="window">
+            <div class="window-bar">
+              <span class="window-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+              <span class="window-title">scenarii / dashboard</span>
+              <span class="window-live">LIVE</span>
+            </div>
+            <img src="screenshots/hero.png" width="2485" height="1830" alt="Scenarii dashboard preview with scenario health, response-time trends, and run history" fetchpriority="high">
+          </div>
+          <div class="float-card float-run" aria-hidden="true">
+            <span class="dot-pass"></span>
+            <span><strong>RUN PASS</strong> &middot; 7/7 steps &middot; 2.4s</span>
+          </div>
+          <div class="float-card float-sla" aria-hidden="true">
+            <span><strong>cron</strong> */5 * * * *</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<!-- Quick Start -->
-<section id="quickstart">
-  <div class="container">
-    <h2>Quick start</h2>
+    <section class="run-strip" aria-label="Example run feed">
+      <div class="run-label"><span class="live-dot" aria-hidden="true"></span> Example run feed</div>
+      <div class="run-viewport">
+        <div class="run-track">
+          <div class="run-group">
+            <span class="run-item" data-state="pass"><span class="dot"></span> api-health <time>204ms</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> lusk.bzh <time>2.4s</time></span>
+            <span class="run-item" data-state="fail"><span class="dot"></span> checkout-flow <time>1.1s</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> login-flow <time>3.2s</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> pricing-page <time>890ms</time></span>
+            <span class="run-item" data-state="warn"><span class="dot"></span> search-api <time>1.8s</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> status-page <time>460ms</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> docs-build <time>2.0s</time></span>
+          </div>
+          <div class="run-group" aria-hidden="true">
+            <span class="run-item" data-state="pass"><span class="dot"></span> api-health <time>204ms</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> lusk.bzh <time>2.4s</time></span>
+            <span class="run-item" data-state="fail"><span class="dot"></span> checkout-flow <time>1.1s</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> login-flow <time>3.2s</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> pricing-page <time>890ms</time></span>
+            <span class="run-item" data-state="warn"><span class="dot"></span> search-api <time>1.8s</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> status-page <time>460ms</time></span>
+            <span class="run-item" data-state="pass"><span class="dot"></span> docs-build <time>2.0s</time></span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <h3>npm</h3>
-    <pre><code>git clone https://github.com/Giwi/giwisoft-scenarii.git
+    <section class="stats" aria-label="Product facts">
+      <div class="stat">
+        <span class="stat-value">HTTP + browser</span>
+        <span class="stat-label">Runtimes</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">Any cron expression</span>
+        <span class="stat-label">Schedule</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">SQLite &middot; WAL</span>
+        <span class="stat-label">Storage</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">5 channels</span>
+        <span class="stat-label">Alerts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">Prometheus</span>
+        <span class="stat-label">Metrics</span>
+      </div>
+    </section>
+
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <p class="label">How it works</p>
+          <h2 id="how-title">Three moves. Then it runs itself.</h2>
+        </div>
+
+        <div class="steps reveal">
+          <article class="step">
+            <span class="step-num">01</span>
+            <h3>Write YAML</h3>
+            <p>Define steps, assertions, variables, and conditions in a plain file. No SDK, no test code.</p>
+          </article>
+          <article class="step">
+            <span class="step-num">02</span>
+            <h3>Put it on cron</h3>
+            <p>Scenarii schedules runs, watches the scenario folder, and keeps every result in SQLite.</p>
+          </article>
+          <article class="step">
+            <span class="step-num">03</span>
+            <h3>Get the signal</h3>
+            <p>Failures and recoveries go to Telegram, Slack, Discord, email, or your own webhook.</p>
+          </article>
+        </div>
+
+        <div class="split reveal">
+          <div class="code">
+            <div class="code-head">
+              <span class="code-file">scenarios/api-health.yml</span>
+              <button class="copy" type="button" data-copy="scenario-api-health">Copy</button>
+            </div>
+            <pre id="scenario-api-health"><code><span class="tok-comment"># Run every 5 minutes</span>
+name: API health check
+<span class="tok-key">schedule</span>: <span class="tok-string">"*/5 * * * *"</span>
+base_url: https://api.example.com
+
+steps:
+  - name: Get health
+    action: http.get
+    url: /health
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+      <span class="tok-key">response_time_under</span>: <span class="tok-number">3000</span>
+
+  - name: Verify build
+    action: http.get
+    url: /health
+    <span class="tok-key">expect</span>:
+      <span class="tok-key">json_path</span>: $.build
+      <span class="tok-key">json_value</span>: <span class="tok-string">"ok"</span>
+
+  - name: Create session
+    action: http.post
+    url: /sessions
+    body:
+      user: monitor
+    <span class="tok-key">expect</span>:
+      <span class="tok-key">status_in</span>: [<span class="tok-number">200</span>, <span class="tok-number">201</span>]</code></pre>
+          </div>
+
+          <div class="timeline" aria-label="Sample run timeline">
+            <div class="timeline-head"><span>Sample run</span><span class="pass">Pass 4/4</span></div>
+            <div class="tl-item">
+              <span class="tl-dot" aria-hidden="true"></span>
+              <span><span class="tl-name">Get health</span><span class="tl-meta">http.get &middot; expect status 200</span></span>
+              <span class="tl-time">204ms</span>
+            </div>
+            <div class="tl-item">
+              <span class="tl-dot" aria-hidden="true"></span>
+              <span><span class="tl-name">Verify build</span><span class="tl-meta">expect.json_path &middot; $.build</span></span>
+              <span class="tl-time">12ms</span>
+            </div>
+            <div class="tl-item">
+              <span class="tl-dot" aria-hidden="true"></span>
+              <span><span class="tl-name">Create session</span><span class="tl-meta">http.post &middot; status_in [200, 201]</span></span>
+              <span class="tl-time">188ms</span>
+            </div>
+            <div class="tl-item is-running">
+              <span class="tl-dot" aria-hidden="true"></span>
+              <span><span class="tl-name">Check headers</span><span class="tl-meta">expect.header_contains &middot; running</span></span>
+              <span class="tl-time">9ms</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--alt" id="capabilities" aria-labelledby="capabilities-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <h2 id="capabilities-title">Built for the boring part of reliability.</h2>
+          <p>No external database. No proprietary test cloud. A small service that watches your sites and tells you the truth.</p>
+        </div>
+
+        <div class="bento reveal">
+          <article class="tile tile-shot">
+            <img src="screenshots/public.png" width="526" height="1050" loading="lazy" alt="Scenarii public status page with scenario health, uptime, and history">
+            <div class="tile-shot-cap">
+              <h3>The whole story, one screen</h3>
+              <p>SLA, response-time trends, success rate, step timings, and every run in one place.</p>
+            </div>
+          </article>
+
+          <article class="tile tile-b">
+            <span class="tile-kicker">Notifications</span>
+            <h3>Alerts that mean something</h3>
+            <p>Sent on state transitions, with retry and exponential backoff. Not on every single run.</p>
+            <div class="channel-list">
+              <div class="channel"><strong>Telegram</strong><span>bot + chat</span></div>
+              <div class="channel"><strong>Slack</strong><span>webhook</span></div>
+              <div class="channel"><strong>Discord</strong><span>webhook</span></div>
+              <div class="channel"><strong>Email</strong><span>Mailgun</span></div>
+              <div class="channel"><strong>Custom</strong><span>JSON webhook</span></div>
+            </div>
+          </article>
+
+          <article class="tile tile-c">
+            <span class="tile-kicker">Storage</span>
+            <span class="big-spec">0<span>external services</span></span>
+            <h3>SQLite, not a cluster</h3>
+            <p>Everything lives in one file. Backups are a copy, not a migration project.</p>
+            <div style="margin-top:16px">
+              <div class="spec-row"><span>Journal mode</span><b>WAL</b></div>
+              <div class="spec-row"><span>Retention</span><b>7 days default</b></div>
+              <div class="spec-row"><span>Backups</span><b>optional, daily</b></div>
+              <div class="spec-row"><span>Database</span><b>single file</b></div>
+            </div>
+          </article>
+
+          <article class="tile tile-d">
+            <span class="tile-kicker">Real-time</span>
+            <h3>Live ticker</h3>
+            <p>WebSocket progress for every step while a run is in flight.</p>
+            <div class="mini-ticker">
+              <div class="mini-step"><span class="dot"></span> Homepage <time>done</time></div>
+              <div class="mini-step"><span class="dot"></span> Login form <time>done</time></div>
+              <div class="mini-step is-running"><span class="dot"></span> Checkout <time>running</time></div>
+            </div>
+          </article>
+
+          <article class="tile tile-e">
+            <span class="tile-kicker">Public status</span>
+            <h3>Share the good news</h3>
+            <p>Per-scenario status pages with charts. No auth, no dashboard access.</p>
+            <div class="status-mini">
+              <div class="status-mini-top"><span class="dot"></span> checkout-flow &middot; operational</div>
+              <code>/public/status/checkout-flow</code>
+            </div>
+          </article>
+
+          <article class="tile tile-f">
+            <span class="tile-kicker">Observability</span>
+            <h3>Prometheus native</h3>
+            <p>Run, step, duration, success, and delivery metrics. Scrape it and move on.</p>
+            <div class="metric-lines">
+<span class="tok-comment"># success (1 = pass)</span>
+scenarii_scenario_success{scenario=<em>"api-health"</em>} <b>1</b>
+scenarii_scenario_runs_total{scenario=<em>"api-health"</em>} <b>142</b>
+scenarii_step_duration_ms{step=<em>"Get health"</em>} <b>204</b>
+            </div>
+          </article>
+        </div>
+
+        <div class="feature-list reveal">
+          <article class="feature"><span class="feature-num">01</span><div><h3>Hot reload</h3><p>Settings and the scenario folder are watched. Add, rename, or remove YAML without a restart.</p></div></article>
+          <article class="feature"><span class="feature-num">02</span><div><h3>Pause and resume</h3><p>Turn one schedule off from the dashboard without deleting the scenario file.</p></div></article>
+          <article class="feature"><span class="feature-num">03</span><div><h3>Scenario editor</h3><p>Create, import, and edit YAML in the browser with syntax highlighting.</p></div></article>
+          <article class="feature"><span class="feature-num">04</span><div><h3>All HTTP methods</h3><p>GET, POST, PUT, PATCH, DELETE with headers, JSON body, and form data on native fetch.</p></div></article>
+          <article class="feature"><span class="feature-num">05</span><div><h3>CLI and API</h3><p>Validate, trigger, and manage from the terminal. 30+ REST endpoints power the dashboard.</p></div></article>
+          <article class="feature"><span class="feature-num">06</span><div><h3>One container</h3><p>Multi-arch image for amd64 and arm64, non-root, with a healthcheck and dumb-init.</p></div></article>
+          <article class="feature"><span class="feature-num">07</span><div><h3>Node test suite</h3><p>Built-in runner covering the queue, state machine, variable interpolation, and YAML parsing.</p></div></article>
+          <article class="feature"><span class="feature-num">08</span><div><h3>Private by default</h3><p>Session cookies, local roles, OIDC group mapping, and an API key for the metrics endpoint.</p></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="scenarios" aria-labelledby="scenarios-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <h2 id="scenarios-title">A scenario is just YAML.</h2>
+          <p>Steps, expectations, extraction variables, and conditions. The API and the browser use the same file format.</p>
+        </div>
+
+        <div class="reveal" data-tabs="scenario-tabs">
+          <div class="tabs" role="tablist" aria-label="Sample scenarios">
+            <button class="tab" role="tab" id="tab-http" aria-controls="panel-http" aria-selected="true" tabindex="0">HTTP health</button>
+            <button class="tab" role="tab" id="tab-browser" aria-controls="panel-browser" aria-selected="false" tabindex="-1">Browser form</button>
+            <button class="tab" role="tab" id="tab-mixed" aria-controls="panel-mixed" aria-selected="false" tabindex="-1">Mixed</button>
+            <button class="tab" role="tab" id="tab-condition" aria-controls="panel-condition" aria-selected="false" tabindex="-1">Conditional</button>
+            <button class="tab" role="tab" id="tab-vars" aria-controls="panel-vars" aria-selected="false" tabindex="-1">Variables</button>
+          </div>
+
+          <div class="tab-panel" role="tabpanel" id="panel-http" aria-labelledby="tab-http">
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">scenarios/example.yml</span>
+                <button class="copy" type="button" data-copy="code-http">Copy</button>
+              </div>
+              <pre id="code-http"><code><span class="tok-comment"># scenarios/example.yml</span>
+name: API health check
+description: Verify API health every 5 minutes
+<span class="tok-key">schedule</span>: <span class="tok-string">"*/5 * * * *"</span>
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Get posts
+    action: http.get
+    url: /posts/1
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+      <span class="tok-key">response_time_under</span>: <span class="tok-number">3000</span>
+
+  - name: Verify JSON content
+    action: http.get
+    url: /posts/1
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+      <span class="tok-key">json_path</span>: $.userId
+      <span class="tok-key">json_value</span>: <span class="tok-number">1</span>
+
+  - name: Create a post
+    action: http.post
+    url: /posts
+    body:
+      title: foo
+      body: bar
+      userId: <span class="tok-number">1</span>
+    headers:
+      Content-Type: application/json
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">201</span></code></pre>
+            </div>
+          </div>
+
+          <div class="tab-panel" role="tabpanel" id="panel-browser" aria-labelledby="tab-browser" hidden>
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">scenarios/browser-example.yml</span>
+                <button class="copy" type="button" data-copy="code-browser">Copy</button>
+              </div>
+              <pre id="code-browser"><code><span class="tok-comment"># scenarios/browser-example.yml</span>
+name: Browser form test
+description: Test page load and content rendering
+<span class="tok-key">schedule</span>: <span class="tok-string">"*/10 * * * *"</span>
+base_url: https://example.com
+
+steps:
+  - name: Open page
+    action: browser.navigate
+    url: /
+
+  - name: Verify page loaded
+    action: browser.wait_for
+    selector: body
+    <span class="tok-key">expect</span>:
+      <span class="tok-key">has_text</span>: <span class="tok-string">"Example"</span>
+
+  - name: Fill the form
+    action: browser.fill
+    selector: <span class="tok-string">"#name"</span>
+    value: <span class="tok-string">"Jane Doe"</span>
+
+  - name: Submit
+    action: browser.click
+    selector: <span class="tok-string">"#submit"</span>
+
+  - name: Wait for result
+    action: browser.wait_for
+    selector: <span class="tok-string">".success-message"</span>
+    timeout: <span class="tok-number">5000</span>
+    <span class="tok-key">expect</span>:
+      <span class="tok-key">has_text</span>: <span class="tok-string">"Thank you"</span>
+
+  - name: Screenshot
+    action: browser.screenshot
+    value: /tmp/screenshot.png</code></pre>
+            </div>
+          </div>
+
+          <div class="tab-panel" role="tabpanel" id="panel-mixed" aria-labelledby="tab-mixed" hidden>
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">scenarios/mixed.yml</span>
+                <button class="copy" type="button" data-copy="code-mixed">Copy</button>
+              </div>
+              <pre id="code-mixed"><code><span class="tok-comment"># scenarios/mixed.yml</span>
+name: Mixed browser and HTTP
+base_url: https://example.com
+
+steps:
+  - name: Open page
+    action: browser.navigate
+    url: /
+    <span class="tok-key">expect</span>:
+      <span class="tok-key">has_text</span>: <span class="tok-string">"Example"</span>
+
+  - name: Check external API
+    action: http.get
+    url: https://jsonplaceholder.typicode.com/posts/1
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+      <span class="tok-key">json_path</span>: $.id
+      <span class="tok-key">json_value</span>: <span class="tok-number">1</span></code></pre>
+            </div>
+          </div>
+
+          <div class="tab-panel" role="tabpanel" id="panel-condition" aria-labelledby="tab-condition" hidden>
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">scenarios/conditional.yml</span>
+                <button class="copy" type="button" data-copy="code-condition">Copy</button>
+              </div>
+              <pre id="code-condition"><code>name: Conditional scenario
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Login
+    action: http.post
+    url: /auth/login
+    body:
+      username: admin
+      password: secret
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+    <span class="tok-key">variables</span>:
+      token: $.access_token    <span class="tok-comment"># extract from response</span>
+
+  - name: Dashboard check
+    action: http.get
+    url: /api/dashboard
+    <span class="tok-key">condition</span>:               <span class="tok-comment"># skip if Login failed</span>
+      <span class="tok-key">if_step</span>: <span class="tok-string">"Login"</span>
+      <span class="tok-key">if_success</span>: true
+    headers:
+      Authorization: <span class="tok-string">"Bearer {{token}}"</span>
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span></code></pre>
+            </div>
+          </div>
+
+          <div class="tab-panel" role="tabpanel" id="panel-vars" aria-labelledby="tab-vars" hidden>
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">scenarios/variables.yml</span>
+                <button class="copy" type="button" data-copy="code-vars">Copy</button>
+              </div>
+              <pre id="code-vars"><code>name: Variable extraction demo
+base_url: https://jsonplaceholder.typicode.com
+
+steps:
+  - name: Get first post
+    action: http.get
+    url: /posts/1
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+    <span class="tok-key">variables</span>:
+      postTitle: $.title       <span class="tok-comment"># extracted from response</span>
+      postId: $.id
+
+  - name: Get user for post
+    action: http.get
+    url: /users/{{postId}}
+    <span class="tok-key">expect</span>:
+      status: <span class="tok-number">200</span>
+
+  - name: Verify content
+    action: http.get
+    url: /posts/{{postId}}
+    <span class="tok-key">expect</span>:
+      <span class="tok-key">body_contains</span>: <span class="tok-string">"{{postTitle}}"</span></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--alt" id="dashboard" aria-labelledby="dashboard-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <h2 id="dashboard-title">Watch it run. Then watch the history.</h2>
+          <p>Dark and light themes, WebSocket updates, trend charts, a seven-day SLA, and shareable public status pages.</p>
+        </div>
+
+        <div class="viewer reveal">
+          <div class="viewer-bar">
+            <div class="viewer-tabs" role="tablist" aria-label="Dashboard preview">
+              <button class="viewer-tab" type="button" role="tab" id="view-list" aria-selected="true" data-view="list">Scenario list</button>
+              <button class="viewer-tab" type="button" role="tab" id="view-detail" aria-selected="false" data-view="detail">Scenario detail</button>
+            </div>
+          </div>
+          <div class="viewer-frame">
+            <img id="dash-image" src="screenshots/scenario-list-dark.png" width="1280" height="900" loading="lazy" alt="Scenarii scenario list dashboard in dark theme">
+          </div>
+          <div class="dash-cap">
+            <div><strong>Live ticker</strong><span>Current step and response time, streamed over WebSocket.</span></div>
+            <div><strong>SLA and trends</strong><span>Success rate, response time, and a configurable SLA window.</span></div>
+            <div><strong>Public status</strong><span>Per-scenario pages without authentication.</span></div>
+            <div><strong>Users and roles</strong><span>Local accounts or OIDC groups, managed in the dashboard.</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="auth" aria-labelledby="auth-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <h2 id="auth-title">Private by default.</h2>
+          <p>Every page is protected, including the dashboard and API. Only the public status pages and health endpoints are open.</p>
+        </div>
+
+        <div class="panel-grid reveal">
+          <article class="panel">
+            <h3>Local users</h3>
+            <p>First start creates an admin and prints a generated password once in the logs.</p>
+            <ul class="check-list">
+              <li><code>admin</code> manages users, roles, and passwords.</li>
+              <li><code>user</code> browses scenarios, triggers runs, and pauses schedules.</li>
+              <li>HTTP-only session cookies. The last admin cannot lock itself out.</li>
+            </ul>
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">terminal</span>
+                <button class="copy" type="button" data-copy="code-users">Copy</button>
+              </div>
+              <pre id="code-users"><code><span class="tok-comment"># add, promote, reset, delete</span>
+node dist/index.js user add bob
+node dist/index.js user role bob admin
+node dist/index.js user passwd bob
+node dist/index.js user del bob</code></pre>
+            </div>
+          </article>
+
+          <article class="panel">
+            <h3>OIDC and SSO</h3>
+            <p>Point Scenarii at your provider and roles follow group membership on every login.</p>
+            <ul class="check-list">
+              <li><code>username_claim</code> falls back to preferred_username, email, then sub.</li>
+              <li><code>groups_claim</code> accepts arrays, strings, or comma-separated lists.</li>
+              <li><code>admin_group</code> grants admin. Everyone else gets user.</li>
+            </ul>
+            <div class="code">
+              <div class="code-head">
+                <span class="code-file">settings.yml</span>
+                <button class="copy" type="button" data-copy="code-oidc">Copy</button>
+              </div>
+              <pre id="code-oidc"><code>auth:
+  oidc:
+    issuer_url: <span class="tok-string">"https://accounts.google.com"</span>
+    client_id: <span class="tok-string">"YOUR_CLIENT_ID"</span>
+    client_secret: <span class="tok-string">"YOUR_SECRET"</span>
+    username_claim: <span class="tok-string">"preferred_username"</span>
+    groups_claim: <span class="tok-string">"groups"</span>
+    admin_group: <span class="tok-string">"scenarii-admins"</span></code></pre>
+            </div>
+          </article>
+        </div>
+
+        <p style="margin-top:18px;font-size:13px;color:var(--muted)"><a href="#ref-auth">Full authentication reference</a> for route rules, role table, and provider notes.</p>
+      </div>
+    </section>
+
+    <section class="section section--alt" id="install" aria-labelledby="install-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <h2 id="install-title">Runs on one box.</h2>
+          <p>No managed service, no external database. Bring a container and a folder of YAML.</p>
+        </div>
+
+        <div class="install-grid reveal" data-tabs="install-tabs">
+          <div>
+            <div class="tabs" role="tablist" aria-label="Install method">
+              <button class="tab" role="tab" id="tab-npm" aria-controls="panel-npm" aria-selected="true" tabindex="0">npm</button>
+              <button class="tab" role="tab" id="tab-docker" aria-controls="panel-docker" aria-selected="false" tabindex="-1">Docker</button>
+            </div>
+
+            <div class="tab-panel" role="tabpanel" id="panel-npm" aria-labelledby="tab-npm">
+              <div class="code">
+                <div class="code-head">
+                  <span class="code-file">terminal</span>
+                  <button class="copy" type="button" data-copy="code-npm">Copy</button>
+                </div>
+                <pre id="code-npm"><code>git clone https://github.com/Giwi/giwisoft-scenarii.git
 cd giwisoft-scenarii
 npm install
 npm run build
 
-# Start the server (loads scenarios from ./scenarios, serves dashboard)
+<span class="tok-comment"># start the server and scheduler</span>
 node dist/index.js server
 
-# Or run a scenario once
+<span class="tok-comment"># or run one scenario once</span>
 node dist/index.js --once scenarios/example.yml</code></pre>
-    <p>Open <a href="http://localhost:3000">http://localhost:3000</a> for the dashboard. Authentication is on by default: the first start prints a generated password for the <code>admin</code> user in the logs, and <code>http://localhost:3000/login</code> shows the landing page with the login form.</p>
+              </div>
+            </div>
 
-    <h3>Docker</h3>
-    <pre><code>docker pull ghcr.io/giwi/giwisoft-scenarii:latest
+            <div class="tab-panel" role="tabpanel" id="panel-docker" aria-labelledby="tab-docker" hidden>
+              <div class="code">
+                <div class="code-head">
+                  <span class="code-file">terminal</span>
+                  <button class="copy" type="button" data-copy="code-docker">Copy</button>
+                </div>
+                <pre id="code-docker"><code>docker pull ghcr.io/giwi/giwisoft-scenarii:latest
 
 mkdir -p scenarios db
 cp settings.example.yaml settings.yml
@@ -354,521 +641,321 @@ docker run -d \
   -v $(pwd)/db:/app/db \
   -v $(pwd)/settings.yml:/app/settings.yml:ro \
   ghcr.io/giwi/giwisoft-scenarii:latest</code></pre>
-  </div>
-</section>
+              </div>
+            </div>
+          </div>
 
-<!-- Dashboard -->
-<section id="dashboard">
-  <div class="container">
-    <h2>Dashboard</h2>
-    <p class="intro-text">The Angular frontend gives you real-time visibility into all your scenarios. Dark and light themes, WebSocket live updates, and public status pages.</p>
-    <div class="screenshots">
-      <img src="screenshots/scenario-list.png" alt="Scenario list (light)">
-      <img src="screenshots/scenario-list-dark.png" alt="Scenario list (dark)">
-      <img src="screenshots/scenario-detail.png" alt="Scenario detail (light)">
-      <img src="screenshots/scenario-detail-dark.png" alt="Scenario detail (dark)">
-    </div>
-    <div class="grid" style="margin-top:24px;">
-      <div class="card"><i class="bi bi-clipboard-data card-icon"></i><h3>Scenario list</h3><p>Overview with pass/fail badges, tag filters, dependencies column, and auto-refresh via WebSocket.</p></div>
-      <div class="card"><i class="bi bi-graph-up-arrow card-icon"></i><h3>Scenario detail</h3><p>Response time trend chart, success rate chart, SLA gauge, step breakdown, paginated run history, JSON/CSV export.</p></div>
-      <div class="card"><i class="bi bi-clock-history card-icon"></i><h3>Live ticker</h3><p>Inline step progress in the toolbar - see exactly which step is executing and its response time in real time.</p></div>
-      <div class="card"><i class="bi bi-globe card-icon"></i><h3>Public status</h3><p>Shareable per-scenario pages at <code style="font-size:.8rem;">/public/status/:name</code> with stat cards and charts - no auth required.</p></div>
-      <div class="card"><i class="bi bi-box-arrow-in-right card-icon"></i><h3>Landing &amp; login</h3><p>Product landing page at <code style="font-size:.8rem;">/login</code> with the login form, then a Sign out button and the username in the navbar.</p></div>
-      <div class="card"><i class="bi bi-people card-icon"></i><h3>User management</h3><p>Admins get a <code style="font-size:.8rem;">/users</code> page (navbar link) to add users, promote or demote them, reset passwords, and delete accounts.</p></div>
-      <div class="card"><i class="bi bi-crosshair card-icon"></i><h3>SLA tracking</h3><p>7-day SLA gauge per scenario with configurable window. Track pass/fail ratios over time.</p></div>
-      <div class="card"><i class="bi bi-arrow-repeat card-icon"></i><h3>Real-time</h3><p>WebSocket push for run completions and step progress. Manual refresh on list and detail pages.</p></div>
-    </div>
-  </div>
-</section>
+          <div class="install-notes">
+            <h3>What happens next</h3>
+            <p>Open <code>http://localhost:3000</code>. The first start prints a generated password for the <code>admin</code> user in the logs.</p>
+            <p>Scenarios load from <code>./scenarios</code>. Add, remove, or rename a YAML file and the server picks it up within five seconds.</p>
+            <p>Settings live in <code>settings.yml</code> and reload on save. Notifications are off until you configure a channel.</p>
+            <p>Images are published for <code>linux/amd64</code> and <code>linux/arm64</code>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<!-- Authentication -->
-<section id="auth">
-  <div class="container">
-    <h2>Authentication</h2>
-    <p class="intro-text">Authentication is <strong>on by default</strong>. Every page is private except the public status pages, and every API route needs a session cookie except the health, status, metrics, and auth endpoints. Set <code>auth.enabled: false</code> to turn it off entirely.</p>
+    <section class="section" id="docs" aria-labelledby="docs-title">
+      <div class="shell">
+        <div class="section-head reveal">
+          <p class="label">Reference</p>
+          <h2 id="docs-title">Everything else, one click deep.</h2>
+          <p>The details that belong in docs, not in the pitch.</p>
+        </div>
 
-    <h3>Local users</h3>
-    <p>On first start a default user is created with the <code>admin</code> role and a generated password printed once in the logs:</p>
-    <pre><code>Created default user "admin" with generated password</code></pre>
-    <p>Users have one of two roles: <code>admin</code> manages users, <code>user</code> browses scenarios. Only an admin can add a user, from the <code>/users</code> page, the CLI, or the API.</p>
+        <div class="docs-grid reveal">
+          <nav class="docs-nav" aria-label="Reference sections">
+            <a href="#ref-auth">Authentication</a>
+            <a href="#ref-notifications">Notifications</a>
+            <a href="#ref-actions">HTTP actions</a>
+            <a href="#ref-browser">Browser actions</a>
+            <a href="#ref-cli">CLI and options</a>
+            <a href="#ref-api">API</a>
+            <a href="#ref-metrics">Metrics and events</a>
+          </nav>
 
-    <pre><code><span style="color:#6c7086;"># List users with their role</span>
-node dist/index.js user list
+          <div>
+            <details class="ref" id="ref-auth">
+              <summary>
+                <div>
+                  <h3>Authentication</h3>
+                  <p>Route protection, local roles, and OIDC group mapping.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <p>Authentication is <strong>on by default</strong>. Every page is private except the public status pages, and every API route needs a session cookie except health, status, metrics, and auth endpoints. Set <code>auth.enabled: false</code> to turn it off.</p>
 
-<span style="color:#6c7086;"># Add a user (password generated and printed, role defaults to "user")</span>
-node dist/index.js user add bob
-node dist/index.js user add carol my-password admin
+                <h4>Roles</h4>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Role</th><th>Can do</th></tr>
+                    <tr><td><code>admin</code></td><td>Everything a user can, plus add, promote, demote, and delete users.</td></tr>
+                    <tr><td><code>user</code></td><td>Browse scenarios, view history and charts, trigger and pause runs.</td></tr>
+                  </table>
+                </div>
+                <p>An admin can neither delete their own account nor change their own role, so the last admin cannot be locked out of user management.</p>
 
-<span style="color:#6c7086;"># Reset a password, change a role, delete a user</span>
-node dist/index.js user passwd bob
-node dist/index.js user role bob admin
-node dist/index.js user del bob</code></pre>
-
-    <table>
-      <tr><th>Role</th><th>Can do</th></tr>
-      <tr><td><code>admin</code></td><td>Everything a <code>user</code> can, plus add, promote, demote, and delete users.</td></tr>
-      <tr><td><code>user</code></td><td>Browse scenarios, view history and charts, trigger and pause runs.</td></tr>
-    </table>
-
-    <p>An admin can neither delete their own account nor change their own role, so the last admin cannot be locked out of user management.</p>
-
-    <h3>OIDC</h3>
-    <p>Add an <code>oidc:</code> block and the provider takes over login. Roles are then <strong>inherited from the provider groups</strong> instead of being stored by hand:</p>
-    <pre><code>auth:
+                <h4>OIDC notes</h4>
+                <ul>
+                  <li><code>username_claim</code> is used as the local username. Unset, it falls back to <code>preferred_username</code>, then <code>email</code>, then <code>sub</code>.</li>
+                  <li><code>groups_claim</code> is read as a group list. Arrays, plain strings, and space or comma separated strings are accepted. <code>groups</code> and <code>roles</code> are fallbacks.</li>
+                  <li><code>admin_group</code> membership grants the <code>admin</code> role. Everyone else gets <code>user</code>. Without it, every OIDC user is a plain user.</li>
+                  <li>The role is re-derived on every login. Changing group membership applies on the next sign-in.</li>
+                </ul>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">settings.yml</span>
+                    <button class="copy" type="button" data-copy="code-auth-full">Copy</button>
+                  </div>
+                  <pre id="code-auth-full"><code>auth:
+  enabled: true
+  default_user: admin
+  default_user_role: admin
   oidc:
-    issuer_url: "https://accounts.google.com"
-    client_id: "YOUR_CLIENT_ID"
-    client_secret: "YOUR_CLIENT_SECRET"
-    redirect_uri: "http://localhost:3000/api/auth/callback"
-    username_claim: "preferred_username"   <span style="color:#6c7086;"># claim used as the local username</span>
-    groups_claim: "groups"                 <span style="color:#6c7086;"># claim holding the group memberships</span>
-    admin_group: "scenarii-admins"         <span style="color:#6c7086;"># group granting the admin role</span></code></pre>
-    <ul>
-      <li><code>username_claim</code>: claim used as the local username. Unset, it falls back to <code>preferred_username</code>, then <code>email</code>, then <code>sub</code>.</li>
-      <li><code>groups_claim</code>: claim read as a group list. Arrays, plain strings, and space or comma separated strings are accepted; <code>groups</code> and <code>roles</code> are used as fallbacks.</li>
-      <li><code>admin_group</code>: membership grants the <code>admin</code> role, everyone else gets <code>user</code>. Without it, every OIDC user is a plain user.</li>
-    </ul>
-    <p>The role is re-derived on every login, so adding or removing someone from the group applies on their next sign-in.</p>
-  </div>
-</section>
+    issuer_url: <span class="tok-string">"https://accounts.google.com"</span>
+    client_id: <span class="tok-string">"YOUR_CLIENT_ID"</span>
+    client_secret: <span class="tok-string">"YOUR_CLIENT_SECRET"</span>
+    redirect_uri: <span class="tok-string">"http://localhost:3000/api/auth/callback"</span>
+    username_claim: <span class="tok-string">"preferred_username"</span>
+    groups_claim: <span class="tok-string">"groups"</span>
+    admin_group: <span class="tok-string">"scenarii-admins"</span></code></pre>
+                </div>
+              </div>
+            </details>
 
-<!-- Sample scenarios -->
-<section id="scenarios">
-  <div class="container">
-    <h2>Sample scenarios</h2>
-    <p class="intro-text">Scenarios are pure YAML - define steps, expectations, extraction variables, and optional conditions. No programming required.</p>
+            <details class="ref" id="ref-notifications">
+              <summary>
+                <div>
+                  <h3>Notifications</h3>
+                  <p>Five channels, state transitions, per-scenario overrides, retries.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <p>Alerts fire when a scenario changes state: pass to fail, or fail to pass. Delivery retries three times with exponential backoff. The server watches <code>settings.yml</code> and reloads it on change.</p>
 
-    <h3><span class="tag http">HTTP</span> API health check</h3>
-    <p>Basic HTTP scenario that verifies an API is responding with the expected status code and response time.</p>
-    <pre><code><span style="color:#6c7086;"># scenarios/example.yml</span>
-name: API health check
-description: Verify API health every 5 minutes
-<span style="color:#a6e3a1;">schedule:</span> <span style="color:#fab387;">"*/5 * * * *"</span>
-base_url: https://jsonplaceholder.typicode.com
+                <h4>Channels</h4>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Channel</th><th>Configuration</th></tr>
+                    <tr><td>Telegram</td><td><code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code>, or the settings file.</td></tr>
+                    <tr><td>Email</td><td>Mailgun API key and domain. Multiple recipients. Daily report at 08:00.</td></tr>
+                    <tr><td>Slack</td><td>Webhook URL. JSON payload with scenario, status, and duration.</td></tr>
+                    <tr><td>Discord</td><td>Webhook URL. Embedded message with color-coded pass or fail.</td></tr>
+                    <tr><td>Generic webhook</td><td>Any endpoint that accepts the JSON payload.</td></tr>
+                  </table>
+                </div>
 
-steps:
-  - name: Get posts
-    action: http.get
-    url: /posts/1
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 200
-      <span style="color:#a6e3a1;">response_time_under:</span> <span style="color:#fab387;">3000</span>
-
-  - name: Verify JSON content
-    action: http.get
-    url: /posts/1
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 200
-      json_path: $.userId      <span style="color:#6c7086;"># check specific JSON field</span>
-      json_value: 1
-
-  - name: Create a post
-    action: http.post
-    url: /posts
-    body:
-      title: foo
-      body: bar
-      userId: 1
-    headers:
-      Content-Type: application/json
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 201</code></pre>
-
-    <h3><span class="tag browser">BROWSER</span> Browser form test</h3>
-    <p>Navigate to a page, wait for content, and evaluate JavaScript in the page - all through a headless Lightpanda browser.</p>
-    <pre><code><span style="color:#6c7086;"># scenarios/browser-example.yml</span>
-name: Browser form test
-description: Tests page load and content rendering
-schedule: <span style="color:#fab387;">"*/10 * * * *"</span>
-base_url: https://example.com
-
-steps:
-  - name: Open page
-    action: browser.navigate
-    url: /
-
-  - name: Verify page loaded
-    action: browser.wait_for
-    selector: body
-    expect:
-      has_text: <span style="color:#fab387;">"Example"</span>
-
-  - name: Check URL
-    action: browser.evaluate
-    script: <span style="color:#fab387;">"window.location.href"</span>
-    expect:
-      url_contains: <span style="color:#fab387;">"example.com"</span></code></pre>
-
-    <h3><span class="tag mixed">MIXED</span> Browser + HTTP</h3>
-    <p>Combine browser steps with HTTP API calls in the same scenario.</p>
-    <pre><code><span style="color:#6c7086;"># scenarios/mixed.yml</span>
-name: Mixed browser and HTTP
-base_url: https://example.com
-
-steps:
-  - name: Open page
-    action: browser.navigate
-    url: /
-    expect:
-      has_text: <span style="color:#fab387;">"Example"</span>
-
-  - name: Check external API
-    action: http.get
-    url: https://jsonplaceholder.typicode.com/posts/1
-    expect:
-      status: 200
-      json_path: $.id
-      json_value: <span style="color:#fab387;">1</span></code></pre>
-
-    <h3><span class="tag http">HTTP</span> Conditional execution</h3>
-    <p>Skip steps based on a previous step's result using the <code>condition</code> field. Extract variables with <code>json_path</code> and reuse with <code>&#123;&#123;variable&#125;&#125;</code>.</p>
-    <pre><code>name: Conditional scenario
-base_url: https://jsonplaceholder.typicode.com
-
-steps:
-  - name: Login
-    action: http.post
-    url: /auth/login
-    body:
-      username: admin
-      password: secret
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 200
-    <span style="color:#a6e3a1;">variables:</span>
-      token: $.access_token    <span style="color:#6c7086;"># extract from response</span>
-
-  - name: Dashboard check
-    action: http.get
-    url: /api/dashboard
-    <span style="color:#a6e3a1;">condition:</span>               <span style="color:#6c7086;"># skip if Login failed</span>
-      if_step: <span style="color:#fab387;">"Login"</span>
-      if_success: true
-    headers:
-      Authorization: <span style="color:#fab387;">"Bearer &#123;&#123;token&#125;&#125;"</span>
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 200</code></pre>
-
-    <h3><span class="tag browser">BROWSER</span> Full browser interactions</h3>
-    <p>Fill forms, click buttons, select options, take screenshots, and compare against baselines.</p>
-    <pre><code>name: Full browser test
-base_url: https://example.com
-
-steps:
-  - name: Navigate to form
-    action: browser.navigate
-    url: /form
-
-  - name: Fill field
-    action: browser.fill
-    selector: <span style="color:#fab387;">"#name"</span>
-    value: <span style="color:#fab387;">"Jane Doe"</span>
-
-  - name: Select country
-    action: browser.select
-    selector: <span style="color:#fab387;">"#country"</span>
-    value: <span style="color:#fab387;">"FR"</span>
-
-  - name: Check agreement
-    action: browser.check
-    selector: <span style="color:#fab387;">"#agree"</span>
-
-  - name: Submit
-    action: browser.click
-    selector: <span style="color:#fab387;">"#submit"</span>
-
-  - name: Wait for result
-    action: browser.wait_for
-    selector: <span style="color:#fab387;">".success-message"</span>
-    timeout: <span style="color:#fab387;">5000</span>
-    expect:
-      has_text: <span style="color:#fab387;">"Thank you"</span>
-
-  - name: Screenshot
-    action: browser.screenshot
-    value: /tmp/screenshot.png</code></pre>
-
-    <h3><span class="tag http">HTTP</span> Variable extraction &amp; reuse</h3>
-    <p>Extract values from JSON responses and reference them in later steps.</p>
-    <pre><code>name: Variable extraction demo
-base_url: https://jsonplaceholder.typicode.com
-
-steps:
-  - name: Get first post
-    action: http.get
-    url: /posts/1
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 200
-    <span style="color:#a6e3a1;">variables:</span>
-      postTitle: $.title       <span style="color:#6c7086;"># extracted from response</span>
-      postId: $.id
-
-  - name: Get user for post
-    action: http.get
-    url: /users/&#123;&#123;postId&#125;&#125;
-    <span style="color:#a6e3a1;">expect:</span>
-      status: 200
-
-  - name: Verify content
-    action: http.get
-    url: /posts/&#123;&#123;postId&#125;&#125;
-    <span style="color:#a6e3a1;">expect:</span>
-      body_contains: <span style="color:#fab387;">"&#123;&#123;postTitle&#125;&#125;"</span></code></pre>
-  </div>
-</section>
-
-<!-- Actions Reference -->
-<section id="actions">
-  <div class="container">
-    <h2>Actions Reference</h2>
-    <p class="intro-text">Every step must have a <code>name</code> and an <code>action</code>. Actions are either HTTP-based (no browser needed) or browser-based (Lightpanda headless browser).</p>
-
-    <h3><span class="tag http">HTTP</span> Actions</h3>
-    <p>HTTP steps use the native <code>fetch</code> API - no Playwright or browser required for simple API monitoring.</p>
-    <table>
-      <tr><th>Action</th><th>Required fields</th><th>Optional fields</th></tr>
-      <tr><td><code>http.get</code></td><td><code>url</code></td><td><code>headers</code>, <code>expect</code></td></tr>
-      <tr><td><code>http.post</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
-      <tr><td><code>http.put</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
-      <tr><td><code>http.patch</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
-      <tr><td><code>http.delete</code></td><td><code>url</code></td><td><code>headers</code>, <code>expect</code></td></tr>
-    </table>
-
-    <h3>HTTP expectations</h3>
-    <table>
-      <tr><th>Expectation</th><th>Description</th></tr>
-      <tr><td><code>status: 200</code></td><td>Exact HTTP status code match.</td></tr>
-      <tr><td><code>status_in: [200, 201]</code></td><td>Status code is one of the listed values.</td></tr>
-      <tr><td><code>body_contains: "text"</code></td><td>Response body contains the given string.</td></tr>
-      <tr><td><code>body_matches: "regex"</code></td><td>Response body matches the given regex.</td></tr>
-      <tr><td><code>header_contains: "Content-Type: json"</code></td><td>Response header contains the given value (format: <code>"HeaderName: value"</code>).</td></tr>
-      <tr><td><code>header_matches: "X-RateLimit: \\d+"</code></td><td>Response header matches the given regex (format: <code>"HeaderName: regex"</code>).</td></tr>
-      <tr><td><code>json_path: "$.user.id"</code></td><td>Extract a JSON path and optionally check <code>json_value</code>.</td></tr>
-      <tr><td><code>json_value: 42</code></td><td>Value at the <code>json_path</code> must match (used together).</td></tr>
-      <tr><td><code>response_time_under: 3000</code></td><td>Response time must be under the given milliseconds.</td></tr>
-    </table>
-
-    <h3><span class="tag browser">BROWSER</span> Actions</h3>
-    <p>Browser steps run through a headless Lightpanda instance via Playwright CDP. Steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.</p>
-    <table>
-      <tr><th>Action</th><th>Fields</th><th>Description</th></tr>
-      <tr><td><code>browser.navigate</code></td><td><code>url</code></td><td>Navigate to a URL. Falls back to <code>domcontentloaded</code> if the <code>load</code> event does not fire.</td></tr>
-      <tr><td><code>browser.click</code></td><td><code>selector</code></td><td>Click an element. Uses Playwright actionability checks (visible, enabled, stable, in viewport).</td></tr>
-      <tr><td><code>browser.fill</code></td><td><code>selector</code>, <code>value</code></td><td>Fill an input field using native property setters for reliable React/Angular form control compatibility.</td></tr>
-      <tr><td><code>browser.type</code></td><td><code>selector</code>, <code>value</code></td><td>Type into an input field. Like <code>fill</code> but dispatches <code>input</code> + <code>change</code> events.</td></tr>
-      <tr><td><code>browser.select</code></td><td><code>selector</code>, <code>value</code></td><td>Select an option from a <code>&lt;select&gt;</code> element.</td></tr>
-      <tr><td><code>browser.check</code></td><td><code>selector</code></td><td>Check a checkbox or radio button.</td></tr>
-      <tr><td><code>browser.uncheck</code></td><td><code>selector</code></td><td>Uncheck a checkbox.</td></tr>
-      <tr><td><code>browser.wait_for</code></td><td><code>selector</code>, <code>timeout</code>, <code>expect</code></td><td>Wait for an element to appear. Optional <code>expect</code> can check <code>has_text</code>, <code>not_has_text</code>, or <code>url_contains</code>.</td></tr>
-      <tr><td><code>browser.evaluate</code></td><td><code>script</code></td><td>Run arbitrary JavaScript in the page context. Useful for programmatic clicks, data extraction, and complex interactions.</td></tr>
-      <tr><td><code>browser.scroll</code></td><td><code>value</code> or <code>selector</code></td><td>Scroll <code>value</code> pixels down, or scroll a <code>selector</code> into view. Useful for lazy-loaded content or elements below the fold.</td></tr>
-      <tr><td><code>browser.screenshot</code></td><td><code>value</code> (path)</td><td>Take a full-page screenshot and save to the given path.</td></tr>
-      <tr><td><code>browser.screenshot_compare</code></td><td><code>value</code> (baseline path)</td><td>Take a screenshot and compare file size against a baseline. Creates baseline on first run; reports diff percentage on subsequent runs.</td></tr>
-    </table>
-
-    <h3>Step options</h3>
-    <table>
-      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-      <tr><td><code>timeout</code></td><td>number</td><td>Per-step timeout in milliseconds (overrides the default 30s for browser actions, 10s for HTTP).</td></tr>
-      <tr><td><code>condition</code></td><td>object</td><td>Conditional execution: <code>{ if_step: "Step name", if_success: true }</code> skips this step unless the named step succeeded (or failed, if <code>false</code>).</td></tr>
-      <tr><td><code>variables</code></td><td>object</td><td>Extract values from HTTP JSON responses: <code>{ varName: "$.json.path" }</code>. Referenced as <code>&#123;&#123;varName&#125;&#125;</code> in later steps.</td></tr>
-      <tr><td><code>expect</code></td><td>object</td><td>Assertions on the step result (status code, body content, headers, JSON path, response time).</td></tr>
-    </table>
-  </div>
-</section>
-
-<!-- Notifications -->
-<section id="notifications">
-  <div class="container">
-    <h2>Notifications</h2>
-    <p class="intro-text">Get alerted when a scenario fails and when it recovers. Create a <code>settings.yaml</code> file to configure channels.</p>
-
-    <h3>Supported channels</h3>
-    <div class="grid">
-      <div class="card"><i class="bi bi-send card-icon"></i><h3>Telegram</h3><p>Bot token + chat ID. Configure <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code> env vars or <code>settings.yaml</code>.</p></div>
-      <div class="card"><i class="bi bi-envelope card-icon"></i><h3>Email (Mailgun)</h3><p>Mailgun API key and domain. Supports multiple recipients. Includes a daily report sent at 8:00 AM.</p></div>
-      <div class="card"><i class="bi bi-chat-dots card-icon"></i><h3>Slack</h3><p>Webhook URL. Simple JSON payload with scenario name, status, and duration.</p></div>
-      <div class="card"><i class="bi bi-mic card-icon"></i><h3>Discord</h3><p>Webhook URL. Embedded message with color-coded pass/fail status.</p></div>
-      <div class="card"><i class="bi bi-globe2 card-icon"></i><h3>Generic webhook</h3><p>Custom endpoint. Receives JSON payload for integration with any system.</p></div>
-    </div>
-
-    <h3>Sample configuration</h3>
-    <pre><code><span style="color:#6c7086;"># settings.yaml</span>
-auth:
-  enabled: true                  <span style="color:#6c7086;"># dashboard auth (on by default)</span>
-  default_user: admin            <span style="color:#6c7086;"># generated password in the logs</span>
-  default_user_role: admin       <span style="color:#6c7086;"># admin | user</span>
-  oidc:                          <span style="color:#6c7086;"># optional SSO, roles come from groups</span>
-    issuer_url: "https://..."
-    client_id: "YOUR_CLIENT_ID"
-    client_secret: "YOUR_SECRET"
-    username_claim: "preferred_username"
-    groups_claim: "groups"
-    admin_group: "scenarii-admins"
-
-storage:
-  retentionDays: 30              <span style="color:#6c7086;"># data retention (default 7)</span>
+                <h4>Sample configuration</h4>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">settings.yml</span>
+                    <button class="copy" type="button" data-copy="code-settings">Copy</button>
+                  </div>
+                  <pre id="code-settings"><code>storage:
+  retentionDays: <span class="tok-number">30</span>
   backup:
-    enabled: true                <span style="color:#6c7086;"># automated daily backups</span>
-    cron: "0 4 * * *"
+    enabled: true
+    cron: <span class="tok-string">"0 4 * * *"</span>
 
 notifications:
   telegram:
     enabled: true
-    bot_token: "YOUR_TOKEN"
-    chat_id: "YOUR_CHAT_ID"
+    bot_token: <span class="tok-string">"YOUR_TOKEN"</span>
+    chat_id: <span class="tok-string">"YOUR_CHAT_ID"</span>
   email:
     enabled: true
     mailgun:
-      api_key: "YOUR_KEY"
-      domain: "your.domain"
-      from: "scenarii &lt;noreply@your.domain&gt;"
+      api_key: <span class="tok-string">"YOUR_KEY"</span>
+      domain: <span class="tok-string">"your.domain"</span>
+      from: <span class="tok-string">"scenarii &lt;noreply@your.domain&gt;"</span>
     to:
-      - "admin@example.com"
+      - <span class="tok-string">"admin@example.com"</span>
   slack:
     enabled: true
-    webhook_url: "https://hooks.slack.com/..."</code></pre>
+    webhook_url: <span class="tok-string">"https://hooks.slack.com/..."</span>
+  discord:
+    enabled: true
+    webhook_url: <span class="tok-string">"https://discord.com/api/webhooks/..."</span>
+  webhook:
+    enabled: true
+    url: <span class="tok-string">"https://example.com/scenarii"</span></code></pre>
+                </div>
 
-    <h3>Per-scenario overrides</h3>
-    <pre><code><span style="color:#6c7086;"># settings.yaml -- override per scenario</span>
-scenarios:
+                <h4>Per-scenario overrides</h4>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">settings.yml</span>
+                    <button class="copy" type="button" data-copy="code-overrides">Copy</button>
+                  </div>
+                  <pre id="code-overrides"><code>scenarios:
   my-scenario:
     ignoreHTTPSErrors: true
-    timeout: 60000
+    timeout: <span class="tok-number">60000</span>
     notifications:
       enabled: false</code></pre>
+                </div>
+                <p>Secrets can be overridden with environment variables such as <code>TELEGRAM_BOT_TOKEN</code> and <code>MAILGUN_API_KEY</code>.</p>
+              </div>
+            </details>
 
-    <p>Secrets can be overridden via environment variables: <code>TELEGRAM_BOT_TOKEN</code>, <code>MAILGUN_API_KEY</code>, etc.</p>
+            <details class="ref" id="ref-actions">
+              <summary>
+                <div>
+                  <h3>HTTP actions</h3>
+                  <p>Methods, expectations, and step options.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <p>Every step needs a <code>name</code> and an <code>action</code>. HTTP steps use native <code>fetch</code>. No browser or Playwright required.</p>
 
-    <p>Notifications trigger on state transitions (pass -> fail, fail -> pass) with retry logic (3 attempts, exponential backoff). The server watches <code>settings.yaml</code> and reloads it automatically on change.</p>
-  </div>
-</section>
+                <h4>Actions</h4>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Action</th><th>Required</th><th>Optional</th></tr>
+                    <tr><td><code>http.get</code></td><td><code>url</code></td><td><code>headers</code>, <code>expect</code></td></tr>
+                    <tr><td><code>http.post</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
+                    <tr><td><code>http.put</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
+                    <tr><td><code>http.patch</code></td><td><code>url</code></td><td><code>headers</code>, <code>body</code>, <code>expect</code></td></tr>
+                    <tr><td><code>http.delete</code></td><td><code>url</code></td><td><code>headers</code>, <code>expect</code></td></tr>
+                  </table>
+                </div>
 
-<!-- Real-time updates -->
-<section id="realtime">
-  <div class="container">
-    <h2><i class="bi bi-activity" style="font-size:1.5rem;vertical-align:middle;margin-right:8px"></i>Real-time updates</h2>
-    <p class="intro-text">The server exposes a WebSocket endpoint at <code>/ws</code> that pushes live updates to connected clients.</p>
+                <h4>Expectations</h4>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Expectation</th><th>Description</th></tr>
+                    <tr><td><code>status: 200</code></td><td>Exact HTTP status code match.</td></tr>
+                    <tr><td><code>status_in: [200, 201]</code></td><td>Status code is one of the listed values.</td></tr>
+                    <tr><td><code>body_contains: "text"</code></td><td>Response body contains the string.</td></tr>
+                    <tr><td><code>body_matches: "regex"</code></td><td>Response body matches the regex.</td></tr>
+                    <tr><td><code>header_contains: "Content-Type: json"</code></td><td>Header contains the value, in <code>"HeaderName: value"</code> form.</td></tr>
+                    <tr><td><code>header_matches: "X-RateLimit: \\d+"</code></td><td>Header matches the regex, in <code>"HeaderName: regex"</code> form.</td></tr>
+                    <tr><td><code>json_path: "$.user.id"</code></td><td>Extract a JSON path, optionally check <code>json_value</code>.</td></tr>
+                    <tr><td><code>json_value: 42</code></td><td>Value at <code>json_path</code> must match.</td></tr>
+                    <tr><td><code>response_time_under: 3000</code></td><td>Response time must be under the given milliseconds.</td></tr>
+                  </table>
+                </div>
 
-    <h3>Scenario run events</h3>
-    <pre><code><span style="color:#6c7086;">// Broadcast after every run</span>
-{
-  "type": "scenario_run",
-  "scenario_name": "Lusk.bzh validation",
-  "success": true,
-  "duration_ms": 2500,
-  "timestamp": "2026-06-06T12:00:00.000Z"
-}</code></pre>
+                <h4>Step options</h4>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+                    <tr><td><code>timeout</code></td><td>number</td><td>Per-step timeout. Default 30s for browser, 10s for HTTP.</td></tr>
+                    <tr><td><code>condition</code></td><td>object</td><td><code>{ if_step: "Step name", if_success: true }</code> skips unless the named step matched.</td></tr>
+                    <tr><td><code>variables</code></td><td>object</td><td>Extract from JSON responses: <code>{ varName: "$.json.path" }</code>. Use <code>{{varName}}</code> later.</td></tr>
+                    <tr><td><code>expect</code></td><td>object</td><td>Assertions on status, body, headers, JSON, and response time.</td></tr>
+                  </table>
+                </div>
+              </div>
+            </details>
 
-    <h3>Step progress (live ticker)</h3>
-    <pre><code><span style="color:#6c7086;">// Streamed during execution -- one per step</span>
-{
-  "type": "step_progress",
-  "scenario_name": "Lusk.bzh validation",
-  "step_name": "Homepage",
-  "action": "http.get",
-  "status": "running",       <span style="color:#6c7086;">// "running" | "done" | "error"</span>
-  "timestamp": "2026-06-06T12:00:00.000Z"
-}</code></pre>
+            <details class="ref" id="ref-browser">
+              <summary>
+                <div>
+                  <h3>Browser actions</h3>
+                  <p>Lightpanda via Playwright CDP, with retries.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <p>Browser steps run through a headless Lightpanda instance. Failed steps retry twice with exponential backoff (1s, 2s).</p>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Action</th><th>Fields</th><th>Description</th></tr>
+                    <tr><td><code>browser.navigate</code></td><td><code>url</code></td><td>Navigate. Falls back to <code>domcontentloaded</code> if <code>load</code> does not fire.</td></tr>
+                    <tr><td><code>browser.click</code></td><td><code>selector</code></td><td>Click with actionability checks: visible, enabled, stable, in viewport.</td></tr>
+                    <tr><td><code>browser.fill</code></td><td><code>selector</code>, <code>value</code></td><td>Fill using native setters, reliable with React and Angular controls.</td></tr>
+                    <tr><td><code>browser.type</code></td><td><code>selector</code>, <code>value</code></td><td>Type and dispatch <code>input</code> plus <code>change</code>.</td></tr>
+                    <tr><td><code>browser.select</code></td><td><code>selector</code>, <code>value</code></td><td>Select an option from a <code>&lt;select&gt;</code>.</td></tr>
+                    <tr><td><code>browser.check</code></td><td><code>selector</code></td><td>Check a checkbox or radio button.</td></tr>
+                    <tr><td><code>browser.uncheck</code></td><td><code>selector</code></td><td>Uncheck a checkbox.</td></tr>
+                    <tr><td><code>browser.wait_for</code></td><td><code>selector</code>, <code>timeout</code>, <code>expect</code></td><td>Wait for an element. Check <code>has_text</code>, <code>not_has_text</code>, or <code>url_contains</code>.</td></tr>
+                    <tr><td><code>browser.evaluate</code></td><td><code>script</code></td><td>Run JavaScript in the page context.</td></tr>
+                    <tr><td><code>browser.scroll</code></td><td><code>value</code> or <code>selector</code></td><td>Scroll by pixels, or scroll an element into view.</td></tr>
+                    <tr><td><code>browser.screenshot</code></td><td><code>value</code> (path)</td><td>Full-page screenshot to the given path.</td></tr>
+                    <tr><td><code>browser.screenshot_compare</code></td><td><code>value</code> (baseline path)</td><td>Compare against a baseline. Creates it on first run, reports diff percentage after.</td></tr>
+                  </table>
+                </div>
+              </div>
+            </details>
 
-    <p>The dashboard shows a live ticker in the detail toolbar while steps are executing - current step name, response time, and status icon update in real time.</p>
-  </div>
-</section>
+            <details class="ref" id="ref-cli">
+              <summary>
+                <div>
+                  <h3>CLI and server options</h3>
+                  <p>Validate, trigger, inspect, and configure.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">terminal</span>
+                    <button class="copy" type="button" data-copy="code-cli">Copy</button>
+                  </div>
+                  <pre id="code-cli"><code><span class="tok-comment"># Start API server and dashboard</span>
+node dist/index.js server <span class="tok-comment">-p 3000 --db db/scenarii.db --scenarios-dir ./scenarios</span>
 
-<!-- Prometheus Metrics -->
-<section id="metrics">
-  <div class="container">
-    <h2>Prometheus Metrics</h2>
-    <p class="intro-text">The server exposes a <code>/api/metrics</code> endpoint in Prometheus/OpenMetrics format. Scrape it with Prometheus or any OpenMetrics-compatible collector.</p>
-
-    <pre><code><span style="color:#6c7086;"># HELP scenarii_scenario_runs_total Total run count</span>
-<span style="color:#6c7086;"># TYPE scenarii_scenario_runs_total counter</span>
-scenarii_scenario_runs_total&#123;scenario="Lusk.bzh"&#125; 142
-
-<span style="color:#6c7086;"># HELP scenarii_scenario_duration_ms Latest run duration</span>
-scenarii_scenario_duration_ms&#123;scenario="Lusk.bzh"&#125; 2540
-
-<span style="color:#6c7086;"># HELP scenarii_scenario_success Latest run result (1=pass, 0=fail)</span>
-scenarii_scenario_success&#123;scenario="Lusk.bzh"&#125; 1
-
-<span style="color:#6c7086;"># HELP scenarii_scenario_last_run_seconds Last run timestamp</span>
-scenarii_scenario_last_run_seconds&#123;scenario="Lusk.bzh"&#125; 1.756e9
-
-<span style="color:#6c7086;"># HELP scenarii_step_duration_ms Per-step duration</span>
-scenarii_step_duration_ms&#123;scenario="Lusk.bzh",step="Homepage",action="http.get"&#125; 127
-
-<span style="color:#6c7086;"># HELP scenarii_step_success Per-step success</span>
-scenarii_step_success&#123;scenario="Lusk.bzh",step="Homepage",action="http.get"&#125; 1
-
-<span style="color:#6c7086;"># HELP scenarii_notification_delivery_total Notification delivery count</span>
-scenarii_notification_delivery_total&#123;status="success"&#125; 12</code></pre>
-
-    <p>Protect the endpoint with the <code>api_key</code> setting. Configure Prometheus to scrape <code>http://localhost:3000/api/metrics</code> with the key in the <code>Authorization</code> header.</p>
-
-    <pre><code><span style="color:#6c7086;"># prometheus.yml</span>
-scrape_configs:
-  - job_name: 'scenarii'
-    authorization:
-      credentials: 'YOUR_API_KEY'
-    static_configs:
-      - targets: ['localhost:3000']
-        metrics_path: '/api/metrics'</code></pre>
-  </div>
-</section>
-
-<!-- CLI Reference -->
-<section id="cli">
-  <div class="container">
-    <h2>CLI Reference</h2>
-    <p class="intro-text">The <code>scenarii</code> CLI provides commands for running, validating, and managing scenarios.</p>
-
-    <pre><code><span style="color:#a6e3a1;"># Start the API server + Dashboard</span>
-node dist/index.js server <span style="color:#6c7086;">-p 3000 --db db/scenarii.db --scenarios-dir ./scenarios</span>
-
-<span style="color:#a6e3a1;"># Validate a YAML file without running</span>
+<span class="tok-comment"># Validate without running</span>
 node dist/index.js validate scenarios/example.yml
 
-<span style="color:#a6e3a1;"># Run a scenario immediately</span>
+<span class="tok-comment"># Run immediately</span>
 node dist/index.js trigger scenarios/example.yml
 
-<span style="color:#a6e3a1;"># Show scheduled scenarios and storage status</span>
+<span class="tok-comment"># Scheduled scenarios and storage status</span>
 node dist/index.js status
 
-<span style="color:#a6e3a1;"># Manage dashboard users</span>
-node dist/index.js user list
-node dist/index.js user add bob <span style="color:#6c7086;"># password generated and printed</span>
-
-<span style="color:#a6e3a1;"># Generate a settings.yaml template</span>
+<span class="tok-comment"># Generate a settings template</span>
 node dist/index.js config --init</code></pre>
+                </div>
 
-    <table>
-      <tr><th>Command</th><th>Description</th></tr>
-      <tr><td><code>server</code></td><td>Start HTTP server with Dashboard, scenario scheduler, and WebSocket. Scenarios directory is rescanned every 5s - add, remove, or rename <code>.yml</code> files without restarting.</td></tr>
-      <tr><td><code>validate &lt;file&gt;</code></td><td>Parse a YAML file and validate its structure without executing it.</td></tr>
-      <tr><td><code>trigger &lt;file&gt;</code></td><td>Run a scenario file immediately (single run, no scheduling).</td></tr>
-      <tr><td><code>status</code></td><td>List all scheduled scenarios and show database connectivity.</td></tr>
-      <tr><td><code>user &lt;action&gt;</code></td><td>Manage dashboard users: <code>list</code>, <code>add</code>, <code>passwd</code>, <code>role</code>, <code>del</code>. See <a href="#auth">Authentication</a>.</td></tr>
-      <tr><td><code>config --init</code></td><td>Generate a boilerplate <code>settings.yaml</code> with all notification channels commented out.</td></tr>
-    </table>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Command</th><th>Description</th></tr>
+                    <tr><td><code>server</code></td><td>HTTP server, dashboard, scheduler, and WebSocket. Scenario folder rescanned every 5s.</td></tr>
+                    <tr><td><code>validate &lt;file&gt;</code></td><td>Parse and validate a YAML file without executing it.</td></tr>
+                    <tr><td><code>trigger &lt;file&gt;</code></td><td>Run immediately, with no scheduling.</td></tr>
+                    <tr><td><code>status</code></td><td>List scheduled scenarios and show database connectivity.</td></tr>
+                    <tr><td><code>user &lt;action&gt;</code></td><td><code>list</code>, <code>add</code>, <code>passwd</code>, <code>role</code>, <code>del</code>.</td></tr>
+                    <tr><td><code>config --init</code></td><td>Generate <code>settings.yaml</code> with channels commented out.</td></tr>
+                  </table>
+                </div>
 
-    <table>
-      <tr><th>Server option</th><th>Default</th><th>Description</th></tr>
-      <tr><td><code>-p, --port</code></td><td><code>3000</code></td><td>HTTP listen port.</td></tr>
-      <tr><td><code>--db</code></td><td><code>db/scenarii.db</code></td><td>Path to SQLite database file.</td></tr>
-      <tr><td><code>--scenarios-dir</code></td><td><code>./scenarios</code></td><td>Directory containing <code>.yml</code> / <code>.yaml</code> scenario files. Watched every 5s for changes.</td></tr>
-      <tr><td><code>--settings</code></td><td>auto-detect</td><td>Path to <code>settings.yaml</code>. Hot-reloaded on change.</td></tr>
-    </table>
-  </div>
-</section>
+                <div class="table-wrap">
+                  <table>
+                    <tr><th>Server option</th><th>Default</th><th>Description</th></tr>
+                    <tr><td><code>-p, --port</code></td><td><code>3000</code></td><td>HTTP listen port.</td></tr>
+                    <tr><td><code>--db</code></td><td><code>db/scenarii.db</code></td><td>SQLite database path.</td></tr>
+                    <tr><td><code>--scenarios-dir</code></td><td><code>./scenarios</code></td><td>YAML directory, watched every 5s.</td></tr>
+                    <tr><td><code>--settings</code></td><td>auto-detect</td><td><code>settings.yaml</code> path. Hot-reloaded.</td></tr>
+                  </table>
+                </div>
+              </div>
+            </details>
 
-<!-- API reference -->
-<section id="api">
-  <div class="container">
-    <h2>API reference</h2>
-    <pre><code style="color:#a6e3a1;"><span style="color:#6c7086;"># Scenarios</span>
-GET    /api/scenarios                   <span style="color:#6c7086;">?tag=critical</span>
-POST   /api/scenarios/import            <span style="color:#6c7086;">{ "yaml": "..." }</span>
-GET    /api/scenarios/export            <span style="color:#6c7086;">YAML bundle</span>
-GET    /api/scenarios/:name             <span style="color:#6c7086;">?limit=&offset=&days=</span>
+            <details class="ref" id="ref-api">
+              <summary>
+                <div>
+                  <h3>API</h3>
+                  <p>30+ endpoints behind the dashboard.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">REST API</span>
+                    <button class="copy" type="button" data-copy="code-api">Copy</button>
+                  </div>
+                  <pre id="code-api"><code><span class="tok-comment"># Scenarios</span>
+GET    /api/scenarios                   <span class="tok-comment">?tag=critical</span>
+POST   /api/scenarios/import            <span class="tok-comment">{ "yaml": "..." }</span>
+GET    /api/scenarios/export            <span class="tok-comment">YAML bundle</span>
+GET    /api/scenarios/:name             <span class="tok-comment">?limit=&amp;offset=&amp;days=</span>
 GET    /api/scenarios/:name/history
 POST   /api/scenarios/:name/run
 POST   /api/scenarios/:name/cancel
@@ -879,39 +966,158 @@ PUT    /api/scenarios/:name/config
 DELETE /api/scenarios/:name/config
 GET    /api/scenarios/:name/export/json
 GET    /api/scenarios/:name/export/csv
-GET    /api/scenarios/:name/sla         <span style="color:#6c7086;">?days=7</span>
+GET    /api/scenarios/:name/sla         <span class="tok-comment">?days=7</span>
 
-<span style="color:#6c7086;"># Authentication</span>
+<span class="tok-comment"># Authentication</span>
 POST   /api/auth/login
 GET    /api/auth/oidc
 GET    /api/auth/callback
 GET    /api/auth/me
 POST   /api/auth/logout
 
-<span style="color:#6c7086;"># Users (admin only)</span>
+<span class="tok-comment"># Users (admin only)</span>
 GET    /api/auth/users
 POST   /api/auth/users
 PUT    /api/auth/users/password
 PUT    /api/auth/users/role
 DELETE /api/auth/users/:username
 
-<span style="color:#6c7086;"># Public / System</span>
+<span class="tok-comment"># Public and system</span>
 GET    /api/public/scenario/:name
 GET    /api/status
 GET    /api/health
 POST   /api/backup
 GET    /api/tags
-GET    /api/metrics                    <span style="color:#6c7086;">Prometheus format</span></code></pre>
-  </div>
-</section>
+GET    /api/metrics                    <span class="tok-comment">Prometheus format</span></code></pre>
+                </div>
+              </div>
+            </details>
 
-<footer>
-  <div class="container">
-    <p><a href="https://github.com/Giwi/giwisoft-scenarii">GitHub</a> &middot; <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii">Container</a> &middot; <a href="https://giwi.fr">GiwiSoft</a></p>
-    <p style="margin-top:8px;">Scenarii &copy; 2026 GiwiSoft</p>
-  </div>
-</footer>
+            <details class="ref" id="ref-metrics">
+              <summary>
+                <div>
+                  <h3>Metrics and events</h3>
+                  <p>Prometheus export and WebSocket payloads.</p>
+                </div>
+                <span class="ref-plus" aria-hidden="true"></span>
+              </summary>
+              <div class="ref-body">
+                <p>Scrape <code>/api/metrics</code> with Prometheus or any OpenMetrics collector. Protect it with the <code>api_key</code> setting and send the key in the <code>Authorization</code> header.</p>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">metrics</span>
+                    <button class="copy" type="button" data-copy="code-metrics">Copy</button>
+                  </div>
+                  <pre id="code-metrics"><code><span class="tok-comment"># HELP scenarii_scenario_runs_total Total run count</span>
+<span class="tok-comment"># TYPE scenarii_scenario_runs_total counter</span>
+scenarii_scenario_runs_total{scenario=<span class="tok-string">"Lusk.bzh"</span>} <span class="tok-number">142</span>
+
+scenarii_scenario_duration_ms{scenario=<span class="tok-string">"Lusk.bzh"</span>} <span class="tok-number">2540</span>
+scenarii_scenario_success{scenario=<span class="tok-string">"Lusk.bzh"</span>} <span class="tok-number">1</span>
+scenarii_scenario_last_run_seconds{scenario=<span class="tok-string">"Lusk.bzh"</span>} <span class="tok-number">1.756e9</span>
+
+scenarii_step_duration_ms{scenario=<span class="tok-string">"Lusk.bzh"</span>,step=<span class="tok-string">"Homepage"</span>,action=<span class="tok-string">"http.get"</span>} <span class="tok-number">127</span>
+scenarii_step_success{scenario=<span class="tok-string">"Lusk.bzh"</span>,step=<span class="tok-string">"Homepage"</span>,action=<span class="tok-string">"http.get"</span>} <span class="tok-number">1</span>
+
+scenarii_notification_delivery_total{status=<span class="tok-string">"success"</span>} <span class="tok-number">12</span></code></pre>
+                </div>
+
+                <h4>Prometheus scrape config</h4>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">prometheus.yml</span>
+                    <button class="copy" type="button" data-copy="code-prometheus">Copy</button>
+                  </div>
+                  <pre id="code-prometheus"><code>scrape_configs:
+  - job_name: <span class="tok-string">"scenarii"</span>
+    authorization:
+      credentials: <span class="tok-string">"YOUR_API_KEY"</span>
+    static_configs:
+      - targets: [<span class="tok-string">"localhost:3000"</span>]
+        metrics_path: <span class="tok-string">"/api/metrics"</span></code></pre>
+                </div>
+
+                <h4>WebSocket at /ws</h4>
+                <p>Run completion events:</p>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">scenario_run</span>
+                    <button class="copy" type="button" data-copy="code-ws-run">Copy</button>
+                  </div>
+                  <pre id="code-ws-run"><code>{
+  <span class="tok-key">"type"</span>: <span class="tok-string">"scenario_run"</span>,
+  <span class="tok-key">"scenario_name"</span>: <span class="tok-string">"Lusk.bzh validation"</span>,
+  <span class="tok-key">"success"</span>: true,
+  <span class="tok-key">"duration_ms"</span>: <span class="tok-number">2500</span>,
+  <span class="tok-key">"timestamp"</span>: <span class="tok-string">"2026-06-06T12:00:00.000Z"</span>
+}</code></pre>
+                </div>
+                <p>Step progress, streamed while a run is in flight:</p>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">step_progress</span>
+                    <button class="copy" type="button" data-copy="code-ws-step">Copy</button>
+                  </div>
+                  <pre id="code-ws-step"><code>{
+  <span class="tok-key">"type"</span>: <span class="tok-string">"step_progress"</span>,
+  <span class="tok-key">"scenario_name"</span>: <span class="tok-string">"Lusk.bzh validation"</span>,
+  <span class="tok-key">"step_name"</span>: <span class="tok-string">"Homepage"</span>,
+  <span class="tok-key">"action"</span>: <span class="tok-string">"http.get"</span>,
+  <span class="tok-key">"status"</span>: <span class="tok-string">"running"</span>,
+  <span class="tok-key">"timestamp"</span>: <span class="tok-string">"2026-06-06T12:00:00.000Z"</span>
+}</code></pre>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="run" aria-labelledby="run-title">
+      <div class="shell">
+        <div class="cta reveal">
+          <div>
+            <h2 id="run-title">Run it on your own box.</h2>
+            <p>One container. No external database. Your scenarios, results, and credentials stay on your infrastructure.</p>
+            <div class="cta-actions">
+              <a class="btn btn-primary" href="https://github.com/Giwi/giwisoft-scenarii">Get Scenarii on GitHub <span aria-hidden="true">&#8599;</span></a>
+              <a class="btn btn-ghost" href="#docs">Read the reference</a>
+            </div>
+          </div>
+          <div>
+            <div class="cmd">
+              <span class="prompt" aria-hidden="true">$</span>
+              <span id="pull-command">docker pull ghcr.io/giwi/giwisoft-scenarii:latest</span>
+              <button class="copy" type="button" data-copy="pull-command">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-grid">
+      <div>
+        <div class="footer-brand">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2.5 12h3.8l2-5.4 3.4 11 2.4-7.2 1.5 1.6h4.9" fill="none" stroke="var(--signal)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Scenarii
+        </div>
+        <p class="footer-copy">&copy; 2026 GiwiSoft. Open source under the MIT license.</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/Giwi/giwisoft-scenarii">GitHub</a>
+        <a href="https://github.com/Giwi/giwisoft-scenarii/pkgs/container/giwisoft-scenarii">Container</a>
+        <a href="https://github.com/Giwi/giwisoft-scenarii/actions">CI</a>
+        <a href="https://giwi.fr">GiwiSoft</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="assets/site.js" defer></script>
   <script defer src="https://analytics.giwi.fr/script.js" data-website-id="f9e3b39a-26b2-4230-ad37-b04284159206"></script>
-
 </body>
 </html>
