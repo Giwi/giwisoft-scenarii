@@ -290,10 +290,12 @@ server logs:
 notifications:
   email:
     enabled: true
-    mailgun:
-      api_key: "key-..."        # or MAILGUN_API_KEY
-      domain: "mg.example.com"
-      from: "scenarii@example.com"
+    from: "scenarii@example.com"
+    to: ["admin@example.com"]
+    smtp:
+      host: smtp.example.com
+      port: 587
+    # Or use Mailgun: mailgun: { api_key: "key-...", domain: "mg.example.com" }
 ```
 
 The reply is the same whether or not the account exists, so it cannot be used to discover
@@ -451,12 +453,21 @@ notifications:
     chat_id: "YOUR_CHAT_ID"
   email:
     enabled: true
-    mailgun:
-      api_key: "YOUR_API_KEY"
-      domain: "YOUR_DOMAIN"
-      from: "scenarii <notifications@YOUR_DOMAIN>"
+    from: "scenarii <notifications@YOUR_DOMAIN>"
     to:
       - "admin@example.com"
+    # SMTP transport (preferred when configured). tls: true = implicit TLS (SMTPS, 465).
+    # Otherwise STARTTLS is used when the server advertises it.
+    smtp:
+      host: smtp.example.com
+      port: 587
+      username: "your-username"   # omit both for an unauthenticated relay
+      password: "your-password"
+      tls: false
+    # Or use Mailgun instead:
+    # mailgun:
+    #   api_key: "YOUR_API_KEY"
+    #   domain: "YOUR_DOMAIN"
   slack:
     enabled: true
     webhook_url: "https://hooks.slack.com/services/..."
@@ -468,7 +479,7 @@ notifications:
     url: "https://your-endpoint/hook"
 ```
 
-Secrets can be overridden via environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`.
+Secrets can be overridden via environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`.
 
 The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions (pass>fail, fail>pass). Notifications include retry logic (3 attempts, exponential backoff).
 
@@ -591,7 +602,7 @@ Uses Node's built-in test runner (`node:test`) - no extra dependencies. Tests co
 - **Browser** - Lightpanda headless browser via Playwright CDP (with retry)
 - **Database** - SQLite (better-sqlite3, WAL mode)
 - **Scheduling** - node-cron
-- **Notifications** - Telegram, Slack, Discord, Generic Webhook, Mailgun (all with retry)
+- **Notifications** - Telegram, Slack, Discord, Generic Webhook, Email (SMTP or Mailgun, all with retry)
 - **Logging** - pino (structured JSON, ISO timestamps)
 - **Security** - Helmet (CSP, HSTS, X-Frame-Options, etc.), optional OIDC-based dashboard auth with HTTP-only session cookies
 - **Frontend** - Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons

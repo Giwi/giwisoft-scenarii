@@ -240,7 +240,7 @@ steps:
               <div class="channel"><strong>Telegram</strong><span>bot + chat</span></div>
               <div class="channel"><strong>Slack</strong><span>webhook</span></div>
               <div class="channel"><strong>Discord</strong><span>webhook</span></div>
-              <div class="channel"><strong>Email</strong><span>Mailgun</span></div>
+              <div class="channel"><strong>Email</strong><span>SMTP / Mailgun</span></div>
               <div class="channel"><strong>Custom</strong><span>JSON webhook</span></div>
             </div>
           </article>
@@ -741,7 +741,7 @@ docker run -d \
                   <table>
                     <tr><th>Channel</th><th>Configuration</th></tr>
                     <tr><td>Telegram</td><td><code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code>, or the settings file.</td></tr>
-                    <tr><td>Email</td><td>Mailgun API key and domain. Multiple recipients. Daily report at 08:00.</td></tr>
+                    <tr><td>Email</td><td>SMTP (<code>host</code>/<code>port</code>, optional auth and TLS/STARTTLS) or Mailgun API key and domain. Multiple recipients. Daily report at 08:00.</td></tr>
                     <tr><td>Slack</td><td>Webhook URL. JSON payload with scenario, status, and duration.</td></tr>
                     <tr><td>Discord</td><td>Webhook URL. Embedded message with color-coded pass or fail.</td></tr>
                     <tr><td>Generic webhook</td><td>Any endpoint that accepts the JSON payload.</td></tr>
@@ -767,12 +767,16 @@ notifications:
     chat_id: <span class="tok-string">"YOUR_CHAT_ID"</span>
   email:
     enabled: true
-    mailgun:
-      api_key: <span class="tok-string">"YOUR_KEY"</span>
-      domain: <span class="tok-string">"your.domain"</span>
-      from: <span class="tok-string">"scenarii &lt;noreply@your.domain&gt;"</span>
+    from: <span class="tok-string">"scenarii &lt;noreply@your.domain&gt;"</span>
     to:
       - <span class="tok-string">"admin@example.com"</span>
+    smtp:
+      host: <span class="tok-string">"smtp.example.com"</span>
+      port: <span class="tok-number">587</span>
+      username: <span class="tok-string">"your-username"</span>
+      password: <span class="tok-string">"your-password"</span>
+      tls: <span class="tok-keyword">false</span>
+    <span class="tok-comment"># Or Mailgun: mailgun: { api_key: "...", domain: "..." }</span>
   slack:
     enabled: true
     webhook_url: <span class="tok-string">"https://hooks.slack.com/..."</span>
@@ -797,7 +801,7 @@ notifications:
     notifications:
       enabled: false</code></pre>
                 </div>
-                <p>Secrets can be overridden with environment variables such as <code>TELEGRAM_BOT_TOKEN</code> and <code>MAILGUN_API_KEY</code>.</p>
+                <p>Secrets can be overridden with environment variables such as <code>TELEGRAM_BOT_TOKEN</code>, <code>MAILGUN_API_KEY</code>, <code>MAILGUN_DOMAIN</code>, <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USERNAME</code>, <code>SMTP_PASSWORD</code>.</p>
               </div>
             </details>
 

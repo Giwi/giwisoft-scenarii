@@ -6,7 +6,7 @@ import { runScenario, RunOptions } from './runner';
 import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess, getScenarioList, getScenarioHistory } from '../config/storage';
 import { getSettings } from '../config/settings';
 import { loadScenarioFile } from '../config/parser';
-import { sendMailgunEmail } from '../notifications/email-client';
+import { sendEmailMessage } from '../notifications/email-client';
 import logger from '../utils/logger';
 import { DEFAULT_ALERT_CONSECUTIVE_FAILURES } from '../utils/constants';
 
@@ -248,8 +248,12 @@ async function sendDailyReport(): Promise<void> {
     }
   }
 
-  const { mailgun, to } = settings.notifications.email;
-  await sendMailgunEmail(mailgun.api_key, mailgun.domain, mailgun.from, to, 'Daily Scenario Report', lines.join('\n'));
+  const { to } = settings.notifications.email;
+  try {
+    await sendEmailMessage(settings.notifications.email, to, 'Daily Scenario Report', lines.join('\n'));
+  } catch (err: unknown) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to send daily report');
+  }
 }
 
 // Schedules the daily email report on the given cron expression.

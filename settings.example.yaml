@@ -45,12 +45,21 @@ notifications:
     chat_id: "YOUR_CHAT_ID"
   email:
     enabled: false
+    # Shared sender address, used by whichever transport below is configured.
+    from: "scenarii <notifications@YOUR_DOMAIN>"
+    to:
+      - "admin@example.com"
+    # SMTP transport (preferred when configured). tls: true = implicit TLS (SMTPS, port
+    # 465); otherwise STARTTLS is used when the server advertises it.
+    # smtp:
+    #   host: smtp.example.com
+    #   port: 587
+    #   username: your-username            # omit both for an unauthenticated relay
+    #   password: your-password
+    #   tls: false
     mailgun:
       api_key: "YOUR_API_KEY"
       domain: "YOUR_DOMAIN"
-      from: "scenarii <notifications@YOUR_DOMAIN>"
-    to:
-      - "admin@example.com"
   slack:
     enabled: false
     webhook_url: "https://hooks.slack.com/services/..."

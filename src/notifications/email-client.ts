@@ -1,7 +1,10 @@
+import { EmailConfig } from '../config/settings';
 import { ScenarioMetrics } from '../types';
 import logger from '../utils/logger';
 import { fetchWithRetry, NOTIFICATION_RETRIES } from '../utils/retry';
+import { sendSmtpEmail } from './smtp-client';
 
+// Sends one message through Mailgun. Kept exported for any direct caller.
 export async function sendMailgunEmail(
   apiKey: string,
   domain: string,
@@ -31,12 +34,42 @@ export async function sendMailgunEmail(
   }
 }
 
+// Resolves the sender address: the shared email.from, else the legacy mailgun.from.
+function sender(email: EmailConfig): string {
+  return email.from ?? email.mailgun?.from ?? '';
+}
+
+// Sends one message through whichever transport is configured. SMTP wins when both are
+// present. Throws when no usable transport is configured so the caller can log it.
+export async function sendEmailMessage(
+  email: EmailConfig,
+  to: string[],
+  subject: string,
+  text: string,
+): Promise<void> {
+  const from = sender(email);
+  if (!from) {
+    throw new Error('Email sender (from) is not configured');
+  }
+
+  if (email.smtp?.host) {
+    await sendSmtpEmail(email.smtp, from, to, subject, text);
+    return;
+  }
+
+  if (email.mailgun?.api_key && email.mailgun.domain) {
+    await sendMailgunEmail(email.mailgun.api_key, email.mailgun.domain, from, to, subject, text);
+    return;
+  }
+
+  throw new Error('No email transport configured (set email.smtp.host or email.mailgun)');
+}
+
 export async function sendEmail(
-  config: { mailgun: { api_key: string; domain: string; from: string }; to: string[] },
+  config: EmailConfig,
   metrics: ScenarioMetrics,
   event: 'failure' | 'recovery'
 ): Promise<void> {
-  const { mailgun } = config;
   const subject = event === 'failure'
     ? `🔴 FAILED: ${metrics.scenario_name}`
     : `🟢 RECOVERED: ${metrics.scenario_name}`;
@@ -55,8 +88,8 @@ export async function sendEmail(
   }
 
   try {
-    await sendMailgunEmail(mailgun.api_key, mailgun.domain, mailgun.from, config.to, subject, body);
+    await sendEmailMessage(config, config.to, subject, body);
   } catch (err: unknown) {
-    logger.error({ err: err instanceof Error ? err.message : err }, 'Mailgun notification error');
+    logger.error({ err: err instanceof Error ? err.message : err }, 'Email notification error');
   }
 }

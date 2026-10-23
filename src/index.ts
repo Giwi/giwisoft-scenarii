@@ -344,8 +344,17 @@ notifications:
     # chat_id: your_chat_id
   email:
     enabled: false
+    # from: scenarii@your-domain.com        # shared sender for mailgun or smtp
     # to:
     #   - you@example.com
+    # SMTP transport (preferred when configured). tls: true = implicit TLS (SMTPS, port
+    # 465); otherwise the client upgrades with STARTTLS when the server advertises it.
+    # smtp:
+    #   host: smtp.example.com
+    #   port: 587
+    #   username: your-username             # omit both for an unauthenticated relay
+    #   password: your-password
+    #   tls: false
     mailgun:
       # api_key: your_mailgun_api_key
       # domain: your_mailgun_domain

@@ -12,12 +12,26 @@ export interface TelegramConfig {
 export interface MailgunConfig {
   api_key: string;
   domain: string;
-  from: string;
+  // Kept for backward compatibility; prefer the shared email.from.
+  from?: string;
+}
+
+// SMTP transport. `tls: true` opens an implicit TLS (SMTPS) connection, otherwise the
+// client connects plaintext and upgrades with STARTTLS when the server advertises it.
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  username?: string;
+  password?: string;
+  tls?: boolean;
 }
 
 export interface EmailConfig {
   enabled: boolean;
-  mailgun: MailgunConfig;
+  // Sender address shared by both transports. Falls back to mailgun.from when omitted.
+  from?: string;
+  mailgun?: MailgunConfig;
+  smtp?: SmtpConfig;
   to: string[];
 }
 
@@ -121,6 +135,18 @@ function applyEnvOverrides(s: Settings): void {
   }
   if (s.notifications.email?.mailgun && !s.notifications.email.mailgun.domain && process.env.MAILGUN_DOMAIN) {
     s.notifications.email.mailgun.domain = process.env.MAILGUN_DOMAIN;
+  }
+  if (s.notifications.email?.smtp && !s.notifications.email.smtp.host && process.env.SMTP_HOST) {
+    s.notifications.email.smtp.host = process.env.SMTP_HOST;
+  }
+  if (s.notifications.email?.smtp && !s.notifications.email.smtp.port && process.env.SMTP_PORT) {
+    s.notifications.email.smtp.port = Number(process.env.SMTP_PORT);
+  }
+  if (s.notifications.email?.smtp && !s.notifications.email.smtp.username && process.env.SMTP_USERNAME) {
+    s.notifications.email.smtp.username = process.env.SMTP_USERNAME;
+  }
+  if (s.notifications.email?.smtp && !s.notifications.email.smtp.password && process.env.SMTP_PASSWORD) {
+    s.notifications.email.smtp.password = process.env.SMTP_PASSWORD;
   }
 }
 

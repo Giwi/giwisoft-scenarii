@@ -9,7 +9,7 @@ import { getDb } from '../config/storage';
 import { avatarUrlFor, decodeDataUrl, gravatarUrl, isOversizedDataUrl, isValidEmail } from '../config/avatar';
 import { requestLang, sessionUsername } from './auth';
 import { generateRecoveryCodes, generateTotpSecret, totpUri, verifyTotp } from '../utils/totp';
-import { sendMailgunEmail } from '../notifications/email-client';
+import { sendEmailMessage } from '../notifications/email-client';
 import { getSettings } from '../config/settings';
 import { normalizeLang, t } from '../i18n';
 import logger from '../utils/logger';
@@ -295,12 +295,10 @@ async function deliverResetLink(username: string, token: string): Promise<void> 
   const link = `/login?reset=${encodeURIComponent(token)}`;
   const email = getSettings().notifications?.email;
   const profile = getProfile(username);
-  if (email?.enabled && email.mailgun?.api_key && profile.email) {
+  if (email?.enabled && profile.email) {
     try {
-      await sendMailgunEmail(
-        email.mailgun.api_key,
-        email.mailgun.domain,
-        email.mailgun.from,
+      await sendEmailMessage(
+        email,
         [profile.email],
         'Scenarii password recovery',
         `Hello ${username},\n\nReset your Scenarii password with this link (valid for one hour):\n${link}\n\n`
