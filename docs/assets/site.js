@@ -91,7 +91,7 @@
 
   function renderDashboard() {
     if (!dashImage) return;
-    var file = (dashView === "detail" ? "scenario-detail" : "scenario-list") + "-dark.png";
+    var file = (dashView === "detail" ? "scenario-detail" : "scenario-list") + "-dark.webp";
     dashImage.src = "screenshots/" + file;
     dashImage.alt = "Scenarii " + (dashView === "detail" ? "scenario detail" : "scenario list") + " dashboard in dark theme";
 

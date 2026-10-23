@@ -2,6 +2,7 @@
   "name": "scenarii",
   "version": "1.4.1",
   "description": "Execute periodic YAML-defined scenarios to test web applications",
+  "license": "GPL-3.0-or-later",
   "main": "dist/index.js",
   "bin": {
     "scenarii": "dist/index.js"

@@ -44,15 +44,15 @@ async function main() {
     await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle', timeout: 15000 });
     await page.waitForSelector('app-root', { timeout: 10000 });
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-list.png'), fullPage: true });
-    console.log('✓ scenario-list.png');
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-list.webp'), fullPage: true, type: 'webp' });
+    console.log('✓ scenario-list.webp');
 
     // Scenario detail
     await page.goto(`http://localhost:${PORT}/scenario/Lusk.bzh%20validation`, { waitUntil: 'networkidle', timeout: 15000 });
     await page.waitForSelector('app-root', { timeout: 10000 });
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-detail.png'), fullPage: true });
-    console.log('✓ scenario-detail.png');
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-detail.webp'), fullPage: true, type: 'webp' });
+    console.log('✓ scenario-detail.webp');
 
     // ---------- Dark theme ----------
     await page.evaluate(`document.documentElement.setAttribute("data-bs-theme", "dark"); localStorage.setItem("scenarii-theme", "dark");`);
@@ -61,15 +61,15 @@ async function main() {
     await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle', timeout: 15000 });
     await page.waitForSelector('app-root', { timeout: 10000 });
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-list-dark.png'), fullPage: true });
-    console.log('✓ scenario-list-dark.png');
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-list-dark.webp'), fullPage: true, type: 'webp' });
+    console.log('✓ scenario-list-dark.webp');
 
     // Scenario detail (dark)
     await page.goto(`http://localhost:${PORT}/scenario/Lusk.bzh%20validation`, { waitUntil: 'networkidle', timeout: 15000 });
     await page.waitForSelector('app-root', { timeout: 10000 });
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-detail-dark.png'), fullPage: true });
-    console.log('✓ scenario-detail-dark.png');
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'scenario-detail-dark.webp'), fullPage: true, type: 'webp' });
+    console.log('✓ scenario-detail-dark.webp');
 
     console.log(`\nAll screenshots in ${SCREENSHOTS_DIR}/`);
   } finally {

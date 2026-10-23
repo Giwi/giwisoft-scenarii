@@ -300,11 +300,11 @@ The reply is the same whether or not the account exists, so it cannot be used to
 usernames. Requests are throttled to 5 per hour per IP.
 
 <p align="center">
-  <img src="frontend/public/screenshots/scenario-list.png" width="45%" alt="Scenario list (light)">
-  <img src="frontend/public/screenshots/scenario-list-dark.png" width="45%" alt="Scenario list (dark)">
+  <img src="frontend/public/screenshots/scenario-list.webp" width="45%" alt="Scenario list (light)">
+  <img src="frontend/public/screenshots/scenario-list-dark.webp" width="45%" alt="Scenario list (dark)">
   <br>
-  <img src="frontend/public/screenshots/scenario-detail.png" width="45%" alt="Scenario detail (light)">
-  <img src="frontend/public/screenshots/scenario-detail-dark.png" width="45%" alt="Scenario detail (dark)">
+  <img src="frontend/public/screenshots/scenario-detail.webp" width="45%" alt="Scenario detail (light)">
+  <img src="frontend/public/screenshots/scenario-detail-dark.webp" width="45%" alt="Scenario detail (dark)">
 </p>
 
 ## Running
