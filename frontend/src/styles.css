@@ -91,6 +91,14 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
   border-color: rgba(99, 102, 241, 0.18) !important;
 }
 
+/* backdrop-filter turns every card into a stacking context, so a later sibling card
+   would otherwise paint over an open dropdown that spills past this card's border.
+   Raise the card that currently holds an open menu above its siblings. */
+.card:has(.dropdown-menu.show) {
+  position: relative;
+  z-index: 1000;
+}
+
 [data-bs-theme="dark"] .card,
 [data-bs-theme="dark"] .chart-card {
   box-shadow: var(--card-shadow);

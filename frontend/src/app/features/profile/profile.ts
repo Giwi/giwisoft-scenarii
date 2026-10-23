@@ -393,6 +393,9 @@ export class ProfileComponent implements OnInit {
       const image = await loadImage(file);
       this.crop = { image, view: { zoom: 1, pan: { x: 0, y: 0 } } };
       this.lastZoomUI = 1;
+      // The crop dialog effect paints once when the dialog opens, but at that point the
+      // image has not decoded yet. Draw it again now that the bitmap is available.
+      requestAnimationFrame(() => this.paint());
     } catch (err) {
       console.error('Avatar crop: image decode failed', err);
       this.cropError = this.i18n.t('profile.crop_decode_error');

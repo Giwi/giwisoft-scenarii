@@ -190,6 +190,7 @@
         <div class="card mb-4">
           <div class="card-body">
             <h2 class="h6 mb-3"><i class="bi bi-key me-2"></i>{{ t('profile.password_change') }}</h2>
+            <form (ngSubmit)="changePassword()" novalidate>
             <div class="row g-3">
               <div class="col-12 col-md-4 field-stack">
                 <label class="form-label" for="pw-current">{{ t('profile.current_password') }}</label>
@@ -224,12 +225,13 @@
             </div>
             <div class="form-text">{{ t('profile.password_help') }}</div>
             <button
+              type="submit"
               class="btn btn-sm btn-primary mt-3"
-              (click)="changePassword()"
               [disabled]="savingPassword"
             >
-              <i class="bi bi-floppy me-1"></i>{{ savingPassword ? t('common.saving') : t('profile.password_change') }}
+              <i class="bi bi-floppy me-1" aria-hidden="true"></i>{{ savingPassword ? t('common.saving') : t('profile.password_change') }}
             </button>
+            </form>
           </div>
         </div>
 
@@ -244,6 +246,7 @@
                 <i class="bi bi-check-circle me-1"></i>{{ t('profile.two_factor_active') }}
               </div>
               <p class="small text-secondary">{{ t('profile.two_factor_disable_help') }}</p>
+              <form (ngSubmit)="disableTwoFactor()" novalidate>
               <div class="row g-3">
                 <div class="col-12 col-md-4 field-stack">
                   <label class="form-label" for="totp-pw">{{ t('profile.current_password') }}</label>
@@ -267,14 +270,15 @@
                 </div>
                 <div class="col-12 col-md-4 field-stack">
                   <button
+                    type="submit"
                     class="btn btn-sm btn-outline-danger w-100"
-                    (click)="disableTwoFactor()"
                     [disabled]="busy2fa"
                   >
-                    <i class="bi bi-shield-slash me-1"></i>{{ t('profile.two_factor_disable') }}
+                    <i class="bi bi-shield-slash me-1" aria-hidden="true"></i>{{ t('profile.two_factor_disable') }}
                   </button>
                 </div>
               </div>
+              </form>
             </div>
 
             <div *ngIf="!profile.totp_enabled && !setup">
@@ -332,6 +336,7 @@
       role="group"
       tabindex="0"
       [style.width.px]="frameSize"
+      [style.height.px]="frameSize"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
