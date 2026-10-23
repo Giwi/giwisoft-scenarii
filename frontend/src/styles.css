@@ -15,19 +15,29 @@
 }
 
 [data-bs-theme="dark"] {
-  --bg: #0a0e14;
-  --card-bg: rgba(22, 27, 34, 0.5);
-  --text: #e6edf3;
-  --text-muted: #8b949e;
-  --border: rgba(48, 54, 61, 0.6);
-  --header-bg: rgba(13, 17, 23, 0.8);
-  --accent: #00d4ff;
-  --accent-gradient: linear-gradient(135deg, #00d4ff, #7928ca);
-  --success-gradient: linear-gradient(135deg, #238636, #2ea043);
-  --danger-gradient: linear-gradient(135deg, #da3633, #f85149);
-  --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --card-shadow-hover: 0 4px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 212, 255, 0.06);
-  --navbar-shadow: 0 1px 0 rgba(0, 212, 255, 0.06);
+  --bg: #07080a;
+  --card-bg: #0d1014;
+  --text: #f2f5f7;
+  --text-muted: #99a1ad;
+  --border: rgba(255, 255, 255, 0.09);
+  --header-bg: rgba(7, 8, 10, 0.88);
+  --accent: #c6ff3d;
+  --accent-gradient: #c6ff3d;
+  --success-gradient: #b7f34a;
+  --danger-gradient: #e5484d;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.35);
+  --card-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --navbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* Bootstrap surfaces follow the graphite palette so forms, tables and dropdowns
+     stay in the same family instead of Bootstrap's bluish dark defaults. */
+  --bs-body-bg: #07080a;
+  --bs-body-color: #f2f5f7;
+  --bs-secondary-bg: #0d1014;
+  --bs-tertiary-bg: #12161b;
+  --bs-border-color: rgba(255, 255, 255, 0.12);
+  --bs-secondary-color: #99a1ad;
+  --bs-tertiary-color: #78818e;
+  --bs-emphasis-color: #f2f5f7;
 }
 
 body {
@@ -55,9 +65,7 @@ body::before {
 }
 
 [data-bs-theme="dark"] body::before {
-  background:
-    radial-gradient(ellipse at 20% 0%, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(121, 40, 202, 0.04) 0%, transparent 50%);
+  background: none;
 }
 
 app-root {
@@ -101,13 +109,15 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
 
 [data-bs-theme="dark"] .card,
 [data-bs-theme="dark"] .chart-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   box-shadow: var(--card-shadow);
-  border-color: rgba(48, 54, 61, 0.5);
+  border-color: var(--border);
 }
 
 [data-bs-theme="dark"] .card:hover,
 [data-bs-theme="dark"] .chart-card:hover {
-  border-color: rgba(0, 212, 255, 0.25) !important;
+  border-color: rgba(198, 255, 61, 0.25) !important;
   box-shadow: var(--card-shadow-hover);
 }
 
@@ -154,7 +164,7 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
 
 [data-bs-theme="dark"] .table-light {
   --bs-table-bg: transparent !important;
-  --bs-table-color: #e6edf3 !important;
+  --bs-table-color: #f2f5f7 !important;
   --bs-table-border-color: var(--border);
 }
 
@@ -176,7 +186,7 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
 }
 
 [data-bs-theme="dark"] .navbar {
-  border-bottom: 1px solid rgba(0, 212, 255, 0.12);
+  border-bottom: 1px solid var(--border);
 }
 
 .btn {
@@ -207,37 +217,57 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
 }
 
 [data-bs-theme="dark"] .btn-outline-primary {
-  --bs-btn-color: #00d4ff;
-  --bs-btn-border-color: rgba(0, 212, 255, 0.35);
-  --bs-btn-hover-bg: rgba(0, 212, 255, 0.12);
-  --bs-btn-hover-color: #fff;
-  --bs-btn-hover-border-color: #00d4ff;
-  --bs-btn-active-bg: rgba(0, 212, 255, 0.2);
-  --bs-btn-active-color: #fff;
-  --bs-btn-active-border-color: #00d4ff;
-  --bs-btn-box-shadow: 0 0 8px rgba(0, 212, 255, 0.06);
+  --bs-btn-color: #c6ff3d;
+  --bs-btn-border-color: rgba(198, 255, 61, 0.35);
+  --bs-btn-hover-bg: rgba(198, 255, 61, 0.12);
+  --bs-btn-hover-color: #d4ff6b;
+  --bs-btn-hover-border-color: #c6ff3d;
+  --bs-btn-active-bg: rgba(198, 255, 61, 0.2);
+  --bs-btn-active-color: #d4ff6b;
+  --bs-btn-active-border-color: #c6ff3d;
+  --bs-btn-box-shadow: 0 0 8px rgba(198, 255, 61, 0.06);
 }
 
 [data-bs-theme="dark"] .btn-outline-secondary {
-  --bs-btn-color: #8b949e;
-  --bs-btn-border-color: rgba(48, 54, 61, 0.8);
+  --bs-btn-color: #99a1ad;
+  --bs-btn-border-color: rgba(255, 255, 255, 0.14);
   --bs-btn-hover-bg: rgba(255, 255, 255, 0.06);
-  --bs-btn-hover-color: #e6edf3;
-  --bs-btn-hover-border-color: #8b949e;
+  --bs-btn-hover-color: #f2f5f7;
+  --bs-btn-hover-border-color: rgba(255, 255, 255, 0.25);
   --bs-btn-active-bg: rgba(255, 255, 255, 0.1);
-  --bs-btn-active-color: #e6edf3;
+  --bs-btn-active-color: #f2f5f7;
+}
+
+/* Lime primary button: dark ink on the signal lime, matching the landing page. */
+[data-bs-theme="dark"] .btn-primary {
+  --bs-btn-color: #0a0c00;
+  --bs-btn-bg: #c6ff3d;
+  --bs-btn-border-color: #c6ff3d;
+  --bs-btn-hover-color: #0a0c00;
+  --bs-btn-hover-bg: #d4ff6b;
+  --bs-btn-hover-border-color: #d4ff6b;
+  --bs-btn-active-color: #0a0c00;
+  --bs-btn-active-bg: #b7f34a;
+  --bs-btn-active-border-color: #b7f34a;
+  --bs-btn-disabled-bg: rgba(198, 255, 61, 0.35);
+  --bs-btn-disabled-border-color: transparent;
+  --bs-btn-disabled-color: rgba(10, 12, 0, 0.55);
 }
 
 [data-bs-theme="dark"] .text-primary {
-  color: #00d4ff !important;
+  color: #c6ff3d !important;
 }
 
 [data-bs-theme="dark"] .text-success {
-  color: #3fb950 !important;
+  color: #b7f34a !important;
 }
 
 [data-bs-theme="dark"] .text-danger {
-  color: #f85149 !important;
+  color: #ff6b6b !important;
+}
+
+[data-bs-theme="dark"] .text-warning {
+  color: #ffb020 !important;
 }
 
 .bg-success {
@@ -249,7 +279,7 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
 }
 
 [data-bs-theme="dark"] .bg-secondary {
-  background-color: #21262d !important;
+  background-color: #12161b !important;
 }
 
 .badge {
@@ -271,17 +301,26 @@ h1, h2, h3, h4, .fw-semibold, .fw-bold {
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
 }
 
+/* Lime pass badge needs dark ink to stay readable. */
+[data-bs-theme="dark"] .badge.bg-success {
+  color: #0a0c00;
+}
+
+[data-bs-theme="dark"] .bg-success.text-white {
+  color: #0a0c00 !important;
+}
+
 details summary {
   color: #6366f1 !important;
   cursor: pointer;
 }
 
 [data-bs-theme="dark"] details summary {
-  color: #00d4ff !important;
+  color: #c6ff3d !important;
 }
 
 [data-bs-theme="dark"] .font-monospace {
-  color: #e6edf3;
+  color: #f2f5f7;
 }
 
 .chart-wrapper { position: relative; height: 250px; }
@@ -311,11 +350,11 @@ details summary {
 }
 
 [data-bs-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(0, 212, 255, 0.15);
+  background: rgba(198, 255, 61, 0.15);
 }
 
 [data-bs-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 212, 255, 0.3);
+  background: rgba(198, 255, 61, 0.3);
 }
 
 * {
@@ -324,5 +363,5 @@ details summary {
 }
 
 [data-bs-theme="dark"] * {
-  scrollbar-color: rgba(0, 212, 255, 0.15) transparent;
+  scrollbar-color: rgba(198, 255, 61, 0.15) transparent;
 }

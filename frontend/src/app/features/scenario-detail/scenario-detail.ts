@@ -319,10 +319,10 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
       if (history.length === 0) return;
 
       const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-      const gridColor = isDark ? '#4a5568' : '#e0e0e0';
-      const textColor = isDark ? '#8b949e' : '#666';
-      const accent = isDark ? '#00d4ff' : '#6366f1';
-      const green = isDark ? '#3fb950' : '#10b981';
+      const gridColor = isDark ? '#262b33' : '#e0e0e0';
+      const textColor = isDark ? '#99a1ad' : '#666';
+      const accent = isDark ? '#c6ff3d' : '#6366f1';
+      const green = isDark ? '#b7f34a' : '#10b981';
 
       const labels = history.map((r) => new Date(r.started_at).toLocaleString()).reverse();
       const durations = history.map((r) => r.duration_ms).reverse();
@@ -411,7 +411,7 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
 
       if (this.detail.stepNames.length > 1) {
         const stepColors = isDark
-          ? ['#00d4ff', '#3fb950', '#f85149', '#d29922', '#bc8cff', '#f778ba']
+          ? ['#c6ff3d', '#b7f34a', '#ff6b6b', '#ffb020', '#8cc8ff', '#f778ba']
           : ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#a855f7', '#ec4899'];
         const datasets = this.detail.stepNames.map((stepName, i) => {
           const data = history
