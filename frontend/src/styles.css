@@ -28,8 +28,12 @@
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.35);
   --card-shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.5);
   --navbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
-  /* Bootstrap surfaces follow the graphite palette so forms, tables and dropdowns
-     stay in the same family instead of Bootstrap's bluish dark defaults. */
+}
+
+/* Bootstrap loads after styles.css and defines the same --bs-* tokens under a bare
+   [data-bs-theme="dark"], so those would win on equal specificity. Target :root to
+   raise specificity and pull forms, tables and dropdowns onto the graphite palette. */
+:root[data-bs-theme="dark"] {
   --bs-body-bg: #07080a;
   --bs-body-color: #f2f5f7;
   --bs-secondary-bg: #0d1014;
