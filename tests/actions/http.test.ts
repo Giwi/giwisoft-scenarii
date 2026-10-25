@@ -204,4 +204,27 @@ describe('executeHttpStep request body', () => {
       fetchMock.mock.restore();
     }
   });
+
+  it('includes body download time in response_time_ms', async () => {
+    const fetchMock = mock.method(globalThis, 'fetch', async () => ({
+      status: 200,
+      headers: new Headers(),
+      text: () => new Promise<string>((resolve) => setTimeout(() => resolve('ok'), 60)),
+    }));
+    try {
+      const step = {
+        name: 'Slow body',
+        action: 'http.get',
+        url: '/slow',
+        expect: { response_time_under: 20 },
+      } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', {});
+
+      assert.strictEqual(metrics.success, false);
+      assert.match(metrics.error!, /Response time .* exceeded limit of 20ms/);
+      assert.ok(metrics.response_time_ms >= 40, `expected at least 40ms, got ${metrics.response_time_ms}`);
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
 });

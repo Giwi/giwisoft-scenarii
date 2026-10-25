@@ -222,8 +222,9 @@ export async function executeHttpStep(
 
     const response = await doFetch(resolvedUrl, method, headers, body, signal);
 
-    const elapsed = Date.now() - start;
     const responseBody = await response.text();
+    // Measure the full request, including body transfer, not just time to first byte.
+    const elapsed = Date.now() - start;
 
     stepMetrics.status_code = response.status;
     stepMetrics.response_time_ms = elapsed;
