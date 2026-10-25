@@ -83,4 +83,19 @@ describe('notifyIfStateChanged', () => {
     const { notifyIfStateChanged } = await import('../../src/notifications/index');
     await notifyIfStateChanged(metrics);
   });
+
+  it('records a failed delivery when a channel throws', async () => {
+    const recorded: boolean[] = [];
+    mock.method(settingsModule, 'getSettings', () => ({
+      notifications: { telegram: { enabled: true, bot_token: 't', chat_id: 'c' } },
+    }));
+    mock.method(storageModule, 'getPreviousRunSuccess', () => true);
+    mock.method(telegramModule, 'sendTelegram', () => Promise.reject(new Error('boom')));
+    mock.method(metricsModule, 'recordNotificationDelivery', (success: boolean) => {
+      recorded.push(success);
+    });
+    const { notifyIfStateChanged } = await import('../../src/notifications/index');
+    await notifyIfStateChanged(failMetrics);
+    assert.deepStrictEqual(recorded, [false]);
+  });
 });

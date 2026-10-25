@@ -23,7 +23,7 @@ export async function sendMailgunEmail(
     form.set('subject', subject);
     form.set('text', text);
 
-    await fetchWithRetry(url, {
+    const res = await fetchWithRetry(url, {
       method: 'POST',
       headers: {
         Authorization: `Basic ${auth}`,
@@ -31,6 +31,11 @@ export async function sendMailgunEmail(
       },
       body: form,
     }, NOTIFICATION_RETRIES);
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Mailgun notification failed: ${res.status} ${err}`);
+    }
   }
 }
 
@@ -91,5 +96,6 @@ export async function sendEmail(
     await sendEmailMessage(config, config.to, subject, body);
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : err }, 'Email notification error');
+    throw err;
   }
 }
