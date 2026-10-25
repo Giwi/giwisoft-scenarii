@@ -24,6 +24,10 @@ export interface SmtpConfig {
   username?: string;
   password?: string;
   tls?: boolean;
+  // Verify the server certificate. Defaults to true. Set false only for self-signed relays.
+  rejectUnauthorized?: boolean;
+  // Extra CA certificate(s) in PEM form, trusted in addition to the system store.
+  ca?: string;
 }
 
 export interface EmailConfig {

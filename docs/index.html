@@ -741,7 +741,7 @@ docker run -d \
                   <table>
                     <tr><th>Channel</th><th>Configuration</th></tr>
                     <tr><td>Telegram</td><td><code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_CHAT_ID</code>, or the settings file.</td></tr>
-                    <tr><td>Email</td><td>SMTP (<code>host</code>/<code>port</code>, optional auth and TLS/STARTTLS) or Mailgun API key and domain. Multiple recipients. Daily report at 08:00.</td></tr>
+                    <tr><td>Email</td><td>SMTP (<code>host</code>/<code>port</code>, optional auth, TLS/STARTTLS, and certificate verification with a custom CA) or Mailgun API key and domain. Multiple recipients. Daily report at 08:00.</td></tr>
                     <tr><td>Slack</td><td>Webhook URL. JSON payload with scenario, status, and duration.</td></tr>
                     <tr><td>Discord</td><td>Webhook URL. Embedded message with color-coded pass or fail.</td></tr>
                     <tr><td>Generic webhook</td><td>Any endpoint that accepts the JSON payload.</td></tr>
@@ -776,6 +776,8 @@ notifications:
       username: <span class="tok-string">"your-username"</span>
       password: <span class="tok-string">"your-password"</span>
       tls: <span class="tok-keyword">false</span>
+      rejectUnauthorized: <span class="tok-keyword">true</span>  <span class="tok-comment"># false only for self-signed relays</span>
+      <span class="tok-comment"># ca: "-----BEGIN CERTIFICATE-----..."  # extra CA, optional</span>
     <span class="tok-comment"># Or Mailgun: mailgun: { api_key: "...", domain: "..." }</span>
   slack:
     enabled: true

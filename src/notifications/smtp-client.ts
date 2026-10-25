@@ -47,6 +47,17 @@ function buildMessage(from: string, to: string[], subject: string, text: string)
 
 type AnySocket = net.Socket | tls.TLSSocket;
 
+// TLS verification settings shared by implicit TLS and STARTTLS connections.
+interface TlsTrust {
+  rejectUnauthorized: boolean;
+  ca?: string;
+}
+
+// A servername is only valid for DNS names, not IP literals (RFC 6066).
+function serverName(host: string): string | undefined {
+  return net.isIP(host) ? undefined : host;
+}
+
 // Wraps a socket with line-oriented reply parsing and command sending.
 class SmtpConnection {
   private socket: AnySocket;
@@ -113,9 +124,14 @@ class SmtpConnection {
   }
 
   // Upgrades the live socket to TLS in place (after STARTTLS).
-  upgradeToTls(): Promise<void> {
+  upgradeToTls(trust: TlsTrust): Promise<void> {
     return new Promise((resolve, reject) => {
-      const secured = tls.connect({ socket: this.socket, servername: this.host });
+      const secured = tls.connect({
+        socket: this.socket,
+        servername: serverName(this.host),
+        rejectUnauthorized: trust.rejectUnauthorized,
+        ca: trust.ca,
+      });
       secured.once('secureConnect', () => {
         this.socket = secured;
         resolve();
@@ -136,10 +152,16 @@ class SmtpConnection {
   }
 }
 
-function connect(host: string, port: number, implicitTls: boolean): Promise<AnySocket> {
+function connect(host: string, port: number, implicitTls: boolean, trust: TlsTrust): Promise<AnySocket> {
   if (implicitTls) {
     return new Promise((resolve, reject) => {
-      const socket = tls.connect({ host, port, servername: host });
+      const socket = tls.connect({
+        host,
+        port,
+        servername: serverName(host),
+        rejectUnauthorized: trust.rejectUnauthorized,
+        ca: trust.ca,
+      });
       socket.once('secureConnect', () => resolve(socket));
       socket.once('error', reject);
     });
@@ -160,8 +182,12 @@ export async function sendSmtpEmail(
 ): Promise<void> {
   const implicitTls = smtp.tls === true;
   const port = smtp.port || (implicitTls ? 465 : 25);
+  const trust: TlsTrust = {
+    rejectUnauthorized: smtp.rejectUnauthorized !== false,
+    ca: smtp.ca,
+  };
 
-  const socket = await connect(smtp.host, port, implicitTls);
+  const socket = await connect(smtp.host, port, implicitTls, trust);
   const conn = new SmtpConnection(socket, smtp.host);
   try {
     await conn.greeting();
@@ -169,7 +195,7 @@ export async function sendSmtpEmail(
     const ehlo = await conn.command(`EHLO ${os.hostname() || 'localhost'}`, 250);
     if (!implicitTls && /STARTTLS/i.test(ehlo)) {
       await conn.command('STARTTLS', 220);
-      await conn.upgradeToTls();
+      await conn.upgradeToTls(trust);
       await conn.command(`EHLO ${os.hostname() || 'localhost'}`, 250);
     }
 

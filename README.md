@@ -464,6 +464,9 @@ notifications:
       username: "your-username"   # omit both for an unauthenticated relay
       password: "your-password"
       tls: false
+      rejectUnauthorized: true    # false only for self-signed relays (insecure)
+      # ca: |                     # extra CA certificate (PEM), optional
+      #   -----BEGIN CERTIFICATE-----
     # Or use Mailgun instead:
     # mailgun:
     #   api_key: "YOUR_API_KEY"
