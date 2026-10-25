@@ -26,7 +26,46 @@ function envelopeAddress(value: string): string {
   return (match ? match[1] : value).trim();
 }
 
-// RFC 5322 message: headers + blank line + body. Body is CRLF-normalised and dot-stuffed.
+// RFC 2045 quoted-printable: 7-bit safe output, lines at most 76 chars including the
+// soft-break '='. Spaces and tabs are always encoded so a soft break can never leave
+// trailing whitespace, which the standard forbids.
+export function quotedPrintable(text: string): string {
+  const bytes = Buffer.from(text, 'utf-8');
+  const lines: string[] = [];
+  let line = '';
+
+  const append = (token: string) => {
+    if (line.length + token.length > 75) {
+      lines.push(line + '=');
+      line = '';
+    }
+    line += token;
+  };
+
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    if (b === 0x0d) {
+      if (bytes[i + 1] === 0x0a) i++;
+      lines.push(line);
+      line = '';
+      continue;
+    }
+    if (b === 0x0a) {
+      lines.push(line);
+      line = '';
+      continue;
+    }
+    const token = b >= 0x21 && b <= 0x7e && b !== 0x3d
+      ? String.fromCharCode(b)
+      : '=' + b.toString(16).toUpperCase().padStart(2, '0');
+    append(token);
+  }
+
+  lines.push(line);
+  return lines.join(CRLF);
+}
+
+// RFC 5322 message: headers + blank line + quoted-printable body, dot-stuffed for DATA.
 function buildMessage(from: string, to: string[], subject: string, text: string): string {
   const lines = [
     `From: ${from}`,
@@ -36,10 +75,10 @@ function buildMessage(from: string, to: string[], subject: string, text: string)
     `Message-ID: ${messageId()}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=utf-8',
-    'Content-Transfer-Encoding: 8bit',
+    'Content-Transfer-Encoding: quoted-printable',
     '',
   ];
-  for (const raw of text.split(/\r?\n/)) {
+  for (const raw of quotedPrintable(text).split(CRLF)) {
     lines.push(raw.startsWith('.') ? '.' + raw : raw);
   }
   return lines.join(CRLF);
