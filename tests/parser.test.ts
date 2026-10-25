@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parseScenario, resolveIncludes } from '../src/config/parser';
-import { Scenario, HttpStep, IncludeStep } from '../src/types';
+import { Scenario, BrowserStep, HttpStep, IncludeStep } from '../src/types';
 
 describe('parseScenario', () => {
   it('parses a minimal valid scenario', () => {
@@ -185,6 +185,43 @@ steps:
     } else {
       assert.fail('expected browser step');
     }
+  });
+
+  it('keeps timeout and condition on HTTP steps', () => {
+    const yaml = `
+name: http-condition
+steps:
+  - name: Login
+    action: http.post
+    url: /api/login
+  - name: Dashboard
+    action: http.get
+    url: /api/dashboard
+    timeout: 10000
+    condition:
+      if_step: Login
+      if_success: true
+`;
+    const s = parseScenario(yaml);
+    const step = s.steps[1] as HttpStep;
+    assert.strictEqual(step.timeout, 10000);
+    assert.deepStrictEqual(step.condition, { if_step: 'Login', if_success: true });
+  });
+
+  it('keeps condition on browser steps', () => {
+    const yaml = `
+name: browser-condition
+steps:
+  - name: Click
+    action: browser.click
+    selector: "#go"
+    condition:
+      if_step: Login
+      if_success: true
+`;
+    const s = parseScenario(yaml);
+    const step = s.steps[0] as BrowserStep;
+    assert.deepStrictEqual(step.condition, { if_step: 'Login', if_success: true });
   });
 });
 

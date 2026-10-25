@@ -24,6 +24,8 @@ function parseStep(raw: Record<string, unknown>, index: number): Step {
     };
     if (raw.headers) step.headers = raw.headers as Record<string, string>;
     if (raw.body !== undefined) step.body = raw.body;
+    if (raw.timeout !== undefined) step.timeout = raw.timeout as number;
+    if (raw.condition) step.condition = raw.condition as HttpStep['condition'];
     if (raw.expect) step.expect = raw.expect as HttpStep['expect'];
     if (raw.variables) step.variables = raw.variables as Record<string, string>;
     return step;
@@ -39,6 +41,7 @@ function parseStep(raw: Record<string, unknown>, index: number): Step {
     if (raw.selector) step.selector = raw.selector as string;
     if (raw.value) step.value = raw.value as string;
     if (raw.timeout) step.timeout = raw.timeout as number;
+    if (raw.condition) step.condition = raw.condition as BrowserStep['condition'];
     if (raw.script) step.script = raw.script as string;
     if (raw.expect) step.expect = raw.expect as BrowserStep['expect'];
     if (raw.variables) step.variables = raw.variables as Record<string, string>;
