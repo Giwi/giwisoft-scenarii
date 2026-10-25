@@ -189,7 +189,12 @@ program
   .option('--headless <bool>', 'Run browser in headless mode', 'true')
   .option('--json', 'Output metrics as JSON')
   .option('--db <path>', 'SQLite database path')
+  .option('--fail-on <when>', 'Exit 1 on failed runs: failure | none', 'failure')
   .action(async (file: string, options) => {
+    if (options.failOn !== 'failure' && options.failOn !== 'none') {
+      logger.error({ fail_on: options.failOn }, 'Invalid --fail-on value, expected "failure" or "none"');
+      process.exit(1);
+    }
     if (options.db) {
       initStorage(options.db);
     }
@@ -197,7 +202,10 @@ program
     const runOptions: RunOptions = { headless, json_output: options.json, persist: !!options.db };
     const scenario = loadScenarioFile(file);
     logger.info({ scenario: scenario.name }, 'Triggering scenario');
-    await runScenario(scenario, runOptions);
+    const metrics = await runScenario(scenario, runOptions);
+    if (options.failOn === 'failure' && !metrics.success) {
+      process.exit(1);
+    }
   });
 
 // Status command: lists scheduled scenarios and storage readiness.

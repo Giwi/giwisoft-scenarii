@@ -909,7 +909,7 @@ node dist/index.js server <span class="tok-comment">-p 3000 --db db/scenarii.db 
 <span class="tok-comment"># Validate without running</span>
 node dist/index.js validate scenarios/example.yml
 
-<span class="tok-comment"># Run immediately</span>
+<span class="tok-comment"># Run immediately (exits 1 on failure; add --fail-on none to always exit 0)</span>
 node dist/index.js trigger scenarios/example.yml
 
 <span class="tok-comment"># Scheduled scenarios and storage status</span>
