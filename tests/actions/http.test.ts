@@ -1,6 +1,6 @@
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
-import { checkExpectations } from '../../src/actions/http';
+import { checkExpectations, executeHttpStep } from '../../src/actions/http';
 import { HttpStep } from '../../src/types';
 
 function makeResponse(overrides: Partial<{ status: number; headers: Record<string, string>; body: string }> = {}) {
@@ -127,5 +127,81 @@ describe('checkExpectations', () => {
     it('returns error on non-JSON body', () => {
       assert.match(checkExpectations(schemaStep({ type: 'object' }), makeResponse({ body: 'not-json' }), 'not-json', 0)!, /Failed to parse JSON/);
     });
+  });
+});
+
+describe('executeHttpStep request body', () => {
+  it('interpolates variables in JSON bodies and sets Content-Type', async () => {
+    let captured: { headers?: Record<string, string>; body?: string } = {};
+    const fetchMock = mock.method(globalThis, 'fetch', async (_url: unknown, init: any) => {
+      captured = { headers: init.headers, body: init.body };
+      return new Response('{"ok":true}', { status: 200 });
+    });
+    try {
+      const step = {
+        name: 'Login',
+        action: 'http.post',
+        url: '/api/login',
+        headers: { 'X-Trace': '{{trace}}' },
+        body: { token: '{{token}}', nested: { list: ['{{token}}', 5] } },
+      } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', { token: 'abc', trace: 't1' });
+
+      assert.strictEqual(metrics.success, true);
+      assert.strictEqual(captured.headers?.['Content-Type'], 'application/json');
+      assert.strictEqual(captured.headers?.['X-Trace'], 't1');
+      assert.deepStrictEqual(JSON.parse(captured.body!), {
+        token: 'abc',
+        nested: { list: ['abc', 5] },
+      });
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('keeps an explicit Content-Type header', async () => {
+    let captured: { headers?: Record<string, string> } = {};
+    const fetchMock = mock.method(globalThis, 'fetch', async (_url: unknown, init: any) => {
+      captured = { headers: init.headers };
+      return new Response('{}', { status: 200 });
+    });
+    try {
+      const step = {
+        name: 'Custom',
+        action: 'http.post',
+        url: '/api',
+        headers: { 'content-type': 'application/vnd.api+json' },
+        body: { value: '{{value}}' },
+      } as HttpStep;
+      await executeHttpStep(step, 'https://example.com', { value: 'v' });
+
+      assert.strictEqual(captured.headers?.['Content-Type'], undefined);
+      assert.strictEqual(captured.headers?.['content-type'], 'application/vnd.api+json');
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('interpolates variables in string bodies without adding a header', async () => {
+    let captured: { headers?: Record<string, string>; body?: string } = {};
+    const fetchMock = mock.method(globalThis, 'fetch', async (_url: unknown, init: any) => {
+      captured = { headers: init.headers, body: init.body };
+      return new Response('ok', { status: 200 });
+    });
+    try {
+      const step = {
+        name: 'Form',
+        action: 'http.post',
+        url: '/api',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'token={{token}}',
+      } as HttpStep;
+      await executeHttpStep(step, 'https://example.com', { token: 'abc' });
+
+      assert.strictEqual(captured.body, 'token=abc');
+      assert.strictEqual(captured.headers?.['Content-Type'], 'application/x-www-form-urlencoded');
+    } finally {
+      fetchMock.mock.restore();
+    }
   });
 });

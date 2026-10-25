@@ -172,6 +172,18 @@ function extractVariables(step: HttpStep, body: string, vars: Record<string, str
   }
 }
 
+// Interpolates {{variables}} in string values anywhere inside a JSON body.
+function interpolateBody(value: unknown, vars: Record<string, string>): unknown {
+  if (typeof value === 'string') return interpolateVars(value, vars);
+  if (Array.isArray(value)) return value.map(item => interpolateBody(item, vars));
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, interpolateBody(item, vars)])
+    );
+  }
+  return value;
+}
+
 // Executes a single HTTP step (GET/POST/PUT/PATCH/DELETE) and validates expectations.
 export async function executeHttpStep(
   step: HttpStep,
@@ -191,7 +203,7 @@ export async function executeHttpStep(
   try {
     const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
     const method = step.action.split('.')[1].toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const headers = step.headers
+    let headers = step.headers
       ? Object.fromEntries(
           Object.entries(step.headers).map(([k, v]) => [k, interpolateVars(v, vars)])
         )
@@ -199,9 +211,13 @@ export async function executeHttpStep(
 
     let body: string | undefined;
     if (step.body && typeof step.body === 'object') {
-      body = JSON.stringify(step.body);
+      body = JSON.stringify(interpolateBody(step.body, vars));
+      // Object bodies are serialised as JSON; supply the header unless the user set one.
+      if (!headers || !Object.keys(headers).some(k => k.toLowerCase() === 'content-type')) {
+        headers = { ...(headers ?? {}), 'Content-Type': 'application/json' };
+      }
     } else if (step.body) {
-      body = String(step.body);
+      body = interpolateVars(String(step.body), vars);
     }
 
     const response = await doFetch(resolvedUrl, method, headers, body, signal);
