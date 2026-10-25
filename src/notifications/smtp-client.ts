@@ -4,8 +4,8 @@ import os from 'os';
 import type { SmtpConfig } from '../config/settings';
 
 // Minimal SMTP client: enough to submit a single plain-text message over a relay with
-// optional AUTH LOGIN and TLS (implicit SMTPS or STARTTLS). No external dependency, in
-// line with the other hand-rolled notification senders.
+// optional AUTH (PLAIN preferred, LOGIN fallback) and TLS (implicit SMTPS or STARTTLS).
+// No external dependency, in line with the other hand-rolled notification senders.
 
 const CRLF = '\r\n';
 const SOCKET_TIMEOUT_MS = 30_000;
@@ -97,6 +97,18 @@ function serverName(host: string): string | undefined {
   return net.isIP(host) ? undefined : host;
 }
 
+// Extracts the AUTH mechanisms advertised in an EHLO reply. Servers write either
+// "250-AUTH PLAIN LOGIN" or "250 AUTH=PLAIN LOGIN"; both forms are accepted here.
+export function authMechanisms(ehlo: string): string[] {
+  for (const line of ehlo.split('\n')) {
+    const match = /^\d{3}[ -]AUTH(?:[ =](.*))?$/i.exec(line.trim());
+    if (match) {
+      return (match[1] ?? '').trim().toUpperCase().split(/\s+/).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 // Wraps a socket with line-oriented reply parsing and command sending.
 class SmtpConnection {
   private socket: AnySocket;
@@ -106,6 +118,12 @@ class SmtpConnection {
   constructor(socket: AnySocket, host: string) {
     this.socket = socket;
     this.host = host;
+    this.applyTimeout();
+  }
+
+  // Applies the inactivity timeout to the current socket. Called again after STARTTLS
+  // because the upgrade wraps the plain socket in a new TLSSocket.
+  private applyTimeout(): void {
     this.socket.setTimeout(SOCKET_TIMEOUT_MS, () => this.socket.destroy(new Error('SMTP socket timeout')));
   }
 
@@ -173,10 +191,27 @@ class SmtpConnection {
       });
       secured.once('secureConnect', () => {
         this.socket = secured;
+        // The timeout was attached to the plain socket; the TLSSocket needs its own.
+        this.applyTimeout();
         resolve();
       });
       secured.once('error', reject);
     });
+  }
+
+  // AUTH PLAIN: a single command carrying NUL-separated credentials. Some servers
+  // answer the initial response with 334 and wait for the credentials line.
+  async authPlain(username: string, password: string): Promise<void> {
+    const credentials = Buffer.from(`\0${username}\0${password}`, 'utf-8').toString('base64');
+    this.socket.write(`AUTH PLAIN ${credentials}${CRLF}`);
+    let reply = await this.readReply();
+    if (reply.code === 334) {
+      this.socket.write(credentials + CRLF);
+      reply = await this.readReply();
+    }
+    if (reply.code !== 235) {
+      throw new Error(`SMTP AUTH PLAIN failed: ${reply.code} ${reply.lines.join(' / ')}`);
+    }
   }
 
   // AUTH LOGIN handshake.
@@ -231,15 +266,21 @@ export async function sendSmtpEmail(
   try {
     await conn.greeting();
 
-    const ehlo = await conn.command(`EHLO ${os.hostname() || 'localhost'}`, 250);
+    let ehlo = await conn.command(`EHLO ${os.hostname() || 'localhost'}`, 250);
     if (!implicitTls && /STARTTLS/i.test(ehlo)) {
       await conn.command('STARTTLS', 220);
       await conn.upgradeToTls(trust);
-      await conn.command(`EHLO ${os.hostname() || 'localhost'}`, 250);
+      // Capabilities are re-advertised after the upgrade; use the fresh list.
+      ehlo = await conn.command(`EHLO ${os.hostname() || 'localhost'}`, 250);
     }
 
     if (smtp.username) {
-      await conn.authLogin(smtp.username, smtp.password ?? '');
+      const mechanisms = authMechanisms(ehlo);
+      if (mechanisms.includes('PLAIN')) {
+        await conn.authPlain(smtp.username, smtp.password ?? '');
+      } else {
+        await conn.authLogin(smtp.username, smtp.password ?? '');
+      }
     }
 
     await conn.command(`MAIL FROM:<${envelopeAddress(from)}>`, 250);

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { quotedPrintable } from '../../src/notifications/smtp-client';
+import { authMechanisms, quotedPrintable } from '../../src/notifications/smtp-client';
 
 // Minimal decoder used to assert round-trips: unfold soft breaks, then decode =XX.
 function decodeQuotedPrintable(value: string): string {
@@ -20,6 +20,27 @@ function decodeQuotedPrintable(value: string): string {
   }
   return Buffer.from(bytes).toString('utf-8');
 }
+
+describe('authMechanisms', () => {
+  it('reads mechanisms from a multi-line EHLO reply', () => {
+    assert.deepStrictEqual(
+      authMechanisms('250-localhost\n250-AUTH PLAIN LOGIN\n250 HELP'),
+      ['PLAIN', 'LOGIN'],
+    );
+  });
+
+  it('reads the AUTH= form', () => {
+    assert.deepStrictEqual(authMechanisms('250 AUTH=LOGIN'), ['LOGIN']);
+  });
+
+  it('normalises case', () => {
+    assert.deepStrictEqual(authMechanisms('250-AUTH plain login'), ['PLAIN', 'LOGIN']);
+  });
+
+  it('returns an empty list when AUTH is not advertised', () => {
+    assert.deepStrictEqual(authMechanisms('250-localhost\n250 STARTTLS'), []);
+  });
+});
 
 describe('quotedPrintable', () => {
   it('keeps printable ASCII literal', () => {
