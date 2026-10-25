@@ -596,17 +596,3 @@ npm test
 ```
 
 Uses Node's built-in test runner (`node:test`) - no extra dependencies. Tests cover the sequential execution queue, notification state machine, settings schema validation, URL resolution, variable interpolation, JSON path extraction, YAML parse/serialize, HTTP expectations, and retry logic. Test files live in `tests/` and are compiled via `tests/tsconfig.json` to `dist-test/`.
-
-## Tech stack
-
-- **Runtime** - Node.js 26 + TypeScript (strict mode)
-- **CLI** - Commander
-- **HTTP** - Native `fetch` (no Playwright needed for API monitoring)
-- **Browser** - Lightpanda headless browser via Playwright CDP (with retry)
-- **Database** - SQLite (better-sqlite3, WAL mode)
-- **Scheduling** - node-cron
-- **Notifications** - Telegram, Slack, Discord, Generic Webhook, Email (SMTP or Mailgun, all with retry)
-- **Logging** - pino (structured JSON, ISO timestamps)
-- **Security** - Helmet (CSP, HSTS, X-Frame-Options, etc.), optional OIDC-based dashboard auth with HTTP-only session cookies
-- **Frontend** - Angular 22 (standalone components), Bootstrap 5, Chart.js, Bootstrap Icons
-- **Container** - Debian-slim (`node:26-slim`), multi-stage build, non-root user
