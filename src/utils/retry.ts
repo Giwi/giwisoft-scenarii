@@ -30,3 +30,21 @@ export async function postJson(
     throw new Error(`${label} notification failed: ${res.status} ${err}`);
   }
 }
+
+// Retries an async operation with the same exponential backoff as fetchWithRetry,
+// rethrowing the last error. Used by transports that open their own connection (SMTP).
+export async function retryAsync<T>(
+  fn: () => Promise<T>,
+  label: string,
+  retries = NOTIFICATION_RETRIES,
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      if (attempt >= retries) throw err;
+      logger.warn({ attempt, err: err instanceof Error ? err.message : String(err) }, `Retrying ${label}`);
+      await new Promise(r => setTimeout(r, attempt * 1000));
+    }
+  }
+}

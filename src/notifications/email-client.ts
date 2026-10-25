@@ -1,7 +1,7 @@
 import { EmailConfig } from '../config/settings';
 import { ScenarioMetrics } from '../types';
 import logger from '../utils/logger';
-import { fetchWithRetry, NOTIFICATION_RETRIES } from '../utils/retry';
+import { fetchWithRetry, retryAsync, NOTIFICATION_RETRIES } from '../utils/retry';
 import { sendSmtpEmail } from './smtp-client';
 
 // Sends one message through Mailgun. Kept exported for any direct caller.
@@ -57,13 +57,15 @@ export async function sendEmailMessage(
     throw new Error('Email sender (from) is not configured');
   }
 
-  if (email.smtp?.host) {
-    await sendSmtpEmail(email.smtp, from, to, subject, text);
+  const smtp = email.smtp;
+  if (smtp?.host) {
+    await retryAsync(() => sendSmtpEmail(smtp, from, to, subject, text), 'SMTP send');
     return;
   }
 
-  if (email.mailgun?.api_key && email.mailgun.domain) {
-    await sendMailgunEmail(email.mailgun.api_key, email.mailgun.domain, from, to, subject, text);
+  const mailgun = email.mailgun;
+  if (mailgun?.api_key && mailgun.domain) {
+    await sendMailgunEmail(mailgun.api_key, mailgun.domain, from, to, subject, text);
     return;
   }
 
