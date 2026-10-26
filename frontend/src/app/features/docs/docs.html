@@ -191,26 +191,40 @@
 
       <!-- Variables -->
       <section id="variables" class="mb-5">
-        <h2 class="h4 border-bottom pb-2">Variables</h2>
+        <h2 class="h4 border-bottom pb-2">Variables and secrets</h2>
         <p class="small text-secondary">
-          A step extracts values from its response with <code>variables</code>, and later steps
-          reuse them with <code>{{ mustaches }}</code>. The key is the name you choose, the value is
-          the JSON path to read.
+          Scenario <code>variables</code> are resolved before the first step. They can read the
+          process environment with <code>{{ envToken }}</code> and reference other scenario
+          variables by name. Missing or empty values can fall back to a default:
+          <code>{{ apiBase }}</code>.
         </p>
-        <pre><code>- name: Get the post
-  action: http.get
-  url: /posts/1
-  variables:
-    postId: $.id
+        <pre><code><span class="key">variables</span>:
+  API_TOKEN: "{{ envToken }}"
+  API_BASE: "{{ apiBase }}"
+<span class="key">base_url</span>: "{{ apiBaseName }}"
 
-- name: Get that post again
-  action: http.get
-  url: /posts/{{ mustaches }}
-  expect:
-    status: 200</code></pre>
+<span class="key">headers</span>:
+  Authorization: "Bearer {{ apiToken }}"
+  Accept: application/json
+
+<span class="key">steps</span>:
+  - name: Get the post
+    action: http.get
+    url: /posts/1
+    variables:
+      postId: $.id
+
+  - name: Get that post again
+    action: http.get
+    url: /posts/{{ mustaches }}
+    expect:
+      status: 200</code></pre>
         <p class="small text-secondary mb-0">
-          Variables are interpolated into urls, headers, body values, selector values, and expected
-          text.
+          Scenario <code>headers</code> are sent with every HTTP step; a step-level header
+          overrides one with the same name. Step <code>variables</code> extract values from a
+          response for later steps; scenario variables cannot reference those runtime values.
+          Placeholders work in urls, headers, body values, selector values, and expected text, and
+          an unresolved placeholder fails before the request is sent.
         </p>
       </section>
 

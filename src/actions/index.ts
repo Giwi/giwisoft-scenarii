@@ -12,11 +12,12 @@ export async function executeStep(
   vars: Record<string, string>,
   stepTimeout?: number,
   signal?: AbortSignal,
+  scenarioHeaders?: Record<string, string>,
 ): Promise<StepMetrics> {
   const runner = async (): Promise<StepMetrics> => {
     if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
     if (step.action.startsWith('http.')) {
-      return executeHttpStep(step as import('../types').HttpStep, base_url, vars, signal);
+      return executeHttpStep(step as import('../types').HttpStep, base_url, vars, scenarioHeaders, signal);
     }
     if (step.action.startsWith('browser.')) {
       if (!page) throw new Error('Browser not initialized for browser action');

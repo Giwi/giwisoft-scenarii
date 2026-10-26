@@ -6,7 +6,7 @@ import { Scenario, ScenarioMetrics, StepMetrics, RunOptions, ExecutableStep } fr
 import { executeStep } from '../actions/index';
 import { createScenarioMetrics } from '../metrics/metrics';
 import { getScenarioSettings } from '../config/settings';
-import { waitForPort } from '../utils/helpers';
+import { resolveVariableDefinitions, waitForPort } from '../utils/helpers';
 import logger from '../utils/logger';
 import {
   DEFAULT_LIGHTPANDA_PORT, DEFAULT_BROWSER_VIEWPORT, DEFAULT_SCENARIO_TIMEOUT,
@@ -67,6 +67,9 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
 
   const run = async () => {
     try {
+      // Resolve scenario variables up front so missing env-backed secrets fail before any step runs.
+      Object.assign(vars, resolveVariableDefinitions(scenario.variables, `scenario "${scenario.name}" variables`));
+
       if (hasBrowserActions) {
         if (options.lightpandaUrl) {
           try {
@@ -113,7 +116,7 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
           }
         }
 
-        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout, abortController.signal);
+        const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout, abortController.signal, scenario.headers);
         metrics.steps.push(stepMetrics);
         stepResults.set(step.name, stepMetrics.success);
 

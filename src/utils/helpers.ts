@@ -33,23 +33,106 @@ export function resolveUrl(base_url: string | undefined, url: string): string {
 }
 
 export class UnresolvedVariableError extends Error {
-  constructor(key: string, stepName?: string) {
-    super(stepName
-      ? `Unresolved variable "{{${key}}}" in step "${stepName}"`
-      : `Unresolved variable "{{${key}}}"`);
+  constructor(message: string) {
+    super(message);
     this.name = 'UnresolvedVariableError';
   }
 }
 
-// Replaces {{variable}} placeholders in a template string with values from the vars map.
-// Throws instead of sending a request with a literal placeholder when a variable is missing.
-export function interpolateVars(template: string, vars: Record<string, string>, stepName?: string): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
-    if (!Object.prototype.hasOwnProperty.call(vars, key)) {
-      throw new UnresolvedVariableError(key, stepName);
-    }
-    return vars[key];
+type VariableLookup = (name: string) => string | undefined;
+
+function appendContext(message: string, context?: string): string {
+  return context ? `${message} in ${context}` : message;
+}
+
+// Empty environment variables count as unset, so a default (or a clear error) applies.
+function readEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return value === '' ? undefined : value;
+}
+
+// Replaces {{var}}, {{env.NAME}}, and {{var:-fallback}} placeholders.
+// A fallback is used when the value is missing or empty. Undefined values throw
+// instead of sending a request with a literal placeholder.
+function renderTemplate(template: string, lookup: VariableLookup, context?: string): string {
+  return template.replace(/\{\{([\w.]+)(?::-([^{}]*))?\}\}/g, (_, name: string, fallback?: string) => {
+    const value = lookup(name);
+
+    if (value !== undefined && value !== '') return value;
+    if (fallback !== undefined) return renderTemplate(fallback, lookup, context);
+    if (value === '') return '';
+
+    const message = name.startsWith('env.')
+      ? `Unresolved environment variable "${name.slice(4)}"`
+      : `Unresolved variable "{{${name}}}"`;
+    throw new UnresolvedVariableError(appendContext(message, context));
   });
+}
+
+// Replaces placeholders in a template using runtime variables and process.env.
+export function interpolateVars(template: string, vars: Record<string, string>, stepName?: string): string {
+  const context = stepName ? `step "${stepName}"` : undefined;
+  return renderTemplate(template, (name) => {
+    if (name.startsWith('env.')) return readEnv(name.slice(4));
+    return Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : undefined;
+  }, context);
+}
+
+// Resolves scenario-level variables before a run starts. Definitions may reference
+// process environment variables and other definitions, in any order.
+export function resolveVariableDefinitions(
+  definitions: Record<string, string> | undefined,
+  context?: string,
+): Record<string, string> {
+  const resolved: Record<string, string> = {};
+  if (!definitions) return resolved;
+
+  const stack: string[] = [];
+
+  const lookup: VariableLookup = (name) => {
+    if (name.startsWith('env.')) return readEnv(name.slice(4));
+    if (!Object.prototype.hasOwnProperty.call(definitions, name)) return undefined;
+    if (Object.prototype.hasOwnProperty.call(resolved, name)) return resolved[name];
+
+    const cycleStart = stack.indexOf(name);
+    if (cycleStart !== -1) {
+      const chain = [...stack.slice(cycleStart), name].join(' -> ');
+      throw new UnresolvedVariableError(appendContext(`Circular variable reference "${chain}"`, context));
+    }
+
+    stack.push(name);
+    try {
+      const value = renderTemplate(definitions[name], lookup, context);
+      resolved[name] = value;
+      return value;
+    } finally {
+      stack.pop();
+    }
+  };
+
+  for (const name of Object.keys(definitions)) lookup(name);
+  return resolved;
+}
+
+// Merges shared scenario headers with step headers. Header names are case-insensitive,
+// so a step can override a scenario header regardless of casing.
+export function mergeHeaders(
+  base: Record<string, string> | undefined,
+  override: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!base && !override) return undefined;
+
+  const merged: Record<string, string> = {};
+  for (const [name, value] of Object.entries(base ?? {})) merged[name] = value;
+
+  for (const [name, value] of Object.entries(override ?? {})) {
+    for (const existing of Object.keys(merged)) {
+      if (existing.toLowerCase() === name.toLowerCase()) delete merged[existing];
+    }
+    merged[name] = value;
+  }
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
 // Navigates a parsed JSON object using a dot-notation path (e.g. $.data.items[0].id).

@@ -292,3 +292,52 @@ describe('executeHttpStep request body', () => {
     }
   });
 });
+
+describe('executeHttpStep shared headers', () => {
+  it('applies scenario headers and lets step headers override them', async () => {
+    let captured: { headers?: Record<string, string> } = {};
+    const fetchMock = mock.method(globalThis, 'fetch', async (_url: unknown, init: any) => {
+      captured = { headers: init.headers };
+      return new Response('{}', { status: 200 });
+    });
+    try {
+      const step = {
+        name: 'Shared',
+        action: 'http.get',
+        url: '/api',
+        headers: { authorization: 'Bearer step', 'X-Step': 'yes' },
+      } as HttpStep;
+      const metrics = await executeHttpStep(
+        step,
+        'https://example.com',
+        { trace: 't1' },
+        { Authorization: 'Bearer shared', 'X-Shared': '{{trace}}', 'X-Override': 'scenario' },
+      );
+
+      assert.strictEqual(metrics.success, true);
+      assert.strictEqual(captured.headers?.Authorization, undefined);
+      assert.strictEqual(captured.headers?.authorization, 'Bearer step');
+      assert.strictEqual(captured.headers?.['X-Shared'], 't1');
+      assert.strictEqual(captured.headers?.['X-Override'], 'scenario');
+      assert.strictEqual(captured.headers?.['X-Step'], 'yes');
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('interpolates variables in base_url', async () => {
+    let capturedUrl = '';
+    const fetchMock = mock.method(globalThis, 'fetch', async (url: unknown) => {
+      capturedUrl = String(url);
+      return new Response('{}', { status: 200 });
+    });
+    try {
+      const step = { name: 'Base', action: 'http.get', url: '/api' } as HttpStep;
+      await executeHttpStep(step, 'https://{{host}}', { host: 'api.example.com' });
+
+      assert.strictEqual(capturedUrl, 'https://api.example.com/api');
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+});

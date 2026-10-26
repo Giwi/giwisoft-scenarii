@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { HttpStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars, resolveJsonPath } from '../utils/helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath, mergeHeaders } from '../utils/helpers';
 
 interface FetchResponse {
   status: number;
@@ -237,6 +237,7 @@ export async function executeHttpStep(
   step: HttpStep,
   base_url: string | undefined,
   vars: Record<string, string>,
+  scenarioHeaders?: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<StepMetrics> {
   const start = Date.now();
@@ -249,11 +250,13 @@ export async function executeHttpStep(
   };
 
   try {
-    const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars, step.name));
+    const resolvedBase = base_url === undefined ? undefined : interpolateVars(base_url, vars, step.name);
+    const resolvedUrl = resolveUrl(resolvedBase, interpolateVars(step.url, vars, step.name));
     const method = step.action.split('.')[1].toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    let headers = step.headers
+    const headerSource = mergeHeaders(scenarioHeaders, step.headers);
+    let headers = headerSource
       ? Object.fromEntries(
-          Object.entries(step.headers).map(([k, v]) => [k, interpolateVars(v, vars, step.name)])
+          Object.entries(headerSource).map(([k, v]) => [k, interpolateVars(v, vars, step.name)])
         )
       : undefined;
 

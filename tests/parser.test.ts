@@ -58,6 +58,30 @@ steps:
     assert.strictEqual(s.timeout, 30000);
   });
 
+  it('parses scenario variables and shared headers', () => {
+    const yaml = `
+name: shared
+variables:
+  API_TOKEN: "{{env.API_TOKEN}}"
+  API_URL: "{{env.API_URL:-https://example.com}}"
+headers:
+  Authorization: "Bearer {{API_TOKEN}}"
+  Accept: application/json
+steps:
+  - action: http.get
+    url: /
+`;
+    const s = parseScenario(yaml);
+    assert.deepStrictEqual(s.variables, {
+      API_TOKEN: '{{env.API_TOKEN}}',
+      API_URL: '{{env.API_URL:-https://example.com}}',
+    });
+    assert.deepStrictEqual(s.headers, {
+      Authorization: 'Bearer {{API_TOKEN}}',
+      Accept: 'application/json',
+    });
+  });
+
   it('assigns default step names', () => {
     const yaml = `
 name: test
@@ -232,6 +256,17 @@ describe('scenario validation', () => {
     assert.throws(
       () => parseScenario(`name: x\nschedul: "* * * * *"\n${steps}`),
       /Unknown field "schedul" in scenario \(did you mean "schedule"\?\)/,
+    );
+  });
+
+  it('rejects non-string scenario variables and headers', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nvariables:\n  PORT: 8080\n${steps}`),
+      /scenario\.variables\.PORT must be a string/,
+    );
+    assert.throws(
+      () => parseScenario(`name: x\nheaders:\n  X-Retry: 3\n${steps}`),
+      /scenario\.headers\.X-Retry must be a string/,
     );
   });
 

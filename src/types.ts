@@ -91,6 +91,10 @@ export interface Scenario {
   description?: string;
   schedule?: string;
   base_url?: string;
+  // Initial variables resolved before the run starts. Values may reference env vars.
+  variables?: Record<string, string>;
+  // Headers merged into every HTTP step. Step headers override them.
+  headers?: Record<string, string>;
   headless?: boolean;
   ignoreHTTPSErrors?: boolean;
   timeout?: number;

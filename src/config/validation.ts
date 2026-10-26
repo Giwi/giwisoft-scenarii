@@ -4,8 +4,8 @@ import cron from 'node-cron';
 // the other fails loudly instead of being silently dropped by the parser.
 
 const SCENARIO_KEYS = [
-  'name', 'description', 'schedule', 'base_url', 'headless', 'ignoreHTTPSErrors',
-  'timeout', 'tags', 'depends_on', 'group', 'time_windows', 'steps', 'alert',
+  'name', 'description', 'schedule', 'base_url', 'variables', 'headers', 'headless',
+  'ignoreHTTPSErrors', 'timeout', 'tags', 'depends_on', 'group', 'time_windows', 'steps', 'alert',
 ] as const;
 
 const STEP_COMMON_KEYS = ['name', 'action', 'timeout', 'condition'] as const;
@@ -328,6 +328,8 @@ export function validateScenario(raw: Record<string, unknown>): void {
     }
   }
   if (raw.base_url !== undefined) assertString(raw.base_url, 'scenario.base_url');
+  if (raw.variables !== undefined) assertStringRecord(raw.variables, 'scenario.variables');
+  if (raw.headers !== undefined) assertStringRecord(raw.headers, 'scenario.headers');
   if (raw.headless !== undefined) assertBoolean(raw.headless, 'scenario.headless');
   if (raw.ignoreHTTPSErrors !== undefined) assertBoolean(raw.ignoreHTTPSErrors, 'scenario.ignoreHTTPSErrors');
   if (raw.timeout !== undefined) assertNumber(raw.timeout, 'scenario.timeout', 1);

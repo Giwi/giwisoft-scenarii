@@ -122,6 +122,8 @@ export function parseScenario(content: string): Scenario {
   if (data.description) scenario.description = data.description as string;
   if (data.schedule) scenario.schedule = data.schedule as string;
   if (data.base_url) scenario.base_url = data.base_url as string;
+  if (data.variables !== undefined) scenario.variables = data.variables as Record<string, string>;
+  if (data.headers !== undefined) scenario.headers = data.headers as Record<string, string>;
   if (data.headless !== undefined) scenario.headless = data.headless as boolean;
   if (data.timeout !== undefined) scenario.timeout = data.timeout as number;
   if (data.ignoreHTTPSErrors !== undefined) scenario.ignoreHTTPSErrors = data.ignoreHTTPSErrors as boolean;

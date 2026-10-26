@@ -9,7 +9,8 @@ interface DocField {
 
 // Rendered from the component: the literal mustaches would be parsed as an
 // interpolation by the Angular template compiler.
-const MUSTACHES = '{{' + 'variable' + '}}';
+const mustache = (body: string): string => '{{' + body + '}}';
+const MUSTACHES = mustache('variable');
 
 // Scenario authoring reference. Static, no data fetching.
 @Component({
@@ -22,6 +23,10 @@ const MUSTACHES = '{{' + 'variable' + '}}';
 })
 export class DocsComponent {
   readonly mustaches = MUSTACHES;
+  readonly envToken = mustache('env.API_TOKEN');
+  readonly apiToken = mustache('API_TOKEN');
+  readonly apiBase = mustache('env.API_BASE:-https://example.com');
+  readonly apiBaseName = mustache('API_BASE');
 
   readonly sections = [
     { id: 'file', label: 'The file' },
@@ -41,6 +46,8 @@ export class DocsComponent {
     { name: 'description', type: 'string', desc: 'Free text shown under the name.' },
     { name: 'schedule', type: 'string', desc: 'Cron expression. Without it the scenario only runs on demand.' },
     { name: 'base_url', type: 'string', desc: 'Prefix applied to every relative url in the steps.' },
+    { name: 'variables', type: 'map', desc: 'Initial values resolved before the first step. Use {{env.NAME}} for secrets and {{NAME:-fallback}} for defaults.' },
+    { name: 'headers', type: 'map', desc: 'Headers sent with every HTTP step. Step headers override them by name.' },
     { name: 'tags', type: 'string[]', desc: 'Drives the dashboard filters.' },
     { name: 'group', type: 'string', desc: 'Groups related scenarios together in the dashboard.' },
     { name: 'depends_on', type: 'string', desc: 'Name of a scenario that runs first.' },
@@ -63,7 +70,7 @@ export class DocsComponent {
     { name: 'name', type: 'string', desc: 'Label of the step, shown in the live ticker and in the run history.' },
     { name: 'action', type: 'string', desc: 'Required. One of the HTTP or browser actions listed below.' },
     { name: 'url', type: 'string', desc: 'Target. Relative urls are resolved against base_url.' },
-    { name: 'headers', type: 'map', desc: 'Request headers (HTTP steps).' },
+    { name: 'headers', type: 'map', desc: 'Request headers (HTTP steps). Overrides scenario-level headers by name.' },
     { name: 'body', type: 'any', desc: 'Request body sent as JSON (HTTP steps).' },
     { name: 'selector', type: 'string', desc: 'CSS selector targeted by the action (browser steps).' },
     { name: 'value', type: 'string', desc: 'Value to type, select, or fill (browser steps).' },

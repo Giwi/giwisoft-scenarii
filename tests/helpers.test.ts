@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { resolveUrl, interpolateVars, resolveJsonPath } from '../src/utils/helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath, resolveVariableDefinitions, mergeHeaders } from '../src/utils/helpers';
 
 describe('resolveUrl', () => {
   it('returns absolute URLs unchanged', () => {
@@ -59,6 +59,94 @@ describe('interpolateVars', () => {
 
   it('handles strings with no variables', () => {
     assert.strictEqual(interpolateVars('plain string', {}), 'plain string');
+  });
+
+  it('reads env-backed variables', () => {
+    process.env.SCENARII_TEST_TOKEN = 's3cret';
+    try {
+      assert.strictEqual(interpolateVars('Bearer {{env.SCENARII_TEST_TOKEN}}', {}), 'Bearer s3cret');
+    } finally {
+      delete process.env.SCENARII_TEST_TOKEN;
+    }
+  });
+
+  it('uses defaults for missing or empty variables', () => {
+    assert.strictEqual(interpolateVars('/api/{{missing:-v1}}', {}), '/api/v1');
+    assert.strictEqual(interpolateVars('/api/{{empty:-v1}}', { empty: '' }), '/api/v1');
+    assert.strictEqual(interpolateVars('/api/{{token:-}}', {}), '/api/');
+  });
+
+  it('uses defaults for missing or empty env variables', () => {
+    process.env.SCENARII_TEST_EMPTY = '';
+    try {
+      assert.strictEqual(interpolateVars('{{env.SCENARII_TEST_MISSING:-localhost}}', {}), 'localhost');
+      assert.strictEqual(interpolateVars('{{env.SCENARII_TEST_EMPTY:-localhost}}', {}), 'localhost');
+    } finally {
+      delete process.env.SCENARII_TEST_EMPTY;
+    }
+  });
+
+  it('throws for missing env variables with step context', () => {
+    delete process.env.SCENARII_TEST_MISSING;
+    assert.throws(
+      () => interpolateVars('{{env.SCENARII_TEST_MISSING}}', {}, 'Login'),
+      /Unresolved environment variable "SCENARII_TEST_MISSING" in step "Login"/,
+    );
+  });
+});
+
+describe('resolveVariableDefinitions', () => {
+  it('resolves env references and forward references between definitions', () => {
+    process.env.SCENARII_TEST_TOKEN = 'abc';
+    try {
+      assert.deepStrictEqual(
+        resolveVariableDefinitions({
+          authorization: 'Bearer {{token}}',
+          token: '{{env.SCENARII_TEST_TOKEN}}',
+        }),
+        { authorization: 'Bearer abc', token: 'abc' },
+      );
+    } finally {
+      delete process.env.SCENARII_TEST_TOKEN;
+    }
+  });
+
+  it('supports defaults inside definitions', () => {
+    assert.deepStrictEqual(
+      resolveVariableDefinitions({
+        base_url: '{{env.SCENARII_TEST_MISSING:-https://example.com}}',
+        health_url: '{{base_url}}/health',
+      }),
+      { base_url: 'https://example.com', health_url: 'https://example.com/health' },
+    );
+  });
+
+  it('rejects circular references', () => {
+    assert.throws(
+      () => resolveVariableDefinitions({ a: '{{b}}', b: '{{a}}' }, 'scenario "loop" variables'),
+      /Circular variable reference "a -> b -> a" in scenario "loop" variables/,
+    );
+  });
+});
+
+describe('mergeHeaders', () => {
+  it('returns undefined when both inputs are empty', () => {
+    assert.strictEqual(mergeHeaders(undefined, undefined), undefined);
+    assert.strictEqual(mergeHeaders({}, {}), undefined);
+  });
+
+  it('merges shared headers', () => {
+    assert.deepStrictEqual(
+      mergeHeaders({ Authorization: 'Bearer a', Accept: 'application/json' }, { 'X-Trace': 't1' }),
+      { Authorization: 'Bearer a', Accept: 'application/json', 'X-Trace': 't1' },
+    );
+  });
+
+  it('lets step headers override shared headers regardless of casing', () => {
+    assert.deepStrictEqual(
+      mergeHeaders({ Authorization: 'Bearer a', 'X-Env': 'shared' }, { authorization: 'Bearer b' }),
+      { 'X-Env': 'shared', authorization: 'Bearer b' },
+    );
   });
 });
 

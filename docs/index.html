@@ -476,7 +476,12 @@ steps:
                 <button class="copy" type="button" data-copy="code-vars">Copy</button>
               </div>
               <pre id="code-vars"><code>name: Variable extraction demo
-base_url: https://jsonplaceholder.typicode.com
+variables:                    <span class="tok-comment"># resolved before the first step</span>
+  API_TOKEN: <span class="tok-string">"{{env.API_TOKEN}}"</span>
+  API_BASE: <span class="tok-string">"{{env.API_BASE:-https://jsonplaceholder.typicode.com}}"</span>
+base_url: <span class="tok-string">"{{API_BASE}}"</span>
+headers:                      <span class="tok-comment"># shared by every HTTP step</span>
+  Authorization: <span class="tok-string">"Bearer {{API_TOKEN}}"</span>
 
 steps:
   - name: Get first post
@@ -499,6 +504,7 @@ steps:
     url: /posts/{{postId}}
     <span class="tok-key">expect</span>:
       <span class="tok-key">body_contains</span>: <span class="tok-string">"{{postTitle}}"</span></code></pre>
+              <p><code>{{env.NAME}}</code> reads the process environment and <code>{{NAME:-fallback}}</code> applies when a value is missing or empty. Step headers override scenario headers by name.</p>
             </div>
           </div>
         </div>

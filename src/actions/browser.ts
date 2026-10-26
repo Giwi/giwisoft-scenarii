@@ -78,7 +78,8 @@ export async function executeBrowserStep(
       switch (step.action) {
         case 'browser.navigate': {
           if (!step.url) throw new Error('browser.navigate requires a "url" field');
-          const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars, step.name));
+          const resolvedBase = base_url === undefined ? undefined : interpolateVars(base_url, vars, step.name);
+          const resolvedUrl = resolveUrl(resolvedBase, interpolateVars(step.url, vars, step.name));
           try {
             await page.goto(resolvedUrl, { waitUntil: 'load', timeout: DEFAULT_PAGE_TIMEOUT });
           } catch {

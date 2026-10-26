@@ -400,6 +400,8 @@ function handleConfigExport(req: express.Request, res: express.Response): void {
         if (scenario.description) obj.description = scenario.description;
         if (scenario.schedule) obj.schedule = scenario.schedule;
         if (scenario.base_url) obj.base_url = scenario.base_url;
+        if (scenario.variables) obj.variables = scenario.variables;
+        if (scenario.headers) obj.headers = scenario.headers;
         if (scenario.timeout) obj.timeout = scenario.timeout;
         if (scenario.tags) obj.tags = scenario.tags;
         if (scenario.depends_on) obj.depends_on = scenario.depends_on;

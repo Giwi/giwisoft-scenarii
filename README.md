@@ -63,6 +63,12 @@ Scenarios are YAML files. HTTP-only steps run in parallel using native fetch; br
 ```yaml
 name: Example
 base_url: https://example.com
+variables:                # initial values, resolved before the first step
+  API_TOKEN: "{{env.API_TOKEN}}"          # read from the process environment
+  API_VERSION: "{{env.API_VERSION:-v1}}"  # fallback when unset or empty
+headers:                  # sent with every HTTP step; step headers override
+  Authorization: "Bearer {{API_TOKEN}}"
+  X-API-Version: "{{API_VERSION}}"
 schedule: "*/5 * * * *"   # optional cron expression
 timeout: 120000           # per-scenario timeout override (default 120s)
 ignoreHTTPSErrors: false  # per-scenario SSL override
@@ -156,26 +162,42 @@ HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed
 
 Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.
 
-### Variables
+### Variables and secrets
 
-Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses or browser evaluate results using the `variables` field with a `json_path` selector. An unresolved placeholder fails the step before any request is sent, and the error includes the step name.
+Use `{{variable_name}}` in URLs, headers, bodies, selector values, and expected text. Values can come from three places:
+
+- **Scenario variables** are resolved once before the first step. They can reference process environment variables with `{{env.NAME}}` and other scenario variables by name. Keep tokens out of YAML by reading them from the environment. Because they run first, they cannot reference values extracted by a step.
+- **Step variables** extract values from an HTTP response or browser evaluate result using a JSON path. They are available to later steps.
+- **Defaults** use shell-style `{{NAME:-fallback}}`. The fallback applies when the value is missing or empty, including env values: `{{env.API_URL:-https://api.example.com}}`.
+
+Scenario `headers` are merged into every HTTP step. Step headers override them by name (case-insensitive), so a single step can replace an inherited `Authorization` header. An unresolved placeholder fails before a request is sent, and the error names the step or scenario variable that failed.
 
 ```yaml
-- name: Get token
-  action: http.post
-  url: /api/login
-  variables:
-    auth_token: $.token       # store response.token as {{auth_token}}
+variables:
+  API_TOKEN: "{{env.API_TOKEN}}"
+  API_BASE: "{{env.API_BASE:-https://example.com}}"
+base_url: "{{API_BASE}}"
 
-- name: Use token
-  action: http.get
-  url: /api/dashboard?token={{auth_token}}
+headers:
+  Authorization: "Bearer {{API_TOKEN}}"
+  Accept: application/json
 
-- name: Extract from page
-  action: browser.evaluate
-  script: "{ version: document.querySelector('meta[name=app-version]')?.content }"
-  variables:
-    app_version: $.version    # store evaluate result.version as {{app_version}}
+steps:
+  - name: Get token
+    action: http.post
+    url: /api/login
+    variables:
+      auth_token: $.token       # store response.token as {{auth_token}}
+
+  - name: Use token
+    action: http.get
+    url: /api/dashboard?token={{auth_token}}
+
+  - name: Extract from page
+    action: browser.evaluate
+    script: "{ version: document.querySelector('meta[name=app-version]')?.content }"
+    variables:
+      app_version: $.version    # store evaluate result.version as {{app_version}}
 ```
 
 ## Dashboard
