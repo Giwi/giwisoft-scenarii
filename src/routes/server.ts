@@ -576,9 +576,10 @@ export function createApp(): express.Application {
 
   app.use(cors());
 
-  // Per-request CSP nonce for the public status page's inline scripts
+  // Per-request CSP nonce for inline scripts (Angular critical-CSS loader, public status
+  // page). base64url avoids '/'/'+' so the value survives proxies and strict CSP parsers.
   app.use((req, res, next) => {
-    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+    res.locals.cspNonce = crypto.randomBytes(16).toString('base64url');
     next();
   });
 
@@ -678,13 +679,17 @@ export function createApp(): express.Application {
   });
 
   if (frontendBuilt) {
-    app.use(express.static(frontendDir));
+    // index: false keeps express.static from serving the raw index.html for '/': every
+    // HTML shell must go through the nonce-stamping middleware below instead.
+    app.use(express.static(frontendDir, { index: false }));
     // index.html embeds an inline script (Angular critical-CSS loader). CSP blocks any inline
     // script without a nonce, so stamp the per-request nonce onto every inline <script> tag
-    // before serving. External scripts stay covered by 'self'.
+    // before serving. External scripts stay covered by 'self'. The HTML shell is never cached,
+    // otherwise a browser could replay a stale nonce against a fresh CSP header.
     const spaIndex = fs.readFileSync(path.join(frontendDir, 'index.html'), 'utf-8');
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+        res.set('Cache-Control', 'no-store');
         res.type('html');
         res.send(spaIndex.replace(/<script(?![^>]*\bsrc=)(?![^>]*\bnonce=)/g, `<script nonce="${res.locals.cspNonce as string}"`));
       } else {

@@ -165,6 +165,10 @@ describe('Profile', () => {
     assert.strictEqual(body.color_scheme, 'dark');
     // An email gives the profile a Gravatar default.
     assert.match(String(body.avatar_url), /^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}/);
+    // The session status must reflect the change immediately (navbar theme + language),
+    // not fall back to the stale value cached at login.
+    const me = await req('/api/auth/me', { headers: { Cookie: cookie } });
+    assert.strictEqual((await me.json() as { color_scheme: string }).color_scheme, 'dark');
   });
 
   it('rejects a malformed email and accepts clearing it', async () => {

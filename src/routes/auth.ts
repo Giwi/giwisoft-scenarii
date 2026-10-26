@@ -85,6 +85,17 @@ export function requestLang(req: express.Request): Lang {
   return langFromAcceptLanguage(req.headers['accept-language']);
 }
 
+// Updates the cached language/colour scheme on every in-memory session for a user, so a
+// profile change takes effect on the next request without re-login.
+export function refreshSessionPreferences(username: string, lang: Lang, colorScheme: ColorScheme): void {
+  for (const session of sessions.values()) {
+    if (session.username === username) {
+      session.lang = lang;
+      session.color_scheme = colorScheme;
+    }
+  }
+}
+
 // Sets the session cookie and returns its value. Caches the role, language and colour
 // scheme in memory so middleware never needs a synchronous database round-trip.
 async function startSession(res: express.Response, username: string, provider: AuthProvider): Promise<void> {
@@ -409,13 +420,22 @@ export async function handleAuthMe(req: express.Request, res: express.Response):
     return;
   }
   const session = getSession(req);
+  let lang: Lang = session?.lang ?? requestLang(req);
+  let colorScheme: ColorScheme = session?.color_scheme ?? 'light';
+  if (session) {
+    // Read the fresh profile so a theme/language change saved moments ago shows up here
+    // (the session cache is only a fast path for requestLang; it can lag the database).
+    const profile = await getProfile(session.username);
+    lang = profile.lang;
+    colorScheme = profile.color_scheme;
+  }
   res.json({
     authenticated: !!session,
     username: session?.username ?? null,
     role: session ? session.role : null,
     provider,
-    lang: session?.lang ?? requestLang(req),
-    color_scheme: session?.color_scheme ?? 'light',
+    lang,
+    color_scheme: colorScheme,
     avatar_url: session ? await avatarUrlFor(session.username) : null,
   });
 }

@@ -7,7 +7,7 @@ import {
   findUserByIdentifier,
 } from '../config/users';
 import { avatarUrlFor, decodeDataUrl, gravatarUrl, isOversizedDataUrl, isValidEmail } from '../config/avatar';
-import { requestLang, sessionUsername } from './auth';
+import { requestLang, sessionUsername, refreshSessionPreferences } from './auth';
 import { generateRecoveryCodes, generateTotpSecret, totpUri, verifyTotp } from '../utils/totp';
 import { sendEmailMessage } from '../notifications/email-client';
 import { getSettings } from '../config/settings';
@@ -81,6 +81,9 @@ export async function handleUpdateProfile(req: express.Request, res: express.Res
   if (body.lang !== undefined) patch.lang = normalizeLang(body.lang);
 
   const profile = await setProfile(username, patch);
+  // Keep the in-memory session's cached language/colour scheme in sync so server-rendered
+  // messages use the new language on the next request.
+  refreshSessionPreferences(username, profile.lang, profile.color_scheme);
   logger.info({ username }, 'Profile updated');
   res.json({
     status: 'updated',
