@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
-import { loadScenarioFile } from './config/parser';
+import { loadScenarioFile, resolveIncludes } from './config/parser';
 import { runScenario, RunOptions } from './runner/runner';
 import { scheduleScenario, stopAll, listScheduled, scheduleReport, watchScenarios } from './runner/scheduler';
 import { initStorage, closeStorage, isStorageReady } from './config/storage';
@@ -166,18 +166,80 @@ program
     process.on('SIGTERM', () => shutdown(server));
   });
 
-// Validate command: checks YAML syntax without executing.
+// Validate command: checks YAML syntax and schema without executing.
+interface ValidateResult {
+  file: string;
+  name?: string;
+  steps?: number;
+  valid: boolean;
+  error?: string;
+}
+
 program
   .command('validate')
   .description('Validate a scenario YAML file without running it')
-  .argument('<file>', 'Path to scenario YAML file')
-  .action((file: string) => {
-    try {
-      const scenario = loadScenarioFile(file);
-      logger.info({ name: scenario.name, steps: scenario.steps.length, schedule: scenario.schedule || 'none' }, 'Scenario is valid');
-    } catch (err: unknown) {
-      logger.error({ err: err instanceof Error ? err.message : err }, 'Scenario validation failed');
-      process.exit(1);
+  .argument('[file]', 'Path to a scenario YAML file')
+  .option('--all', 'Validate every .yml/.yaml file in the scenarios directory')
+  .option('--scenarios-dir <path>', 'Directory containing YAML scenario files', './scenarios')
+  .option('--json', 'Output results as JSON')
+  .action((file: string | undefined, options: { all?: boolean; scenariosDir: string; json?: boolean }) => {
+    const emit = (results: ValidateResult[]): void => {
+      if (options.json) {
+        process.stdout.write(JSON.stringify(results, null, 2) + '\n');
+        return;
+      }
+      for (const result of results) {
+        if (result.valid) {
+          logger.info({ file: result.file, name: result.name, steps: result.steps }, 'Scenario is valid');
+        } else {
+          logger.error({ file: result.file, err: result.error }, 'Scenario validation failed');
+        }
+      }
+    };
+
+    if (!file && !options.all) {
+      emit([{ file: '', valid: false, error: 'Provide a scenario file or use --all' }]);
+      process.exitCode = 1;
+      return;
+    }
+
+    const scenariosDir = path.resolve(options.scenariosDir);
+    let files: string[];
+
+    if (options.all) {
+      try {
+        files = fs.readdirSync(scenariosDir)
+          .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'))
+          .sort()
+          .map(f => path.join(scenariosDir, f));
+      } catch {
+        emit([{ file: scenariosDir, valid: false, error: `Scenarios directory not found: ${scenariosDir}` }]);
+        process.exitCode = 1;
+        return;
+      }
+      if (files.length === 0) {
+        emit([{ file: scenariosDir, valid: false, error: 'No .yml or .yaml files found' }]);
+        process.exitCode = 1;
+        return;
+      }
+    } else {
+      files = [path.resolve(file!)];
+    }
+
+    const results = files.map((filePath): ValidateResult => {
+      try {
+        const scenario = loadScenarioFile(filePath);
+        // Resolving includes also validates every referenced scenario file.
+        const steps = resolveIncludes(scenario, options.all ? scenariosDir : path.dirname(filePath));
+        return { file: filePath, name: scenario.name, steps: steps.length, valid: true };
+      } catch (err: unknown) {
+        return { file: filePath, valid: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    });
+
+    emit(results);
+    if (results.some(result => !result.valid)) {
+      process.exitCode = 1;
     }
   });
 

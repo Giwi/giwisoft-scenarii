@@ -225,3 +225,87 @@ steps:
   });
 });
 
+describe('scenario validation', () => {
+  const steps = 'steps:\n  - action: http.get\n    url: /\n';
+
+  it('rejects an unknown scenario field and suggests the closest key', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nschedul: "* * * * *"\n${steps}`),
+      /Unknown field "schedul" in scenario \(did you mean "schedule"\?\)/,
+    );
+  });
+
+  it('rejects an unknown step field', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    retries: 3\n`),
+      /Unknown field "retries" in step 0/,
+    );
+  });
+
+  it('rejects an unknown expect field and suggests the closest key', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - name: Login\n    action: http.get\n    url: /\n    expect:\n      status_code: 200\n`),
+      /Unknown field "status_code" in expect in step "Login" \(did you mean "status"\?\)/,
+    );
+  });
+
+  it('rejects browser expect keys on HTTP steps', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      has_text: hello\n`),
+      /Unknown field "has_text" in expect/,
+    );
+  });
+
+  it('requires url on HTTP steps', () => {
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: http.get\n'),
+      /step 0 \(http.get\) requires a "url" field/,
+    );
+  });
+
+  it('requires selector and value for browser.fill', () => {
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.fill\n    selector: "#a"\n'),
+      /requires a "value" field/,
+    );
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.fill\n    value: hello\n'),
+      /requires a "selector" field/,
+    );
+  });
+
+  it('allows an empty browser value', () => {
+    const s = parseScenario('name: x\nsteps:\n  - action: browser.fill\n    selector: "#a"\n    value: ""\n');
+    assert.strictEqual((s.steps[0] as BrowserStep).value, '');
+  });
+
+  it('rejects unknown action variants', () => {
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: http.head\n    url: /\n'),
+      /Unknown action type "http\.head"/,
+    );
+  });
+
+  it('rejects an invalid cron expression', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nschedule: "not a cron"\n${steps}`),
+      /not a valid cron expression/,
+    );
+  });
+
+  it('rejects malformed time windows', () => {
+    assert.throws(
+      () => parseScenario(`name: x\ntime_windows:\n  - start: "25:00"\n    end: "17:00"\n${steps}`),
+      /time_windows\[0\]\.start must be a time of day/,
+    );
+  });
+
+  it('rejects unknown body schema types', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: objct\n`),
+      /unknown type "objct"/,
+    );
+  });
+});
+
+

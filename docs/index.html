@@ -906,8 +906,9 @@ notifications:
                   <pre id="code-cli"><code><span class="tok-comment"># Start API server and dashboard</span>
 node dist/index.js server <span class="tok-comment">-p 3000 --db db/scenarii.db --scenarios-dir ./scenarios</span>
 
-<span class="tok-comment"># Validate without running</span>
+<span class="tok-comment"># Validate without running (checks schema, unknown fields, cron, required fields)</span>
 node dist/index.js validate scenarios/example.yml
+node dist/index.js validate --all --json
 
 <span class="tok-comment"># Run immediately (exits 1 on failure; add --fail-on none to always exit 0)</span>
 node dist/index.js trigger scenarios/example.yml

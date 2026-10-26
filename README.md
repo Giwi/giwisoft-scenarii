@@ -31,7 +31,7 @@ Open http://localhost:3000 to see the dashboard. Each scenario also has a sharea
 | Command | Description |
 |---------|-------------|
 | `server` | Start API server + Dashboard |
-| `validate <file>` | Validate a scenario YAML without running it |
+| `validate [file]` | Validate a scenario YAML: schema, unknown fields (with suggestions), cron, and action-specific required fields. `--all` checks the scenarios directory; `--json` prints machine-readable results |
 | `trigger <file>` | Run a scenario immediately. Exits 1 when the run fails; pass `--fail-on none` to always exit 0 |
 | `status` | Show scheduled scenarios and storage status |
 | `user <action>` | Manage dashboard users: `list`, `add`, `passwd`, `role`, `del` (also available in the UI at `/users`, admins only) |
@@ -39,6 +39,7 @@ Open http://localhost:3000 to see the dashboard. Each scenario also has a sharea
 
 ```bash
 node dist/index.js validate scenarios/lusk.yml
+node dist/index.js validate --all --json   # check every scenario, machine-readable
 node dist/index.js trigger scenarios/lusk.yml
 node dist/index.js trigger scenarios/lusk.yml --fail-on none   # always exit 0
 node dist/index.js status
