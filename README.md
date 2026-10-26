@@ -579,18 +579,6 @@ make build-arm64  # linux/arm64
 make build-multi  # multi-arch manifest
 ```
 
-## CI/CD
-
-On push to `main`, GitHub Actions:
-
-1. Installs dependencies and runs `tsc --noEmit`
-2. Executes unit tests (`npm test`)
-3. Builds the frontend and backend
-4. Builds the Docker image (`linux/amd64`, `linux/arm64`) with a smoke test and vulnerability scan
-5. Publishes the multi-arch Docker image to **GitHub Container Registry** (tagged `latest` + git SHA)
-
-The workflow is in `.github/workflows/ci.yml`. Dependabot is configured for weekly npm and GitHub Actions updates.
-
 ## Testing
 
 ```bash
