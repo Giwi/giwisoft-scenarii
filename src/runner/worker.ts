@@ -118,6 +118,9 @@ async function runScenarioInternal(scenario: Scenario, options: RunOptions): Pro
 
         const stepMetrics = await executeStep(step, page, scenario.base_url, vars, step.timeout, abortController.signal, scenario.headers);
         metrics.steps.push(stepMetrics);
+        if (stepMetrics.attempts !== undefined && stepMetrics.attempts > 1) {
+          metrics.flaky = true;
+        }
         stepResults.set(step.name, stepMetrics.success);
 
         send({

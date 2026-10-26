@@ -341,3 +341,73 @@ describe('executeHttpStep shared headers', () => {
     }
   });
 });
+
+describe('executeHttpStep retries', () => {
+  it('retries on expectation failure and records attempts', async () => {
+    let calls = 0;
+    const fetchMock = mock.method(globalThis, 'fetch', async () => {
+      calls++;
+      if (calls < 3) return new Response('fail', { status: 500 });
+      return new Response('{}', { status: 200 });
+    });
+    try {
+      const step = { name: 'Flaky', action: 'http.get', url: '/api', retries: 2, retry_delay: 0, expect: { status: 200 } } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', {});
+
+      assert.strictEqual(metrics.success, true);
+      assert.strictEqual(metrics.attempts, 3);
+      assert.strictEqual(calls, 3);
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('records a single attempt on first-try success', async () => {
+    const fetchMock = mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 200 }));
+    try {
+      const step = { name: 'Ok', action: 'http.get', url: '/api', retries: 5 } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', {});
+
+      assert.strictEqual(metrics.success, true);
+      assert.strictEqual(metrics.attempts, 1);
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('does not retry by default', async () => {
+    let calls = 0;
+    const fetchMock = mock.method(globalThis, 'fetch', async () => {
+      calls++;
+      return new Response('fail', { status: 500 });
+    });
+    try {
+      const step = { name: 'NoRetry', action: 'http.get', url: '/api', expect: { status: 200 } } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', {});
+
+      assert.strictEqual(metrics.success, false);
+      assert.strictEqual(metrics.attempts, 1);
+      assert.strictEqual(calls, 1);
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('does not retry on unresolved variables', async () => {
+    let calls = 0;
+    const fetchMock = mock.method(globalThis, 'fetch', async () => {
+      calls++;
+      return new Response('{}', { status: 200 });
+    });
+    try {
+      const step = { name: 'BadVar', action: 'http.get', url: '/{{typo}}', retries: 3 } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', {});
+
+      assert.strictEqual(metrics.success, false);
+      assert.strictEqual(metrics.attempts, 1);
+      assert.strictEqual(calls, 0);
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+});

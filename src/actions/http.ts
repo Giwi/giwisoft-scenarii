@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { HttpStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars, resolveJsonPath, mergeHeaders } from '../utils/helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath, mergeHeaders, UnresolvedVariableError } from '../utils/helpers';
+import { DEFAULT_HTTP_RETRIES, DEFAULT_RETRY_DELAY } from '../utils/constants';
 
 interface FetchResponse {
   status: number;
@@ -233,6 +234,7 @@ function interpolateBody(value: unknown, vars: Record<string, string>, stepName:
 }
 
 // Executes a single HTTP step (GET/POST/PUT/PATCH/DELETE) and validates expectations.
+// Retries on failure up to step.retries (default 0) with step.retry_delay between attempts.
 export async function executeHttpStep(
   step: HttpStep,
   base_url: string | undefined,
@@ -240,60 +242,75 @@ export async function executeHttpStep(
   scenarioHeaders?: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<StepMetrics> {
-  const start = Date.now();
-  const stepMetrics: StepMetrics = {
-    step_name: step.name,
-    action: step.action,
-    success: false,
-    response_time_ms: 0,
-    timestamp: new Date(),
-  };
+  const maxRetries = step.retries ?? DEFAULT_HTTP_RETRIES;
+  const retryDelay = step.retry_delay ?? DEFAULT_RETRY_DELAY;
 
-  try {
-    const resolvedBase = base_url === undefined ? undefined : interpolateVars(base_url, vars, step.name);
-    const resolvedUrl = resolveUrl(resolvedBase, interpolateVars(step.url, vars, step.name));
-    const method = step.action.split('.')[1].toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-    const headerSource = mergeHeaders(scenarioHeaders, step.headers);
-    let headers = headerSource
-      ? Object.fromEntries(
-          Object.entries(headerSource).map(([k, v]) => [k, interpolateVars(v, vars, step.name)])
-        )
-      : undefined;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const start = Date.now();
+    const stepMetrics: StepMetrics = {
+      step_name: step.name,
+      action: step.action,
+      success: false,
+      response_time_ms: 0,
+      attempts: attempt + 1,
+      timestamp: new Date(),
+    };
 
-    let body: string | undefined;
-    if (step.body && typeof step.body === 'object') {
-      body = JSON.stringify(interpolateBody(step.body, vars, step.name));
-      // Object bodies are serialised as JSON; supply the header unless the user set one.
-      if (!headers || !Object.keys(headers).some(k => k.toLowerCase() === 'content-type')) {
-        headers = { ...(headers ?? {}), 'Content-Type': 'application/json' };
+    try {
+      const resolvedBase = base_url === undefined ? undefined : interpolateVars(base_url, vars, step.name);
+      const resolvedUrl = resolveUrl(resolvedBase, interpolateVars(step.url, vars, step.name));
+      const method = step.action.split('.')[1].toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+      const headerSource = mergeHeaders(scenarioHeaders, step.headers);
+      let headers = headerSource
+        ? Object.fromEntries(
+            Object.entries(headerSource).map(([k, v]) => [k, interpolateVars(v, vars, step.name)])
+          )
+        : undefined;
+
+      let body: string | undefined;
+      if (step.body && typeof step.body === 'object') {
+        body = JSON.stringify(interpolateBody(step.body, vars, step.name));
+        // Object bodies are serialised as JSON; supply the header unless the user set one.
+        if (!headers || !Object.keys(headers).some(k => k.toLowerCase() === 'content-type')) {
+          headers = { ...(headers ?? {}), 'Content-Type': 'application/json' };
+        }
+      } else if (step.body) {
+        body = interpolateVars(String(step.body), vars, step.name);
       }
-    } else if (step.body) {
-      body = interpolateVars(String(step.body), vars, step.name);
-    }
 
-    const response = await doFetch(resolvedUrl, method, headers, body, signal);
+      const response = await doFetch(resolvedUrl, method, headers, body, signal);
 
-    const responseBody = await response.text();
-    // Measure the full request, including body transfer, not just time to first byte.
-    const elapsed = Date.now() - start;
+      const responseBody = await response.text();
+      // Measure the full request, including body transfer, not just time to first byte.
+      const elapsed = Date.now() - start;
 
-    stepMetrics.status_code = response.status;
-    stepMetrics.response_time_ms = elapsed;
+      stepMetrics.status_code = response.status;
+      stepMetrics.response_time_ms = elapsed;
 
-    const error = checkExpectations(step, response, responseBody, elapsed);
-    if (error) {
+      const error = checkExpectations(step, response, responseBody, elapsed);
+      if (error) {
+        stepMetrics.success = false;
+        stepMetrics.error = error;
+      } else {
+        stepMetrics.success = true;
+      }
+
+      extractVariables(step, responseBody, vars);
+    } catch (err: unknown) {
       stepMetrics.success = false;
-      stepMetrics.error = error;
-    } else {
-      stepMetrics.success = true;
+      stepMetrics.error = err instanceof Error ? err.message : String(err);
+      stepMetrics.response_time_ms = Date.now() - start;
+      // Missing variables will not resolve on retry.
+      if (err instanceof UnresolvedVariableError) return stepMetrics;
     }
 
-    extractVariables(step, responseBody, vars);
-  } catch (err: unknown) {
-    stepMetrics.success = false;
-    stepMetrics.error = err instanceof Error ? err.message : String(err);
-    stepMetrics.response_time_ms = Date.now() - start;
+    // Return on success or final attempt — otherwise retry
+    if (stepMetrics.success || attempt === maxRetries) {
+      return stepMetrics;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
   }
 
-  return stepMetrics;
+  throw new Error('Retry exhausted');
 }

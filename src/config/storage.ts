@@ -38,6 +38,7 @@ export function initStorage(dbPath?: string): void {
       finished_at TEXT NOT NULL,
       duration_ms INTEGER NOT NULL,
       success INTEGER NOT NULL,
+      flaky INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
 
@@ -49,6 +50,7 @@ export function initStorage(dbPath?: string): void {
       success INTEGER NOT NULL,
       status_code INTEGER,
       response_time_ms INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 1,
       error TEXT,
       timestamp TEXT NOT NULL,
       FOREIGN KEY (run_id) REFERENCES scenario_runs(id)
@@ -63,6 +65,16 @@ export function initStorage(dbPath?: string): void {
     CREATE INDEX IF NOT EXISTS idx_runs_created ON scenario_runs(created_at);
     CREATE INDEX IF NOT EXISTS idx_step_run ON step_metrics(run_id);
   `);
+
+  // Add columns introduced after the initial schema to existing databases.
+  const runColumns = (db.prepare('PRAGMA table_info(scenario_runs)').all() as { name: string }[]).map(c => c.name);
+  if (!runColumns.includes('flaky')) {
+    db.exec('ALTER TABLE scenario_runs ADD COLUMN flaky INTEGER NOT NULL DEFAULT 0');
+  }
+  const stepColumns = (db.prepare('PRAGMA table_info(step_metrics)').all() as { name: string }[]).map(c => c.name);
+  if (!stepColumns.includes('attempts')) {
+    db.exec('ALTER TABLE step_metrics ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1');
+  }
 }
 
 // Persists a full scenario run (with all step metrics) inside a single transaction.
@@ -70,13 +82,13 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
   if (!db) throw new Error('Database not initialized');
 
   const insertRun = db.prepare(`
-    INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success, flaky, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
   const insertStep = db.prepare(`
-    INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, error, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const transaction = db.transaction(() => {
@@ -87,6 +99,7 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
       metrics.finished_at.toISOString(),
       metrics.duration_ms,
       metrics.success ? 1 : 0,
+      metrics.flaky ? 1 : 0,
       now
     );
     const runId = result.lastInsertRowid as number;
@@ -99,6 +112,7 @@ export function storeMetrics(metrics: ScenarioMetrics): void {
         step.success ? 1 : 0,
         step.status_code ?? null,
         step.response_time_ms,
+        step.attempts ?? 1,
         step.error ?? null,
         step.timestamp.toISOString()
       );
@@ -174,6 +188,7 @@ export function getScenarioHistory(
       r.finished_at,
       r.duration_ms,
       r.success,
+      r.flaky,
       r.created_at,
       s.id AS step_id,
       s.step_name,
@@ -181,6 +196,7 @@ export function getScenarioHistory(
       s.success AS step_success,
       s.status_code,
       s.response_time_ms,
+      s.attempts,
       s.error,
       s.timestamp
     FROM (
@@ -198,6 +214,7 @@ export function getScenarioHistory(
     finished_at: string;
     duration_ms: number;
     success: number;
+    flaky: number;
     created_at: string;
     step_id: number | null;
     step_name: string | null;
@@ -205,6 +222,7 @@ export function getScenarioHistory(
     step_success: number | null;
     status_code: number | null;
     response_time_ms: number | null;
+    attempts: number | null;
     error: string | null;
     timestamp: string | null;
   }>;
@@ -219,6 +237,7 @@ export function getScenarioHistory(
         finished_at: new Date(row.finished_at),
         duration_ms: row.duration_ms,
         success: row.success === 1,
+        flaky: row.flaky === 1,
         steps: [],
       });
     }
@@ -230,6 +249,7 @@ export function getScenarioHistory(
         success: row.step_success === 1,
         status_code: row.status_code ?? undefined,
         response_time_ms: row.response_time_ms!,
+        attempts: row.attempts ?? undefined,
         error: row.error ?? undefined,
         timestamp: new Date(row.timestamp!),
       });

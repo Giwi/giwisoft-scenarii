@@ -8,7 +8,7 @@ const SCENARIO_KEYS = [
   'ignoreHTTPSErrors', 'timeout', 'tags', 'depends_on', 'group', 'time_windows', 'steps', 'alert',
 ] as const;
 
-const STEP_COMMON_KEYS = ['name', 'action', 'timeout', 'condition'] as const;
+const STEP_COMMON_KEYS = ['name', 'action', 'timeout', 'condition', 'retries', 'retry_delay'] as const;
 
 const HTTP_KEYS = [...STEP_COMMON_KEYS, 'url', 'headers', 'body', 'expect', 'variables'] as const;
 const BROWSER_KEYS = [...STEP_COMMON_KEYS, 'url', 'selector', 'value', 'script', 'expect', 'variables'] as const;
@@ -256,6 +256,8 @@ function validateStep(value: unknown, index: number): void {
 
   if (value.name !== undefined) assertString(value.name, `${label}.name`);
   if (value.timeout !== undefined) assertNumber(value.timeout, `${label}.timeout`, 1);
+  if (value.retries !== undefined) assertInteger(value.retries, `${label}.retries`, 0);
+  if (value.retry_delay !== undefined) assertNumber(value.retry_delay, `${label}.retry_delay`, 0);
   if (value.condition !== undefined) validateCondition(value.condition, label);
   if (value.variables !== undefined) assertStringRecord(value.variables, `${label}.variables`);
   if (value.headers !== undefined && isHttp) assertStringRecord(value.headers, `${label}.headers`);

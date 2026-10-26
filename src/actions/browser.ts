@@ -2,10 +2,7 @@ import fs from 'fs';
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
 import { resolveUrl, interpolateVars, resolveJsonPath, UnresolvedVariableError } from '../utils/helpers';
-import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../utils/constants';
-
-const BROWSER_RETRIES = 2;
-const RETRY_DELAYS = [1000, 2000];
+import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD, DEFAULT_BROWSER_RETRIES, DEFAULT_RETRY_DELAY } from '../utils/constants';
 
 // Validates browser-level expectations against the current page state.
 // Returns an error string on failure, or null if all expectations pass.
@@ -61,7 +58,8 @@ export async function executeBrowserStep(
   signal?: AbortSignal,
 ): Promise<StepMetrics> {
   const noRetry = step.action === 'browser.evaluate' || step.action === 'browser.screenshot' || step.action === 'browser.screenshot_compare';
-  const maxRetries = noRetry ? 0 : BROWSER_RETRIES;
+  const maxRetries = noRetry ? 0 : (step.retries ?? DEFAULT_BROWSER_RETRIES);
+  const retryDelay = step.retry_delay ?? DEFAULT_RETRY_DELAY;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const start = Date.now();
@@ -70,6 +68,7 @@ export async function executeBrowserStep(
       action: step.action,
       success: false,
       response_time_ms: 0,
+      attempts: attempt + 1,
       timestamp: new Date(),
     };
 
@@ -239,7 +238,7 @@ export async function executeBrowserStep(
       return stepMetrics;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]));
+    await new Promise((resolve) => setTimeout(resolve, retryDelay));
   }
 
   throw new Error('Retry exhausted');

@@ -23,6 +23,10 @@ export interface HttpStep {
   headers?: Record<string, string>;
   body?: unknown;
   timeout?: number;
+  // Number of retries after the first attempt. Defaults to 0 (no retries).
+  retries?: number;
+  // Delay in milliseconds before each retry. Defaults to 1000.
+  retry_delay?: number;
   condition?: StepCondition;
   expect?: HttpExpect;
   variables?: Record<string, string>;
@@ -56,6 +60,10 @@ export interface BrowserStep {
   selector?: string;
   value?: string;
   timeout?: number;
+  // Number of retries after the first attempt. Defaults to 2.
+  retries?: number;
+  // Delay in milliseconds before each retry. Defaults to 1000.
+  retry_delay?: number;
   script?: string;
   expect?: BrowserExpect;
   condition?: StepCondition;
@@ -118,6 +126,8 @@ export interface StepMetrics {
   success: boolean;
   status_code?: number;
   response_time_ms: number;
+  // Number of attempts made (1 when the step passed or failed on the first try).
+  attempts?: number;
   error?: string;
   timestamp: Date;
 }
@@ -131,6 +141,8 @@ export interface ScenarioMetrics {
   success: boolean;
   steps: StepMetrics[];
   consecutive_failures?: number;
+  // True when at least one step needed a retry to complete.
+  flaky?: boolean;
 }
 
 // Real-time progress update sent via WebSocket during a run

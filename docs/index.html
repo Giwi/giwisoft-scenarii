@@ -824,6 +824,8 @@ notifications:
               <div class="ref-body">
                 <p>Every step needs a <code>name</code> and an <code>action</code>. HTTP steps use native <code>fetch</code>. No browser or Playwright required.</p>
 
+                <p>HTTP steps do not retry by default. Set <code>retries</code> to retry a failed request or expectation, and <code>retry_delay</code> (ms) to control the wait between attempts.</p>
+
                 <h4>Actions</h4>
                 <div class="table-wrap">
                   <table>
@@ -875,7 +877,7 @@ notifications:
                 <span class="ref-plus" aria-hidden="true"></span>
               </summary>
               <div class="ref-body">
-                <p>Browser steps run through a headless Lightpanda instance. Failed steps retry twice with exponential backoff (1s, 2s).</p>
+                <p>Browser steps run through a headless Lightpanda instance. Failed steps retry twice, waiting <code>retry_delay</code> ms (default 1000) between attempts. Override per step with <code>retries</code> and <code>retry_delay</code>. <code>browser.evaluate</code>, <code>browser.screenshot</code>, and <code>browser.screenshot_compare</code> never retry.</p>
                 <div class="table-wrap">
                   <table>
                     <tr><th>Action</th><th>Fields</th><th>Description</th></tr>

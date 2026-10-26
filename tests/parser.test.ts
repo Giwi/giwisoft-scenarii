@@ -272,8 +272,41 @@ describe('scenario validation', () => {
 
   it('rejects an unknown step field', () => {
     assert.throws(
-      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    retries: 3\n`),
-      /Unknown field "retries" in step 0/,
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    retrys: 3\n`),
+      /Unknown field "retrys" in step 0/,
+    );
+  });
+
+  it('parses retries and retry_delay on HTTP and browser steps', () => {
+    const s = parseScenario(`name: x
+steps:
+  - action: http.get
+    url: /
+    retries: 3
+    retry_delay: 250
+  - action: browser.click
+    selector: "#go"
+    retries: 1
+    retry_delay: 500
+`);
+    assert.strictEqual((s.steps[0] as HttpStep).retries, 3);
+    assert.strictEqual((s.steps[0] as HttpStep).retry_delay, 250);
+    assert.strictEqual((s.steps[1] as BrowserStep).retries, 1);
+    assert.strictEqual((s.steps[1] as BrowserStep).retry_delay, 500);
+  });
+
+  it('rejects non-integer retries and non-numeric retry_delay', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    retries: 1.5\n`),
+      /retries must be an integer/,
+    );
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    retries: -1\n`),
+      /retries must be at least 0/,
+    );
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    retry_delay: "1s"\n`),
+      /retry_delay must be a number/,
     );
   });
 

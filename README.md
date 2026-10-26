@@ -140,9 +140,11 @@ HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed
 
 | Action | Fields |
 |--------|--------|
-| `http.get` / `http.post` / `http.put` / `http.patch` / `http.delete` | `url`, `headers`, `body`, `expect` |
+| `http.get` / `http.post` / `http.put` / `http.patch` / `http.delete` | `url`, `headers`, `body`, `expect`, `retries`, `retry_delay` |
 
 **Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `header_contains` (format `"HeaderName: value"`), `header_matches` (format `"HeaderName: regex"`), `json_path`, `json_value`, `response_time_under`, `body_schema` (JSON body schema: `type` (`object`, `array`, `string`, `number`, `boolean`, `null`), `properties` + `required` for objects, `items` for arrays, `enum`, `pattern`, `min`/`max` for numbers, and `nullable`)
+
+HTTP steps do not retry by default. Set `retries` to retry a failed request or expectation, and `retry_delay` (ms) to control the wait between attempts.
 
 ### Browser actions
 
@@ -160,7 +162,9 @@ HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed
 | `browser.screenshot_compare` | `value` (baseline path - creates baseline on first run, compares on subsequent) |
 | `browser.scroll` | `value` (pixels to scroll down), `selector` (scroll element into view) |
 
-Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s) on failure.
+Browser steps automatically retry up to 2 times on failure, waiting `retry_delay` ms (default 1000) between attempts. Override per step with `retries` and `retry_delay`. `browser.evaluate`, `browser.screenshot`, and `browser.screenshot_compare` never retry.
+
+A run is marked **flaky** when any step needed a retry to complete, and each step records its `attempts` count in metrics.
 
 ### Variables and secrets
 

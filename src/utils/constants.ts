@@ -12,6 +12,12 @@ export const DEFAULT_HISTORY_DAYS = 7;
 export const DEFAULT_PAGE_TIMEOUT = 30000;
 // Selector wait timeout in milliseconds
 export const DEFAULT_SELECTOR_TIMEOUT = 10000;
+// Default retries for HTTP steps (0: opt-in via per-step config)
+export const DEFAULT_HTTP_RETRIES = 0;
+// Default retries for browser steps
+export const DEFAULT_BROWSER_RETRIES = 2;
+// Default delay in milliseconds between retries
+export const DEFAULT_RETRY_DELAY = 1000;
 // Time to wait for a port to become reachable
 export const PORT_WAIT_TIMEOUT = 5000;
 
