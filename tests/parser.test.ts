@@ -306,6 +306,55 @@ describe('scenario validation', () => {
       /unknown type "objct"/,
     );
   });
+
+  it('rejects unsupported body schema keywords with a suggestion', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: number\n        minimum: 1\n`),
+      /Unknown field "minimum".*did you mean "min"/,
+    );
+  });
+
+  it('rejects body schema patterns that do not compile', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: string\n        pattern: "["\n`),
+      /pattern is not a valid regular expression/,
+    );
+  });
+
+  it('requires a string body schema type for patterns', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: number\n        pattern: "^\\\\d+$"\n`),
+      /pattern requires type "string"/,
+    );
+  });
+
+  it('rejects an empty body schema enum', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: string\n        enum: []\n`),
+      /enum must be a non-empty array/,
+    );
+  });
+
+  it('rejects non-numeric body schema bounds', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: number\n        min: "5"\n`),
+      /\.min must be a number/,
+    );
+  });
+
+  it('rejects body schema bounds where min exceeds max', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: number\n        min: 10\n        max: 1\n`),
+      /min must not be greater than/,
+    );
+  });
+
+  it('rejects a non-boolean body schema nullable', () => {
+    assert.throws(
+      () => parseScenario(`name: x\nsteps:\n  - action: http.get\n    url: /\n    expect:\n      body_schema:\n        type: string\n        nullable: "yes"\n`),
+      /nullable must be a boolean/,
+    );
+  });
 });
 
 

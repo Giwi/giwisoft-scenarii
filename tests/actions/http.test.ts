@@ -124,6 +124,48 @@ describe('checkExpectations', () => {
       assert.match(checkExpectations(schemaStep({ type: 'object', properties: { data: { type: 'null' } } }), makeResponse({ body: '{"data":1}' }), '{"data":1}', 0)!, /expected null/);
     });
 
+    it('rejects unknown schema types instead of passing', () => {
+      assert.match(checkExpectations(schemaStep({ type: 'objct' }), makeResponse({ body: '{}' }), '{}', 0)!, /unknown schema type "objct"/);
+    });
+
+    it('validates enum values', () => {
+      const schema = { type: 'string', enum: ['admin', 'editor'] };
+      assert.strictEqual(checkExpectations(schemaStep(schema), makeResponse({ body: '"admin"' }), '"admin"', 0), null);
+      assert.match(
+        checkExpectations(schemaStep(schema), makeResponse({ body: '"guest"' }), '"guest"', 0)!,
+        /expected one of "admin", "editor", got "guest"/,
+      );
+    });
+
+    it('validates string patterns', () => {
+      const schema = { type: 'string', pattern: '^[a-z]+$' };
+      assert.strictEqual(checkExpectations(schemaStep(schema), makeResponse({ body: '"abc"' }), '"abc"', 0), null);
+      assert.match(
+        checkExpectations(schemaStep(schema), makeResponse({ body: '"abc1"' }), '"abc1"', 0)!,
+        /does not match pattern/,
+      );
+      assert.match(
+        checkExpectations(schemaStep({ type: 'string', pattern: '[' }), makeResponse({ body: '"abc"' }), '"abc"', 0)!,
+        /invalid pattern/,
+      );
+    });
+
+    it('validates numeric min and max', () => {
+      const schema = { type: 'number', min: 1, max: 10 };
+      assert.strictEqual(checkExpectations(schemaStep(schema), makeResponse({ body: '5' }), '5', 0), null);
+      assert.match(checkExpectations(schemaStep(schema), makeResponse({ body: '0' }), '0', 0)!, /expected at least 1/);
+      assert.match(checkExpectations(schemaStep(schema), makeResponse({ body: '11' }), '11', 0)!, /expected at most 10/);
+    });
+
+    it('allows null only when nullable is true', () => {
+      const nullable = { type: 'string', nullable: true };
+      assert.strictEqual(checkExpectations(schemaStep(nullable), makeResponse({ body: 'null' }), 'null', 0), null);
+      assert.match(
+        checkExpectations(schemaStep({ type: 'string' }), makeResponse({ body: 'null' }), 'null', 0)!,
+        /expected string, got null/,
+      );
+    });
+
     it('returns error on non-JSON body', () => {
       assert.match(checkExpectations(schemaStep({ type: 'object' }), makeResponse({ body: 'not-json' }), 'not-json', 0)!, /Failed to parse JSON/);
     });

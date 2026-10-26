@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { HttpStep, StepMetrics } from '../types';
 import { resolveUrl, interpolateVars, resolveJsonPath } from '../utils/helpers';
 
@@ -101,16 +102,35 @@ export function checkExpectations(step: HttpStep, response: FetchResponse, body:
   return null;
 }
 
-// Simple recursive schema validator for body_schema.
-// Supports: { type: "object", properties: {...}, required: [...] }
-//           { type: "array", items: {...} }
-//           { type: "string" | "number" | "boolean" }
+const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'null'] as const;
+
+function describeType(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function formatValue(value: unknown): string {
+  const json = JSON.stringify(value);
+  return json === undefined ? String(value) : json;
+}
+
+// Recursive schema validator for body_schema.
+// Supports: type, properties/required, items, enum, pattern, min/max, nullable.
 function validateSchema(value: unknown, schema: Record<string, unknown>, path: string): string | null {
+  const label = path || 'root';
   const type = schema.type as string | undefined;
+
+  if (type !== undefined && !(SCHEMA_TYPES as readonly string[]).includes(type)) {
+    return `${label}: unknown schema type "${type}"`;
+  }
+
+  // null is allowed before the type check when the schema opts in.
+  if (value === null && schema.nullable === true) return null;
 
   if (type === 'object') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return `${path || 'root'}: expected object, got ${typeof value}`;
+      return `${label}: expected object, got ${describeType(value)}`;
     }
     const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
     if (properties) {
@@ -126,13 +146,13 @@ function validateSchema(value: unknown, schema: Record<string, unknown>, path: s
     if (required) {
       for (const key of required) {
         if (!(key in (value as Record<string, unknown>))) {
-          return `${path || 'root'}: missing required field "${key}"`;
+          return `${label}: missing required field "${key}"`;
         }
       }
     }
   } else if (type === 'array') {
     if (!Array.isArray(value)) {
-      return `${path || 'root'}: expected array, got ${typeof value}`;
+      return `${label}: expected array, got ${describeType(value)}`;
     }
     const items = schema.items as Record<string, unknown> | undefined;
     if (items) {
@@ -142,16 +162,44 @@ function validateSchema(value: unknown, schema: Record<string, unknown>, path: s
       }
     }
   } else if (type === 'string') {
-    if (typeof value !== 'string') return `${path}: expected string, got ${typeof value}`;
+    if (typeof value !== 'string') return `${label}: expected string, got ${describeType(value)}`;
   } else if (type === 'number') {
-    if (typeof value !== 'number') return `${path}: expected number, got ${typeof value}`;
+    if (typeof value !== 'number') return `${label}: expected number, got ${describeType(value)}`;
   } else if (type === 'boolean') {
-    if (typeof value !== 'boolean') return `${path}: expected boolean, got ${typeof value}`;
+    if (typeof value !== 'boolean') return `${label}: expected boolean, got ${describeType(value)}`;
   } else if (type === 'null') {
-    if (value !== null) return `${path}: expected null`;
+    if (value !== null) return `${label}: expected null`;
   }
 
-  // When no type is specified or type is unknown, skip validation
+  if (Array.isArray(schema.enum) && !schema.enum.some(option => isDeepStrictEqual(option, value))) {
+    const options = schema.enum.map(formatValue).join(', ');
+    return `${label}: expected one of ${options}, got ${formatValue(value)}`;
+  }
+
+  if (schema.pattern !== undefined) {
+    if (typeof schema.pattern !== 'string') return `${label}: pattern must be a string`;
+    if (typeof value === 'string') {
+      let pattern: RegExp;
+      try {
+        pattern = new RegExp(schema.pattern);
+      } catch {
+        return `${label}: invalid pattern "${schema.pattern}"`;
+      }
+      if (!pattern.test(value)) {
+        return `${label}: value does not match pattern "${schema.pattern}"`;
+      }
+    }
+  }
+
+  if (typeof value === 'number') {
+    if (typeof schema.min === 'number' && value < schema.min) {
+      return `${label}: expected at least ${schema.min}, got ${value}`;
+    }
+    if (typeof schema.max === 'number' && value > schema.max) {
+      return `${label}: expected at most ${schema.max}, got ${value}`;
+    }
+  }
+
   return null;
 }
 

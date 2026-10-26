@@ -108,7 +108,7 @@ export class DocsComponent {
     { name: 'json_path', type: 'string', desc: 'Dot path into the JSON body, e.g. $.userId or $.data.items[0].id.' },
     { name: 'json_value', type: 'any', desc: 'Value json_path must equal. Compared together with json_path.' },
     { name: 'response_time_under', type: 'number', desc: 'Fail when the response is slower than this many ms.' },
-    { name: 'body_schema', type: 'object', desc: 'Expected JSON shape.' },
+    { name: 'body_schema', type: 'object', desc: 'Expected JSON shape. Supports type, properties/required, items, enum, pattern, min/max, and nullable.' },
   ];
 
   readonly browserExpects: DocField[] = [

@@ -843,6 +843,7 @@ notifications:
                     <tr><td><code>json_path: "$.user.id"</code></td><td>Extract a JSON path, optionally check <code>json_value</code>.</td></tr>
                     <tr><td><code>json_value: 42</code></td><td>Value at <code>json_path</code> must match.</td></tr>
                     <tr><td><code>response_time_under: 3000</code></td><td>Response time must be under the given milliseconds.</td></tr>
+                    <tr><td><code>body_schema: { type: object, required: [id] }</code></td><td>Validate the JSON body. Supports <code>type</code>, <code>properties</code>/<code>required</code>, <code>items</code>, <code>enum</code>, <code>pattern</code>, <code>min</code>/<code>max</code>, and <code>nullable</code>.</td></tr>
                   </table>
                 </div>
 

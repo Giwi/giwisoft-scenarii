@@ -29,7 +29,10 @@ const BROWSER_EXPECT_KEYS = ['has_text', 'not_has_text', 'url_contains', 'select
 const CONDITION_KEYS = ['if_step', 'if_status', 'if_success'] as const;
 const ALERT_KEYS = ['consecutive_failures'] as const;
 const TIME_WINDOW_KEYS = ['start', 'end', 'timezone'] as const;
-const SCHEMA_KEYS = ['type', 'properties', 'required', 'items', 'title', 'description'] as const;
+const SCHEMA_KEYS = [
+  'type', 'properties', 'required', 'items', 'enum', 'pattern', 'min', 'max', 'nullable',
+  'title', 'description',
+] as const;
 const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'boolean', 'null'] as const;
 
 const TIME_OF_DAY = /^(\d{1,2}):(\d{2})$/;
@@ -192,6 +195,37 @@ function validateBodySchema(value: unknown, where: string): void {
     }
   }
   if (value.items !== undefined) validateBodySchema(value.items, `${where}.items`);
+
+  if (value.enum !== undefined) {
+    if (!Array.isArray(value.enum) || value.enum.length === 0) {
+      throw new Error(`${where}.enum must be a non-empty array`);
+    }
+  }
+  if (value.pattern !== undefined) {
+    assertString(value.pattern, `${where}.pattern`);
+    try {
+      new RegExp(value.pattern as string);
+    } catch {
+      throw new Error(`${where}.pattern is not a valid regular expression`);
+    }
+    if (value.type !== undefined && value.type !== 'string') {
+      throw new Error(`${where}.pattern requires type "string"`);
+    }
+  }
+  if (value.min !== undefined) assertNumber(value.min, `${where}.min`);
+  if (value.max !== undefined) assertNumber(value.max, `${where}.max`);
+  if (
+    (value.min !== undefined || value.max !== undefined)
+    && value.type !== undefined
+    && value.type !== 'number'
+  ) {
+    throw new Error(`${where}.min/max require type "number"`);
+  }
+  if (typeof value.min === 'number' && typeof value.max === 'number' && value.min > value.max) {
+    throw new Error(`${where}.min must not be greater than ${where}.max`);
+  }
+  if (value.nullable !== undefined) assertBoolean(value.nullable, `${where}.nullable`);
+
   for (const key of ['title', 'description'] as const) {
     if (value[key] !== undefined) assertString(value[key], `${where}.${key}`, true);
   }

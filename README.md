@@ -136,7 +136,7 @@ HTTP-only scenarios use the native `fetch` API - no Playwright or browser needed
 |--------|--------|
 | `http.get` / `http.post` / `http.put` / `http.patch` / `http.delete` | `url`, `headers`, `body`, `expect` |
 
-**Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `header_contains` (format `"HeaderName: value"`), `header_matches` (format `"HeaderName: regex"`), `json_path`, `json_value`, `response_time_under`, `body_schema` (validate JSON body structure with a simple schema: `type` + `properties` + `required` for objects, `type` + `items` for arrays)
+**Expectations**: `status`, `status_in`, `body_contains`, `body_matches`, `header_contains` (format `"HeaderName: value"`), `header_matches` (format `"HeaderName: regex"`), `json_path`, `json_value`, `response_time_under`, `body_schema` (JSON body schema: `type` (`object`, `array`, `string`, `number`, `boolean`, `null`), `properties` + `required` for objects, `items` for arrays, `enum`, `pattern`, `min`/`max` for numbers, and `nullable`)
 
 ### Browser actions
 
