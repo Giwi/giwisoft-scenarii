@@ -75,7 +75,7 @@ export function scheduleScenario(
 
     // If the scenario depends on another, check that dependency's last run succeeded
     if (scenario.depends_on) {
-      const depOk = getLastRunSuccess(scenario.depends_on);
+      const depOk = await getLastRunSuccess(scenario.depends_on);
       if (depOk === false) {
         logger.warn({ scenario: scenario.name, depends_on: scenario.depends_on }, 'Dependency failed, skipping run');
         return;
@@ -92,7 +92,7 @@ export function scheduleScenario(
     if (!metrics.success && threshold > 0) {
       let consecutive = 1;
       for (let i = 0; i < threshold; i++) {
-        const prev = getPreviousRunSuccess(scenario.name);
+        const prev = await getPreviousRunSuccess(scenario.name);
         if (prev === false) consecutive++;
         else break;
       }
@@ -103,11 +103,9 @@ export function scheduleScenario(
   });
 
   if (scenario.tags && scenario.tags.length > 0) {
-    try {
-      upsertScenarioTags(scenario.name, scenario.tags);
-    } catch (err: unknown) {
+    void upsertScenarioTags(scenario.name, scenario.tags).catch((err: unknown) => {
       logger.warn({ scenario: scenario.name, err: err instanceof Error ? err.message : err }, 'Failed to store scenario tags');
-    }
+    });
   }
 
   scheduledTasks.push({ scenario, task, options, paused: false, filePath, mtimeMs });
@@ -233,11 +231,11 @@ async function sendDailyReport(): Promise<void> {
   const settings = getSettings();
   if (!settings.notifications?.email?.enabled) return;
 
-  const scenarios = getScenarioList();
+  const scenarios = await getScenarioList();
   const lines: string[] = ['Daily Scenario Report', '====================\n'];
 
   for (const s of scenarios) {
-    const history = getScenarioHistory(s.name, 1);
+    const history = await getScenarioHistory(s.name, 1);
     const totalRuns = history.length;
     const passedRuns = history.filter(r => r.success).length;
     const passRate = totalRuns > 0 ? Math.round(passedRuns / totalRuns * 100) : 0;

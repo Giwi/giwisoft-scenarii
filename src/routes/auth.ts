@@ -4,7 +4,7 @@ import path from 'path';
 import { getSettings, AuthProvider } from '../config/settings';
 import {
   verifyCredentials, ensureUser, getUser, listUsers, createUser, setPassword, setRole,
-  deleteUser, generatePassword, normalizeRole, UserRole, getProfile, getPasswordHash,
+  deleteUser, generatePassword, normalizeRole, UserRole, ColorScheme, getProfile,
   getTotpSecret, useRecoveryCode, verifyPassword,
 } from '../config/users';
 import { verifyTotp } from '../utils/totp';
@@ -16,6 +16,8 @@ interface Session {
   username: string;
   role: UserRole;
   provider: AuthProvider;
+  lang: Lang;
+  color_scheme: ColorScheme;
   createdAt: number;
 }
 
@@ -79,14 +81,23 @@ export function sessionUsername(req: express.Request): string | undefined {
 // anonymous visitors (login page, public status page) the Accept-Language header.
 export function requestLang(req: express.Request): Lang {
   const session = getSession(req);
-  if (session) return getProfile(session.username).lang;
+  if (session) return session.lang;
   return langFromAcceptLanguage(req.headers['accept-language']);
 }
 
-// Sets the session cookie and returns its value.
-function startSession(res: express.Response, username: string, provider: AuthProvider): void {
+// Sets the session cookie and returns its value. Caches the role, language and colour
+// scheme in memory so middleware never needs a synchronous database round-trip.
+async function startSession(res: express.Response, username: string, provider: AuthProvider): Promise<void> {
+  const [user, profile] = await Promise.all([getUser(username), getProfile(username)]);
   const sessionId = generateSessionId();
-  sessions.set(sessionId, { username, role: getUser(username)?.role ?? 'user', provider, createdAt: Date.now() });
+  sessions.set(sessionId, {
+    username,
+    role: user?.role ?? 'user',
+    provider,
+    lang: profile.lang,
+    color_scheme: profile.color_scheme,
+    createdAt: Date.now(),
+  });
   const secure = res.req.secure ? '; Secure' : '';
   res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${sessionId}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL / 1000}${secure}`);
 }
@@ -115,7 +126,7 @@ export function authMiddleware(req: express.Request, res: express.Response, next
 
 // Guards admin-only API routes: requires a session whose user has the admin role.
 // When auth is disabled every request passes through.
-export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): void {
+export async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> {
   if (!authProvider()) return next();
   const session = getSession(req);
   if (!session) {
@@ -123,7 +134,7 @@ export function requireAdmin(req: express.Request, res: express.Response, next: 
     return;
   }
   // Re-read the role so a promotion or demotion takes effect on the next request.
-  const role = getUser(session.username)?.role ?? 'user';
+  const role = (await getUser(session.username))?.role ?? 'user';
   if (role !== 'admin') {
     res.status(403).json({ error: t('auth.admin_required', requestLang(req)) });
     return;
@@ -148,25 +159,25 @@ export function pageAuthMiddleware(req: express.Request, res: express.Response, 
 // Local username/password login. Sets a session cookie on success. When the account has
 // two-factor authentication enabled the response asks for a code instead of logging in,
 // and the session is only created once that code checks out.
-export function handleLocalLogin(req: express.Request, res: express.Response): void {
+export async function handleLocalLogin(req: express.Request, res: express.Response): Promise<void> {
   const lang = requestLang(req);
   if (authProvider() !== 'local') {
     res.status(400).json({ error: t('auth.password_login_disabled', lang) });
     return;
   }
   const { username, password } = req.body as { username?: string; password?: string };
-  const user = verifyCredentials(username ?? '', password ?? '');
+  const user = await verifyCredentials(username ?? '', password ?? '');
   if (!user) {
     logger.warn({ username }, 'Failed login attempt');
     res.status(401).json({ error: t('auth.invalid_credentials', lang) });
     return;
   }
-  if (getProfile(user).totp_enabled) {
+  if ((await getProfile(user)).totp_enabled) {
     const challenge = createChallenge(user);
     res.json({ requires_2fa: true, challenge, message: t('auth.totp_required', lang) });
     return;
   }
-  finishLogin(res, user);
+  await finishLogin(res, user);
 }
 
 // Second step of the login: exchanges a challenge for a session once the code (or a
@@ -182,10 +193,11 @@ interface LoginChallenge {
 const challenges = new Map<string, LoginChallenge>();
 
 // Passwords only, no 2FA: shared by the first login step and the challenge exchange.
-function finishLogin(res: express.Response, username: string, lang: Lang = DEFAULT_LANG): void {
-  startSession(res, username, 'local');
-  logger.info({ username, role: getUser(username)?.role }, 'User logged in');
-  res.json({ username, role: getUser(username)?.role, provider: 'local', lang });
+async function finishLogin(res: express.Response, username: string, lang: Lang = DEFAULT_LANG): Promise<void> {
+  await startSession(res, username, 'local');
+  const role = (await getUser(username))?.role;
+  logger.info({ username, role }, 'User logged in');
+  res.json({ username, role, provider: 'local', lang });
 }
 
 // Issues a short-lived challenge id for a user that passed the password step.
@@ -200,7 +212,7 @@ function createChallenge(username: string): string {
 // is dropped so the password has to be entered again.
 const MAX_CHALLENGE_ATTEMPTS = 3;
 
-export function handleTwoFactorLogin(req: express.Request, res: express.Response): void {
+export async function handleTwoFactorLogin(req: express.Request, res: express.Response): Promise<void> {
   const lang = requestLang(req);
   const { challenge, code } = req.body as { challenge?: string; code?: string };
   const pending = challenge ? challenges.get(challenge) : undefined;
@@ -215,15 +227,15 @@ export function handleTwoFactorLogin(req: express.Request, res: express.Response
     return;
   }
   pending.attempts++;
-  const secret = getTotpSecret(pending.username);
+  const secret = await getTotpSecret(pending.username);
   const supplied = String(code ?? '').trim();
-  if (!secret || !(verifyTotp(secret, supplied) || useRecoveryCode(pending.username, supplied))) {
+  if (!secret || !(verifyTotp(secret, supplied) || await useRecoveryCode(pending.username, supplied))) {
     logger.warn({ username: pending.username }, 'Failed two-factor attempt');
     res.status(401).json({ error: t('auth.totp_invalid', lang) });
     return;
   }
   challenges.delete(challenge!);
-  finishLogin(res, pending.username, lang);
+  await finishLogin(res, pending.username, lang);
 }
 
 // Drops login challenges whose window has passed. Called whenever a new one is issued.
@@ -377,10 +389,10 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
     const tokens = await tokenRes.json() as { access_token?: string };
     if (!tokens.access_token) throw new Error('Token response has no access_token');
     const claims = await fetchUserInfo(discovery, tokens.access_token);
-    const username = ensureUser(usernameFromClaims(claims, oidc.username_claim), roleFromGroups(claims, oidc));
+    const username = await ensureUser(usernameFromClaims(claims, oidc.username_claim), roleFromGroups(claims, oidc));
 
-    startSession(res, username, 'oidc');
-    logger.info({ username, role: getUser(username)?.role }, 'User logged in via OIDC');
+    await startSession(res, username, 'oidc');
+    logger.info({ username, role: (await getUser(username))?.role }, 'User logged in via OIDC');
     res.redirect('/scenarios');
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'OIDC callback failed');
@@ -390,75 +402,74 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
 
 // Returns the current authentication status to the client. The language comes from the
 // Accept-Language header so the login page can pick one before there is a session.
-export function handleAuthMe(req: express.Request, res: express.Response): void {
+export async function handleAuthMe(req: express.Request, res: express.Response): Promise<void> {
   const provider = authProvider();
   if (!provider) {
     res.json({ authenticated: true, username: null, role: null, provider: null, lang: requestLang(req) });
     return;
   }
   const session = getSession(req);
-  const profile = session ? getProfile(session.username) : undefined;
   res.json({
     authenticated: !!session,
     username: session?.username ?? null,
-    role: session ? getUser(session.username)?.role ?? 'user' : null,
+    role: session ? session.role : null,
     provider,
-    lang: profile?.lang ?? requestLang(req),
-    color_scheme: profile?.color_scheme ?? 'light',
-    avatar_url: session ? avatarUrlFor(session.username) : null,
+    lang: session?.lang ?? requestLang(req),
+    color_scheme: session?.color_scheme ?? 'light',
+    avatar_url: session ? await avatarUrlFor(session.username) : null,
   });
 }
 
 // ── User management (admin only) ────────────────────────────────────────────
 
 // Lists the local users.
-export function handleListUsers(_req: express.Request, res: express.Response): void {
-  res.json({ users: listUsers() });
+export async function handleListUsers(_req: express.Request, res: express.Response): Promise<void> {
+  res.json({ users: await listUsers() });
 }
 
 // Creates a user. Without OIDC, only an admin may do this. The password is generated
 // and returned once when the caller does not supply one.
-export function handleCreateUser(req: express.Request, res: express.Response): void {
+export async function handleCreateUser(req: express.Request, res: express.Response): Promise<void> {
   const { username, password, role } = req.body as { username?: string; password?: string; role?: string };
   if (!username?.trim()) {
     res.status(400).json({ error: t('auth.username_required', requestLang(req)) });
     return;
   }
-  if (getUser(username.trim())) {
+  if (await getUser(username.trim())) {
     res.status(409).json({ error: t('auth.user_exists', requestLang(req)) });
     return;
   }
   const generated = !password;
   const secret = password || generatePassword();
-  const created = createUser(username.trim(), secret, normalizeRole(role));
+  const created = await createUser(username.trim(), secret, normalizeRole(role));
   if (!created) {
     res.status(409).json({ error: t('auth.user_exists', requestLang(req)) });
     return;
   }
   logger.info({ username, role: normalizeRole(role) }, 'User created');
-  res.status(201).json({ ...getUser(username.trim()), generated_password: generated ? secret : undefined });
+  res.status(201).json({ ...(await getUser(username.trim())), generated_password: generated ? secret : undefined });
 }
 
 // Changes a user's password. When no password is supplied, one is generated and returned once.
-export function handleSetUserPassword(req: express.Request, res: express.Response): void {
+export async function handleSetUserPassword(req: express.Request, res: express.Response): Promise<void> {
   const { username, password } = req.body as { username?: string; password?: string };
   if (!username) {
     res.status(400).json({ error: t('auth.username_required', requestLang(req)) });
     return;
   }
-  if (!getUser(username)) {
+  if (!(await getUser(username))) {
     res.status(404).json({ error: t('auth.unknown_user', requestLang(req)) });
     return;
   }
   const secret = password || generatePassword();
-  setPassword(username, secret);
+  await setPassword(username, secret);
   logger.info({ username }, 'Password updated');
   res.json({ status: 'updated', generated_password: password ? undefined : secret });
 }
 
 // Changes a user's role. Admins cannot change their own role: that is the surest way to
 // lock the install out of user management.
-export function handleSetUserRole(req: express.Request, res: express.Response): void {
+export async function handleSetUserRole(req: express.Request, res: express.Response): Promise<void> {
   const { username, role } = req.body as { username?: string; role?: string };
   if (!username || !role) {
     res.status(400).json({ error: t('auth.role_required', requestLang(req)) });
@@ -469,7 +480,7 @@ export function handleSetUserRole(req: express.Request, res: express.Response): 
     return;
   }
   const next = normalizeRole(role);
-  if (!setRole(username, next)) {
+  if (!(await setRole(username, next))) {
     res.status(404).json({ error: t('auth.unknown_user', requestLang(req)) });
     return;
   }
@@ -479,17 +490,17 @@ export function handleSetUserRole(req: express.Request, res: express.Response): 
 
 // Deletes a user. Your own account is protected: that also makes the last admin
 // undeletable through the API, since the caller is always an admin too.
-export function handleDeleteUser(req: express.Request, res: express.Response): void {
+export async function handleDeleteUser(req: express.Request, res: express.Response): Promise<void> {
   const username = String(req.params.username);
   if (username === getSession(req)?.username) {
     res.status(400).json({ error: t('auth.own_delete', requestLang(req)) });
     return;
   }
-  if (!getUser(username)) {
+  if (!(await getUser(username))) {
     res.status(404).json({ error: t('auth.unknown_user', requestLang(req)) });
     return;
   }
-  deleteUser(username);
+  await deleteUser(username);
   logger.info({ username }, 'User deleted');
   res.json({ status: 'deleted' });
 }

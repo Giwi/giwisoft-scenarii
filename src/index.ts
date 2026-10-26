@@ -28,14 +28,14 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // Gracefully stops schedulers, Lightpanda, server, and the database before exiting.
-function shutdown(server?: http.Server): void {
+async function shutdown(server?: http.Server): Promise<void> {
   logger.info('Shutting down...');
   stopAll();
   closeLightpanda();
   if (server) {
     server.close();
   }
-  closeStorage();
+  await closeStorage();
   process.exit(0);
 }
 
@@ -59,15 +59,16 @@ program
   .option('--headless <bool>', 'Run browser in headless mode', 'true')
   .option('--json', 'Output metrics as JSON')
   .option('--once', 'Run scenarios once without scheduling')
-  .option('--db <path>', 'SQLite database path for persisting metrics')
+  .option('--db <path>', 'SQLite database path or PostgreSQL connection URL for persisting metrics')
   .action(async (files: string[], options) => {
-    if (options.db) {
-    initStorage(options.db);
-    loadSettings();
+    const persist = !!(options.db || process.env.DATABASE_URL);
+    if (persist) {
+      await initStorage(options.db);
+      loadSettings();
     }
 
     const headless = options.headless !== 'false';
-    const runOptions = { headless, json_output: options.json, persist: !!options.db, scenariosDir: path.dirname(path.resolve(files[0])) };
+    const runOptions = { headless, json_output: options.json, persist, scenariosDir: path.dirname(path.resolve(files[0])) };
 
     const scenarios = files.map((f) => {
       logger.info({ file: f }, 'Loading scenario');
@@ -104,19 +105,19 @@ program
   .command('server')
   .description('Start the API server and Angular frontend')
   .option('-p, --port <number>', 'Port to listen on', '3000')
-  .option('--db <path>', 'SQLite database path', 'db/scenarii.db')
+  .option('--db <path>', 'SQLite database path or PostgreSQL connection URL')
   .option('--scenarios-dir <path>', 'Directory containing YAML scenario files', './scenarios')
   .option('--settings <path>', 'Path to settings.yaml')
   .action(async (options) => {
+    loadSettings(options.settings);
     try {
-      initStorage(options.db);
+      await initStorage(options.db);
     } catch (err: unknown) {
       logger.error({ path: options.db, err: err instanceof Error ? err.message : String(err) }, 'Failed to initialize database');
       process.exit(1);
     }
-    loadSettings(options.settings);
     watchSettings();
-    ensureDefaultUser();
+    await ensureDefaultUser();
 
     const scenariosDir = path.resolve(options.scenariosDir);
     let scenarioFiles: string[];
@@ -250,18 +251,19 @@ program
   .argument('<file>', 'Path to scenario YAML file')
   .option('--headless <bool>', 'Run browser in headless mode', 'true')
   .option('--json', 'Output metrics as JSON')
-  .option('--db <path>', 'SQLite database path')
+  .option('--db <path>', 'SQLite database path or PostgreSQL connection URL')
   .option('--fail-on <when>', 'Exit 1 on failed runs: failure | none', 'failure')
   .action(async (file: string, options) => {
     if (options.failOn !== 'failure' && options.failOn !== 'none') {
       logger.error({ fail_on: options.failOn }, 'Invalid --fail-on value, expected "failure" or "none"');
       process.exit(1);
     }
-    if (options.db) {
-      initStorage(options.db);
+    const persist = !!(options.db || process.env.DATABASE_URL);
+    if (persist) {
+      await initStorage(options.db);
     }
     const headless = options.headless !== 'false';
-    const runOptions: RunOptions = { headless, json_output: options.json, persist: !!options.db };
+    const runOptions: RunOptions = { headless, json_output: options.json, persist };
     const scenario = loadScenarioFile(file);
     logger.info({ scenario: scenario.name }, 'Triggering scenario');
     const metrics = await runScenario(scenario, runOptions);
@@ -290,17 +292,17 @@ program
   .description('Manage dashboard users')
   .argument('<action>', 'list | add <username> [password] [role] | passwd <username> [password] | role <username> <role> | del <username>')
   .argument('[args...]', 'Arguments for the action')
-  .option('--db <path>', 'SQLite database path', 'db/scenarii.db')
-  .action((action: string, args: string[], options) => {
+  .option('--db <path>', 'SQLite database path or PostgreSQL connection URL')
+  .action(async (action: string, args: string[], options) => {
     try {
-      initStorage(options.db);
+      await initStorage(options.db);
     } catch (err: unknown) {
       logger.error({ path: options.db, err: err instanceof Error ? err.message : String(err) }, 'Failed to initialize database');
       process.exit(1);
     }
 
     if (action === 'list') {
-      const users = listUsers();
+      const users = await listUsers();
       for (const u of users) logger.info({ user: u.username, role: u.role, created_at: u.created_at }, 'User');
       if (users.length === 0) logger.info('No users: start the server once to create the default user');
       return;
@@ -314,7 +316,7 @@ program
       }
       const role = normalizeRole(args[2]);
       const password = args[1] || generatePassword();
-      if (!createUser(username, password, role)) {
+      if (!(await createUser(username, password, role))) {
         logger.error({ user: username }, 'User already exists');
         process.exit(1);
       }
@@ -329,7 +331,7 @@ program
         process.exit(1);
       }
       const password = args[1] || generatePassword();
-      if (!setPassword(username, password)) {
+      if (!(await setPassword(username, password))) {
         logger.error({ user: username }, 'Unknown user');
         process.exit(1);
       }
@@ -343,7 +345,7 @@ program
         logger.error('Usage: scenarii user role <username> <admin|user>');
         process.exit(1);
       }
-      if (!setRole(username, normalizeRole(role))) {
+      if (!(await setRole(username, normalizeRole(role)))) {
         logger.error({ user: username }, 'Unknown user');
         process.exit(1);
       }
@@ -357,7 +359,7 @@ program
         logger.error('Usage: scenarii user del <username>');
         process.exit(1);
       }
-      if (!deleteUser(username)) {
+      if (!(await deleteUser(username))) {
         logger.error({ user: username }, 'Unknown user');
         process.exit(1);
       }
@@ -403,9 +405,20 @@ program
 #     groups_claim: groups
 #     admin_group: scenarii-admins
 
-# Storage retention (optional, defaults to 7 days)
+# Storage (optional, defaults to SQLite at ./db/scenarii.db with 7-day retention)
 # storage:
 #   retentionDays: 30
+#   # Backend: 'sqlite' (default) or 'postgres'.
+#   type: postgres
+#   # PostgreSQL connection string (used when type is 'postgres'). DATABASE_URL env var
+#   # is also honoured as a fallback.
+#   url: postgres://user:password@host:5432/scenarii
+#   # SQLite file path (used when type is 'sqlite').
+#   # path: ./db/scenarii.db
+#   backup:
+#     enabled: true
+#     cron: "0 4 * * *"
+#     directory: ./backups
 
 notifications:
   telegram:

@@ -30,17 +30,17 @@ async function req(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 before(async () => {
-  initStorage(':memory:');
-  createUser('admin', adminPassword, 'admin');
-  createUser('bob', userPassword, 'user');
+  await initStorage(':memory:');
+  await createUser('admin', adminPassword, 'admin');
+  await createUser('bob', userPassword, 'user');
   server = createApp().listen(0);
   await new Promise(r => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 
-after(() => {
+after(async () => {
   server.close();
-  closeStorage();
+  await closeStorage();
 });
 
 describe('API authentication', () => {

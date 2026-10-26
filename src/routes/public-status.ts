@@ -9,9 +9,9 @@ function escapeHtml(s: string): string {
 import logger from '../utils/logger';
 
 // Renders a public-facing HTML status page for a single scenario (no auth required).
-export function handlePublicScenarioStatus(req: express.Request, res: express.Response): void {
+export async function handlePublicScenarioStatus(req: express.Request, res: express.Response): Promise<void> {
   try {
-    const list = getScenarioList();
+    const list = await getScenarioList();
     const scenario = list.find(s => s.name === req.params.name);
     // Public page: no session, so the visitor's Accept-Language header picks the language.
     const lang = langFromAcceptLanguage(req.headers['accept-language']);
@@ -21,9 +21,9 @@ export function handlePublicScenarioStatus(req: express.Request, res: express.Re
     }
 
     const days = parseDaysParam(req.query.days as string);
-    const history = getScenarioHistory(scenario.name, days);
-    const total = getScenarioHistoryCount(scenario.name, days);
-    const passed = getScenarioPassedRunCount(scenario.name, days);
+    const history = await getScenarioHistory(scenario.name, days);
+    const total = await getScenarioHistoryCount(scenario.name, days);
+    const passed = await getScenarioPassedRunCount(scenario.name, days);
     const sla = total > 0 ? Math.round((passed / total) * 1000) / 10 : 100;
 
     const labelsJson = JSON.stringify(history.map(r => new Date(r.started_at).toLocaleString()).reverse());
@@ -51,18 +51,18 @@ export function handlePublicScenarioStatus(req: express.Request, res: express.Re
 }
 
 // Public API endpoint that returns scenario run data in JSON format (no auth required).
-export function handlePublicScenarioApi(req: express.Request, res: express.Response): void {
+export async function handlePublicScenarioApi(req: express.Request, res: express.Response): Promise<void> {
   try {
-    const list = getScenarioList();
+    const list = await getScenarioList();
     const scenario = list.find(s => s.name === req.params.name);
     if (!scenario) {
       res.status(404).json({ error: t('scenario.not_found', langFromAcceptLanguage(req.headers['accept-language'])) });
       return;
     }
     const days = parseDaysParam(req.query.days as string);
-    const history = getScenarioHistory(scenario.name, days);
-    const total = getScenarioHistoryCount(scenario.name, days);
-    const passed = getScenarioPassedRunCount(scenario.name, days);
+    const history = await getScenarioHistory(scenario.name, days);
+    const total = await getScenarioHistoryCount(scenario.name, days);
+    const passed = await getScenarioPassedRunCount(scenario.name, days);
     const sla = total > 0 ? Math.round((passed / total) * 1000) / 10 : 100;
     res.json({
       name: scenario.name,

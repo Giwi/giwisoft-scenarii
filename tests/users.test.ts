@@ -7,8 +7,8 @@ import {
   verifyCredentials, ensureUser, ensureDefaultUser, normalizeRole,
 } from '../src/config/users';
 
-before(() => { initStorage(':memory:'); });
-after(() => { closeStorage(); });
+before(async () => { await initStorage(':memory:'); });
+after(async () => { await closeStorage(); });
 
 describe('hashPassword / verifyPassword', () => {
   it('accepts the correct password', () => {
@@ -45,69 +45,69 @@ describe('generatePassword', () => {
 });
 
 describe('user store', () => {
-  it('creates a user and verifies its credentials', () => {
-    assert.strictEqual(createUser('alice', 'alice-pw'), true);
-    assert.strictEqual(verifyCredentials('alice', 'alice-pw'), 'alice');
+  it('creates a user and verifies its credentials', async () => {
+    assert.strictEqual(await createUser('alice', 'alice-pw'), true);
+    assert.strictEqual(await verifyCredentials('alice', 'alice-pw'), 'alice');
   });
 
-  it('refuses to create a duplicate user', () => {
-    createUser('bob', 'bob-pw');
-    assert.strictEqual(createUser('bob', 'other'), false);
-    assert.strictEqual(verifyCredentials('bob', 'bob-pw'), 'bob');
+  it('refuses to create a duplicate user', async () => {
+    await createUser('bob', 'bob-pw');
+    assert.strictEqual(await createUser('bob', 'other'), false);
+    assert.strictEqual(await verifyCredentials('bob', 'bob-pw'), 'bob');
   });
 
-  it('rejects an unknown user and a wrong password alike', () => {
-    assert.strictEqual(verifyCredentials('ghost', 'whatever'), undefined);
-    assert.strictEqual(verifyCredentials('alice', 'wrong'), undefined);
-    assert.strictEqual(verifyCredentials('', ''), undefined);
+  it('rejects an unknown user and a wrong password alike', async () => {
+    assert.strictEqual(await verifyCredentials('ghost', 'whatever'), undefined);
+    assert.strictEqual(await verifyCredentials('alice', 'wrong'), undefined);
+    assert.strictEqual(await verifyCredentials('', ''), undefined);
   });
 
-  it('changes a password, invalidating the old one', () => {
-    assert.strictEqual(setPassword('alice', 'new-pw'), true);
-    assert.strictEqual(verifyCredentials('alice', 'new-pw'), 'alice');
-    assert.strictEqual(verifyCredentials('alice', 'alice-pw'), undefined);
+  it('changes a password, invalidating the old one', async () => {
+    assert.strictEqual(await setPassword('alice', 'new-pw'), true);
+    assert.strictEqual(await verifyCredentials('alice', 'new-pw'), 'alice');
+    assert.strictEqual(await verifyCredentials('alice', 'alice-pw'), undefined);
   });
 
-  it('reports false when changing a password for an unknown user', () => {
-    assert.strictEqual(setPassword('ghost', 'x'), false);
+  it('reports false when changing a password for an unknown user', async () => {
+    assert.strictEqual(await setPassword('ghost', 'x'), false);
   });
 
-  it('lists users with metadata', () => {
-    const users = listUsers();
+  it('lists users with metadata', async () => {
+    const users = await listUsers();
     assert.ok(users.some(u => u.username === 'alice'));
     assert.ok(users.every(u => typeof u.created_at === 'string'));
-    assert.ok(countUsers() >= 2);
-    assert.strictEqual(getUser('alice')?.username, 'alice');
-    assert.strictEqual(getUser('ghost'), undefined);
+    assert.ok((await countUsers()) >= 2);
+    assert.strictEqual((await getUser('alice'))?.username, 'alice');
+    assert.strictEqual(await getUser('ghost'), undefined);
   });
 });
 
 describe('roles', () => {
-  it('defaults new users to the user role', () => {
-    createUser('carol', 'carol-pw');
-    assert.strictEqual(getUser('carol')?.role, 'user');
+  it('defaults new users to the user role', async () => {
+    await createUser('carol', 'carol-pw');
+    assert.strictEqual((await getUser('carol'))?.role, 'user');
   });
 
-  it('creates admins explicitly', () => {
-    assert.strictEqual(createUser('root', 'root-pw', 'admin'), true);
-    assert.strictEqual(getUser('root')?.role, 'admin');
+  it('creates admins explicitly', async () => {
+    assert.strictEqual(await createUser('root', 'root-pw', 'admin'), true);
+    assert.strictEqual((await getUser('root'))?.role, 'admin');
   });
 
-  it('promotes and demotes a user', () => {
-    assert.strictEqual(setRole('carol', 'admin'), true);
-    assert.strictEqual(getUser('carol')?.role, 'admin');
-    assert.strictEqual(setRole('carol', 'user'), true);
-    assert.strictEqual(getUser('carol')?.role, 'user');
+  it('promotes and demotes a user', async () => {
+    assert.strictEqual(await setRole('carol', 'admin'), true);
+    assert.strictEqual((await getUser('carol'))?.role, 'admin');
+    assert.strictEqual(await setRole('carol', 'user'), true);
+    assert.strictEqual((await getUser('carol'))?.role, 'user');
   });
 
-  it('reports false when changing the role of an unknown user', () => {
-    assert.strictEqual(setRole('ghost', 'admin'), false);
+  it('reports false when changing the role of an unknown user', async () => {
+    assert.strictEqual(await setRole('ghost', 'admin'), false);
   });
 
-  it('deletes a user', () => {
-    assert.strictEqual(deleteUser('carol'), true);
-    assert.strictEqual(getUser('carol'), undefined);
-    assert.strictEqual(deleteUser('carol'), false);
+  it('deletes a user', async () => {
+    assert.strictEqual(await deleteUser('carol'), true);
+    assert.strictEqual(await getUser('carol'), undefined);
+    assert.strictEqual(await deleteUser('carol'), false);
   });
 
   it('normalizes unknown roles to the least privileged one', () => {
@@ -119,31 +119,31 @@ describe('roles', () => {
 });
 
 describe('ensureUser (OIDC JIT provisioning)', () => {
-  it('creates the user on first call and reuses it afterwards', () => {
-    assert.strictEqual(ensureUser('oidc-user'), 'oidc-user');
-    assert.strictEqual(getUser('oidc-user')?.username, 'oidc-user');
-    assert.strictEqual(ensureUser('oidc-user'), 'oidc-user');
-    assert.strictEqual(listUsers().filter(u => u.username === 'oidc-user').length, 1);
+  it('creates the user on first call and reuses it afterwards', async () => {
+    assert.strictEqual(await ensureUser('oidc-user'), 'oidc-user');
+    assert.strictEqual((await getUser('oidc-user'))?.username, 'oidc-user');
+    assert.strictEqual(await ensureUser('oidc-user'), 'oidc-user');
+    assert.strictEqual((await listUsers()).filter(u => u.username === 'oidc-user').length, 1);
   });
 
-  it('applies the role derived from the provider groups', () => {
-    ensureUser('oidc-admin', 'admin');
-    assert.strictEqual(getUser('oidc-admin')?.role, 'admin');
+  it('applies the role derived from the provider groups', async () => {
+    await ensureUser('oidc-admin', 'admin');
+    assert.strictEqual((await getUser('oidc-admin'))?.role, 'admin');
   });
 
-  it('syncs the role on every login so a group change applies', () => {
-    ensureUser('oidc-user', 'admin');
-    assert.strictEqual(getUser('oidc-user')?.role, 'admin');
-    ensureUser('oidc-user', 'user');
-    assert.strictEqual(getUser('oidc-user')?.role, 'user');
+  it('syncs the role on every login so a group change applies', async () => {
+    await ensureUser('oidc-user', 'admin');
+    assert.strictEqual((await getUser('oidc-user'))?.role, 'admin');
+    await ensureUser('oidc-user', 'user');
+    assert.strictEqual((await getUser('oidc-user'))?.role, 'user');
   });
 });
 
 describe('ensureDefaultUser', () => {
-  it('creates the default user as admin, once', () => {
-    assert.strictEqual(ensureDefaultUser(), true);
-    assert.strictEqual(getUser('admin')?.role, 'admin');
+  it('creates the default user as admin, once', async () => {
+    assert.strictEqual(await ensureDefaultUser(), true);
+    assert.strictEqual((await getUser('admin'))?.role, 'admin');
     // Second call is a no-op: no new password is generated.
-    assert.strictEqual(ensureDefaultUser(), false);
+    assert.strictEqual(await ensureDefaultUser(), false);
   });
 });

@@ -90,7 +90,7 @@ function sendError(res: express.Response, status: number, err: unknown): void {
 // Scenario handlers
 // ──────────────────────────────────────────
 
-function handleScenarioList(req: express.Request, res: express.Response): void {
+async function handleScenarioList(req: express.Request, res: express.Response): Promise<void> {
   try {
     const tag = req.query.tag as string | undefined;
     const group = req.query.group as string | undefined;
@@ -110,7 +110,7 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
       } catch { /* scenarios dir unavailable */ }
     }
 
-    const dbList = getScenarioList();
+    const dbList = await getScenarioList();
     const dbNames = new Set(dbList.map(s => s.name));
 
     const scheduledNames = listScheduled();
@@ -123,7 +123,7 @@ function handleScenarioList(req: express.Request, res: express.Response): void {
           last_success: null,
           last_duration_ms: null,
           total_runs: 0,
-          tags: getDbScenarioTags(name),
+          tags: await getDbScenarioTags(name),
         });
       }
     }
@@ -276,14 +276,14 @@ function getScenarioDependsOn(name: string): string | undefined {
   return undefined;
 }
 
-function handleScenarioDetail(req: express.Request, res: express.Response): void {
+async function handleScenarioDetail(req: express.Request, res: express.Response): Promise<void> {
   try {
     const days = parseDaysParam(req.query.days as string);
     const limit = parseLimitParam(req.query.limit as string) ?? DEFAULT_LIMIT;
     const offset = parseLimitParam(req.query.offset as string) ?? 0;
     const name = req.params.name as string;
-    const { info: rawInfo, history, stepNames, total } = getScenarioDetail(name, days, limit, offset);
-    const passedRuns = getScenarioPassedRunCount(name, days);
+    const { info: rawInfo, history, stepNames, total } = await getScenarioDetail(name, days, limit, offset);
+    const passedRuns = await getScenarioPassedRunCount(name, days);
 
     res.json({
       info: { ...rawInfo, total_runs: total, passed_runs: passedRuns, failed_runs: total - passedRuns, depends_on: getScenarioDependsOn(name) },
@@ -295,15 +295,15 @@ function handleScenarioDetail(req: express.Request, res: express.Response): void
   }
 }
 
-function handleScenarioHistory(req: express.Request, res: express.Response): void {
+async function handleScenarioHistory(req: express.Request, res: express.Response): Promise<void> {
   try {
     const name = req.params.name as string;
     const days = parseDaysParam(req.query.days as string);
     const limit = parseLimitParam(req.query.limit as string) ?? DEFAULT_LIMIT;
     const offset = parseLimitParam(req.query.offset as string) ?? 0;
-    const total = getScenarioHistoryCount(name, days);
-    const history = getScenarioHistory(name, days, limit, offset);
-    const stepNames = getScenarioStepNames(name);
+    const total = await getScenarioHistoryCount(name, days);
+    const history = await getScenarioHistory(name, days, limit, offset);
+    const stepNames = await getScenarioStepNames(name);
     res.json({ history, stepNames, total });
   } catch (err: unknown) {
     sendError(res, 500, err);
@@ -474,11 +474,11 @@ function handleConfigDelete(req: express.Request, res: express.Response): void {
 }
 
 // Exports scenario history as a downloadable JSON file.
-function handleExportJson(req: express.Request, res: express.Response): void {
+async function handleExportJson(req: express.Request, res: express.Response): Promise<void> {
   try {
     const name = req.params.name as string;
     const days = parseDaysParam(req.query.days as string);
-    const history = getScenarioHistory(name, days);
+    const history = await getScenarioHistory(name, days);
     const filename = `scenario-${name}.json`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.json(history);
@@ -488,11 +488,11 @@ function handleExportJson(req: express.Request, res: express.Response): void {
 }
 
 // Exports scenario history as a downloadable CSV file.
-function handleExportCsv(req: express.Request, res: express.Response): void {
+async function handleExportCsv(req: express.Request, res: express.Response): Promise<void> {
   try {
     const name = req.params.name as string;
     const days = parseDaysParam(req.query.days as string);
-    const history = getScenarioHistory(name, days);
+    const history = await getScenarioHistory(name, days);
     const filename = `scenario-${name}.csv`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.type('text/csv');
@@ -503,12 +503,12 @@ function handleExportCsv(req: express.Request, res: express.Response): void {
 }
 
 // Returns SLA statistics (total, passed, failed runs and percentage) for a scenario.
-function handleSla(req: express.Request, res: express.Response): void {
+async function handleSla(req: express.Request, res: express.Response): Promise<void> {
   try {
     const name = req.params.name as string;
     const days = parseDaysParam(req.query.days as string);
-    const total = getScenarioHistoryCount(name, days);
-    const passed = getScenarioPassedRunCount(name, days);
+    const total = await getScenarioHistoryCount(name, days);
+    const passed = await getScenarioPassedRunCount(name, days);
     res.json({
       scenario: name, days,
       total_runs: total, passed_runs: passed, failed_runs: total - passed,
@@ -520,25 +520,25 @@ function handleSla(req: express.Request, res: express.Response): void {
 }
 
 // Returns all distinct tags across all scenarios.
-function handleTags(_req: express.Request, res: express.Response): void {
+async function handleTags(_req: express.Request, res: express.Response): Promise<void> {
   try {
-    res.json(getDistinctTags());
+    res.json(await getDistinctTags());
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
 }
 
 // Returns aggregate health information for all scenarios (healthy/unhealthy counts).
-function handleStatus(_req: express.Request, res: express.Response): void {
+async function handleStatus(_req: express.Request, res: express.Response): Promise<void> {
   try {
-    const list = getScenarioList();
+    const list = await getScenarioList();
     res.json({
       scenarios: list.length,
       healthy: list.filter(s => s.last_success === 1).length,
       unhealthy: list.filter(s => s.last_success === 0).length,
       unknown: list.filter(s => s.last_success === null).length,
       storage_ready: isStorageReady(),
-      tags: getDistinctTags(),
+      tags: await getDistinctTags(),
     });
   } catch (err: unknown) {
     sendError(res, 500, err);
@@ -546,11 +546,11 @@ function handleStatus(_req: express.Request, res: express.Response): void {
 }
 
 // Triggers an on-demand database backup to the configured backup directory.
-function handleBackup(_req: express.Request, res: express.Response): void {
+async function handleBackup(_req: express.Request, res: express.Response): Promise<void> {
   try {
     const settings = getSettings();
     const dir = settings.storage?.backup?.directory || './backups';
-    const dst = backupDatabase(dir);
+    const dst = await backupDatabase(dir);
     res.json({ status: 'ok', path: dst });
   } catch (err: unknown) {
     sendError(res, 500, err);
@@ -732,10 +732,10 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
     try {
       const backupCron = s.storage.backup.cron || '0 4 * * *';
       if (require('node-cron').validate(backupCron)) {
-        require('node-cron').schedule(backupCron, () => {
+        require('node-cron').schedule(backupCron, async () => {
           try {
             const dir = s.storage?.backup?.directory || './backups';
-            const dst = backupDatabase(dir);
+            const dst = await backupDatabase(dir);
             logger.info({ path: dst }, 'Automated database backup completed');
           } catch (err: unknown) {
             logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Automated backup failed');

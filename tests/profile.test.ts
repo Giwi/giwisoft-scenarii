@@ -59,17 +59,17 @@ async function enableTotpFor(cookie: string, username: string): Promise<{ secret
 }
 
 before(async () => {
-  initStorage(':memory:');
-  createUser('admin', adminPassword, 'admin');
-  createUser('bob', bobPassword, 'user');
+  await initStorage(':memory:');
+  await createUser('admin', adminPassword, 'admin');
+  await createUser('bob', bobPassword, 'user');
   server = createApp().listen(0);
   await new Promise(r => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 
-after(() => {
+after(async () => {
   server.close();
-  closeStorage();
+  await closeStorage();
 });
 
 describe('TOTP primitives', () => {
@@ -256,7 +256,7 @@ describe('Password change', () => {
     // The old password no longer works, the new one does.
     assert.strictEqual((await req('/api/auth/login', json({ username: 'bob', password: bobPassword }))).status, 401);
     await loginAs('bob', 'a-long-enough-password');
-    setPassword('bob', bobPassword);
+    await setPassword('bob', bobPassword);
   });
 });
 
@@ -276,7 +276,7 @@ describe('Password recovery', () => {
       headers: { Cookie: cookie, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'bob@example.com' }),
     });
-    const token = createPasswordReset('bob');
+    const token = await createPasswordReset('bob');
     const res = await req('/api/auth/password/reset', json({ token, password: 'brand-new-password' }));
     assert.strictEqual(res.status, 200);
     await loginAs('bob', 'brand-new-password');
@@ -287,7 +287,7 @@ describe('Password recovery', () => {
     assert.strictEqual(bad.status, 400);
     assert.strictEqual((await bad.json() as { error: string }).error, 'This recovery link is invalid or has expired');
 
-    const token = createPasswordReset('bob');
+    const token = await createPasswordReset('bob');
     assert.strictEqual((await req('/api/auth/password/reset', json({ token, password: 'first-password' }))).status, 200);
     // Single use: the second attempt with the same token fails.
     assert.strictEqual((await req('/api/auth/password/reset', json({ token, password: 'second-password' }))).status, 400);
@@ -295,7 +295,7 @@ describe('Password recovery', () => {
   });
 
   it('rejects a too short password', async () => {
-    const token = createPasswordReset('bob');
+    const token = await createPasswordReset('bob');
     const res = await req('/api/auth/password/reset', json({ token, password: 'tiny' }));
     assert.strictEqual(res.status, 400);
     assert.strictEqual((await res.json() as { error: string }).error, 'Password must be at least 8 characters');
@@ -307,7 +307,7 @@ describe('Two-factor authentication', () => {
     const cookie = await loginAs('admin', adminPassword);
     const { secret, recovery } = await enableTotpFor(cookie, 'admin');
     assert.strictEqual(recovery.length, 10);
-    assert.ok(getProfile('admin').totp_enabled);
+    assert.ok((await getProfile('admin')).totp_enabled);
 
     // Login now needs a second step.
     const first = await req('/api/auth/login', json({ username: 'admin', password: adminPassword }));
@@ -331,7 +331,7 @@ describe('Two-factor authentication', () => {
     assert.strictEqual(noCode.status, 400);
     const off = await req('/api/profile/totp/disable', json({ password: adminPassword, code: currentTotpCode(secret) }, cookie));
     assert.strictEqual(off.status, 200);
-    assert.ok(!getProfile('admin').totp_enabled);
+    assert.ok(!(await getProfile('admin')).totp_enabled);
   });
 
   it('accepts a recovery code at login and burns it', async () => {
@@ -357,12 +357,12 @@ describe('Two-factor authentication', () => {
     const { secret } = await setup.json() as { secret: string };
     const bad = await req('/api/profile/totp/enable', json({ code: '111111' }, cookie));
     assert.strictEqual(bad.status, 400);
-    assert.ok(!getProfile('admin').totp_enabled);
+    assert.ok(!(await getProfile('admin')).totp_enabled);
     // A wrong code must not destroy the setup: the same secret confirms right after.
     const good = await req('/api/profile/totp/enable', json({ code: currentTotpCode(secret) }, cookie));
     assert.strictEqual(good.status, 200);
     const { recovery_codes } = await good.json() as { recovery_codes: string[] };
-    assert.ok(getProfile('admin').totp_enabled);
+    assert.ok((await getProfile('admin')).totp_enabled);
     // Clean up: 2FA is now on.
     const off = await req('/api/profile/totp/disable', json({ password: adminPassword, code: recovery_codes[0] }, cookie));
     assert.strictEqual(off.status, 200);
@@ -409,7 +409,7 @@ describe('Two-factor with OIDC configured', () => {
 
     // The provider check does not need a session, so call it directly.
     assert.strictEqual(oidcManaged(), true);
-    assert.strictEqual(getProfile('admin').totp_enabled, false);
+    assert.strictEqual((await getProfile('admin')).totp_enabled, false);
   });
 });
 

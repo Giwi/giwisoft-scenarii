@@ -4,8 +4,8 @@ import {
   getProfile, setProfile, UserProfile, getUser, setPassword, getPasswordHash, setTotpSecret,
   getTotpSecret, enableTotp, disableTotp, useRecoveryCode, getAvatar, setAvatar, deleteAvatar,
   createPasswordReset, resetPasswordWithToken, prunePasswordResets, verifyPassword, ColorScheme,
+  findUserByIdentifier,
 } from '../config/users';
-import { getDb } from '../config/storage';
 import { avatarUrlFor, decodeDataUrl, gravatarUrl, isOversizedDataUrl, isValidEmail } from '../config/avatar';
 import { requestLang, sessionUsername } from './auth';
 import { generateRecoveryCodes, generateTotpSecret, totpUri, verifyTotp } from '../utils/totp';
@@ -45,15 +45,15 @@ function requireUser(req: express.Request, res: express.Response): string | unde
 // ── Profile ─────────────────────────────────────────────────────────────────
 
 // Returns the profile of the session user, including the avatar URL to render.
-export function handleGetProfile(req: express.Request, res: express.Response): void {
+export async function handleGetProfile(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
-  const profile = getProfile(username);
+  const profile = await getProfile(username);
   res.json({
     username,
-    role: getUser(username)?.role ?? 'user',
+    role: (await getUser(username))?.role ?? 'user',
     ...profile,
-    avatar_url: avatarUrlFor(username, 96),
+    avatar_url: await avatarUrlFor(username, 96),
     gravatar_url: gravatarUrl(profile.email, 96),
     // TOTP belongs to the local password provider only: with OIDC the identity provider
     // owns the second factor, so the profile must not offer it.
@@ -62,7 +62,7 @@ export function handleGetProfile(req: express.Request, res: express.Response): v
 }
 
 // Updates the profile fields the user owns: email, colour scheme, language.
-export function handleUpdateProfile(req: express.Request, res: express.Response): void {
+export async function handleUpdateProfile(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
   const body = req.body as { email?: string; color_scheme?: string; lang?: string };
@@ -80,12 +80,12 @@ export function handleUpdateProfile(req: express.Request, res: express.Response)
   if (body.color_scheme !== undefined) patch.color_scheme = String(body.color_scheme) as ColorScheme;
   if (body.lang !== undefined) patch.lang = normalizeLang(body.lang);
 
-  const profile = setProfile(username, patch);
+  const profile = await setProfile(username, patch);
   logger.info({ username }, 'Profile updated');
   res.json({
     status: 'updated',
     ...profile,
-    avatar_url: avatarUrlFor(username, 96),
+    avatar_url: await avatarUrlFor(username, 96),
     // Translated here so the profile page can show the confirmation in its own language.
     message: t(patch.lang !== undefined ? 'profile.lang_updated'
       : patch.color_scheme !== undefined ? 'profile.theme_updated' : 'profile.updated', lang),
@@ -95,7 +95,7 @@ export function handleUpdateProfile(req: express.Request, res: express.Response)
 // ── Avatar ──────────────────────────────────────────────────────────────────
 
 // Stores an uploaded avatar. The browser crops and scales it to a square first.
-export function handleUploadAvatar(req: express.Request, res: express.Response): void {
+export async function handleUploadAvatar(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
   const image = (req.body as { image?: string }).image;
@@ -106,24 +106,24 @@ export function handleUploadAvatar(req: express.Request, res: express.Response):
     res.status(400).json({ error: t(key, lang) });
     return;
   }
-  setAvatar(username, decoded.mime, decoded.bytes);
+  await setAvatar(username, decoded.mime, decoded.bytes);
   logger.info({ username, mime: decoded.mime, bytes: decoded.bytes.length }, 'Avatar uploaded');
-  res.json({ status: 'updated', avatar_url: avatarUrlFor(username, 96), message: t('profile.avatar_updated', requestLang(req)) });
+  res.json({ status: 'updated', avatar_url: await avatarUrlFor(username, 96), message: t('profile.avatar_updated', requestLang(req)) });
 }
 
 // Drops the uploaded avatar so the user falls back to Gravatar.
-export function handleDeleteAvatar(req: express.Request, res: express.Response): void {
+export async function handleDeleteAvatar(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
-  deleteAvatar(username);
+  await deleteAvatar(username);
   logger.info({ username }, 'Avatar removed');
-  res.json({ status: 'deleted', avatar_url: avatarUrlFor(username, 96), message: t('profile.avatar_removed', requestLang(req)) });
+  res.json({ status: 'deleted', avatar_url: await avatarUrlFor(username, 96), message: t('profile.avatar_removed', requestLang(req)) });
 }
 
 // Serves a stored avatar. Public so the navbar can render it before the profile page is
 // loaded; avatars are not sensitive and Gravatar is a third-party fetch anyway.
-export function handleGetAvatar(req: express.Request, res: express.Response): void {
-  const avatar = getAvatar(String(req.params.username));
+export async function handleGetAvatar(req: express.Request, res: express.Response): Promise<void> {
+  const avatar = await getAvatar(String(req.params.username));
   if (!avatar) {
     res.status(404).end();
     return;
@@ -135,7 +135,7 @@ export function handleGetAvatar(req: express.Request, res: express.Response): vo
 
 // Changes the session user's password. Requires the current one, so a stolen session
 // cookie alone cannot lock the owner out.
-export function handleChangePassword(req: express.Request, res: express.Response): void {
+export async function handleChangePassword(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
   const { current_password, new_password } = req.body as { current_password?: string; new_password?: string };
@@ -144,19 +144,19 @@ export function handleChangePassword(req: express.Request, res: express.Response
     res.status(400).json({ error: t('auth.password_too_short', lang) });
     return;
   }
-  if (!verifyPassword(String(current_password ?? ''), getPasswordHash(username) ?? '')) {
+  if (!verifyPassword(String(current_password ?? ''), (await getPasswordHash(username)) ?? '')) {
     res.status(400).json({ error: t('auth.current_password_wrong', lang) });
     return;
   }
-  setPassword(username, new_password);
+  await setPassword(username, new_password);
   logger.info({ username }, 'Password changed by the user');
   res.json({ status: 'updated', message: t('auth.password_changed', lang) });
 }
 
 // Requests a recovery link for a username or email address. The response is identical
 // whether or not the account exists, so it cannot be used to enumerate users.
-export function handleForgotPassword(req: express.Request, res: express.Response): void {
-  prunePasswordResets();
+export async function handleForgotPassword(req: express.Request, res: express.Response): Promise<void> {
+  await prunePasswordResets();
   const lang = requestLang(req);
   const needle = String((req.body as { identifier?: string }).identifier ?? '').trim();
   if (!needle) {
@@ -167,15 +167,15 @@ export function handleForgotPassword(req: express.Request, res: express.Response
     res.status(429).json({ error: t('auth.rate_limited', lang) });
     return;
   }
-  const username = findUserByIdentifier(needle);
-  if (username) void deliverResetLink(username, createPasswordReset(username));
+  const username = await findUserByIdentifier(needle);
+  if (username) void deliverResetLink(username, await createPasswordReset(username));
   else logger.info({}, 'Password recovery requested for an unknown identifier');
   res.json({ status: 'sent', message: t('auth.reset_requested', lang) });
 }
 
 // Applies a recovery token. Single use: it is consumed on the first attempt, valid or not.
-export function handleResetPassword(req: express.Request, res: express.Response): void {
-  prunePasswordResets();
+export async function handleResetPassword(req: express.Request, res: express.Response): Promise<void> {
+  await prunePasswordResets();
   const lang = requestLang(req);
   const { token, password } = req.body as { token?: string; password?: string };
   if (!token || !password) {
@@ -186,7 +186,7 @@ export function handleResetPassword(req: express.Request, res: express.Response)
     res.status(400).json({ error: t('auth.password_too_short', lang) });
     return;
   }
-  if (!resetPasswordWithToken(String(token), password)) {
+  if (!(await resetPasswordWithToken(String(token), password))) {
     res.status(400).json({ error: t('auth.reset_invalid_token', lang) });
     return;
   }
@@ -205,13 +205,13 @@ export async function handleTotpSetup(req: express.Request, res: express.Respons
     res.status(400).json({ error: t('auth.totp_disabled_with_oidc', lang) });
     return;
   }
-  if (getProfile(username).totp_enabled) {
+  if ((await getProfile(username)).totp_enabled) {
     res.status(409).json({ error: t('auth.totp_already_enabled', lang) });
     return;
   }
   const secret = generateTotpSecret();
   const uri = totpUri(secret, username);
-  setTotpSecret(username, secret);
+  await setTotpSecret(username, secret);
   const svg = await QRCode.toString(uri, { type: 'svg', margin: 1, width: 240 });
   res.json({
     status: 'pending',
@@ -226,7 +226,7 @@ export async function handleTotpSetup(req: express.Request, res: express.Respons
 
 // Confirms setup: verifies a code from the authenticator app, then enables 2FA and
 // returns single-use recovery codes shown exactly once.
-export function handleTotpEnable(req: express.Request, res: express.Response): void {
+export async function handleTotpEnable(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
   const lang = requestLang(req);
@@ -234,7 +234,7 @@ export function handleTotpEnable(req: express.Request, res: express.Response): v
     res.status(400).json({ error: t('auth.totp_disabled_with_oidc', lang) });
     return;
   }
-  const secret = getTotpSecret(username);
+  const secret = await getTotpSecret(username);
   if (!secret) {
     res.status(400).json({ error: t('auth.totp_required', lang) });
     return;
@@ -246,29 +246,29 @@ export function handleTotpEnable(req: express.Request, res: express.Response): v
     return;
   }
   const recovery = generateRecoveryCodes();
-  enableTotp(username, secret, recovery);
+  await enableTotp(username, secret, recovery);
   logger.info({ username }, 'Two-factor authentication enabled');
   res.json({ status: 'enabled', recovery_codes: recovery, message: t('auth.totp_enabled', lang) });
 }
 
 // Turns 2FA off. Requires the password and a current code (or a recovery code), so
 // neither a hijacked session nor a borrowed phone can silently disable it.
-export function handleTotpDisable(req: express.Request, res: express.Response): void {
+export async function handleTotpDisable(req: express.Request, res: express.Response): Promise<void> {
   const username = requireUser(req, res);
   if (!username) return;
   const lang = requestLang(req);
   const { password, code } = req.body as { password?: string; code?: string };
-  if (!verifyPassword(String(password ?? ''), getPasswordHash(username) ?? '')) {
+  if (!verifyPassword(String(password ?? ''), (await getPasswordHash(username)) ?? '')) {
     res.status(400).json({ error: t('auth.current_password_wrong', lang) });
     return;
   }
-  const secret = getTotpSecret(username);
+  const secret = await getTotpSecret(username);
   const supplied = String(code ?? '').trim();
-  if (!secret || !(verifyTotp(secret, supplied) || useRecoveryCode(username, supplied))) {
+  if (!secret || !(verifyTotp(secret, supplied) || await useRecoveryCode(username, supplied))) {
     res.status(400).json({ error: t('auth.totp_invalid', lang) });
     return;
   }
-  disableTotp(username);
+  await disableTotp(username);
   logger.info({ username }, 'Two-factor authentication disabled');
   res.json({ status: 'disabled', message: t('auth.totp_disabled', lang) });
 }
@@ -281,20 +281,11 @@ export function oidcManaged(): boolean {
   return !authDisabled() && !!getSettings().auth?.oidc;
 }
 
-// Finds a username from either a username or an email address.
-export function findUserByIdentifier(needle: string): string | undefined {
-  const wanted = needle.toLowerCase();
-  const row = getDb()
-    .prepare('SELECT username FROM users WHERE lower(username) = ? OR lower(email) = ?')
-    .get(wanted, wanted) as { username: string } | undefined;
-  return row?.username;
-}
-
 // Emails the recovery link when an email channel is configured, logs it otherwise.
 async function deliverResetLink(username: string, token: string): Promise<void> {
   const link = `/login?reset=${encodeURIComponent(token)}`;
   const email = getSettings().notifications?.email;
-  const profile = getProfile(username);
+  const profile = await getProfile(username);
   if (email?.enabled && profile.email) {
     try {
       await sendEmailMessage(

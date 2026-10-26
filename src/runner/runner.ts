@@ -41,11 +41,11 @@ function createCancelledMetrics(scenarioName: string, error: string): ScenarioMe
 }
 
 // Persists metrics to the database, prints the report, sends notifications, and broadcasts over WebSocket.
-function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): void {
+async function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): Promise<void> {
   if (options.persist) {
     try {
-      storeMetrics(metrics);
-      purgeOldData(getSettings().storage?.retentionDays ?? DEFAULT_PURGE_DAYS);
+      await storeMetrics(metrics);
+      await purgeOldData(getSettings().storage?.retentionDays ?? DEFAULT_PURGE_DAYS);
     } catch (err: unknown) {
       logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to store metrics');
     }
@@ -78,7 +78,7 @@ export async function runScenario(
 ): Promise<ScenarioMetrics> {
   if (scenario.tags?.length) {
     try {
-      upsertScenarioTags(scenario.name, scenario.tags);
+      await upsertScenarioTags(scenario.name, scenario.tags);
     } catch (err: unknown) {
       logger.warn({ scenario: scenario.name, err: err instanceof Error ? err.message : err }, 'Failed to store scenario tags');
     }
@@ -92,8 +92,8 @@ export async function runScenario(
       scenario.steps = resolveIncludes(scenario, options.scenariosDir);
     } catch (err: unknown) {
       const metrics = createCancelledMetrics(scenario.name, `Include resolution failed: ${err instanceof Error ? err.message : String(err)}`);
-      persistAndNotify(metrics, options);
-      return Promise.resolve(metrics);
+      await persistAndNotify(metrics, options);
+      return metrics;
     }
   }
 
@@ -112,18 +112,18 @@ export async function runScenario(
     runningWorkers.set(scenario.name, worker);
 
     // Safety timeout: kills the worker if it doesn't finish within reasonable bounds
-    const safetyTimer = setTimeout(() => {
+    const safetyTimer = setTimeout(async () => {
       if (!resolved) {
         resolved = true;
         runningWorkers.delete(scenario.name);
         worker.terminate();
         const metrics = createCancelledMetrics(scenario.name, `Scenario "${scenario.name}" timed out after ${timeoutMs}ms`);
-        persistAndNotify(metrics, options);
+        await persistAndNotify(metrics, options);
         resolve(metrics);
       }
     }, timeoutMs + 60000).unref();
 
-    worker.on('message', (msg: Record<string, unknown>) => {
+    worker.on('message', async (msg: Record<string, unknown>) => {
       if (msg.type === 'step_progress') {
         broadcastStepProgress({
           scenario_name: msg.scenario_name as string,
@@ -139,7 +139,7 @@ export async function runScenario(
           clearTimeout(safetyTimer);
           runningWorkers.delete(scenario.name);
           const metrics = msg.metrics as ScenarioMetrics;
-          persistAndNotify(metrics, options);
+          await persistAndNotify(metrics, options);
           resolve(metrics);
         }
       } else if (msg.type === 'error') {
@@ -149,32 +149,32 @@ export async function runScenario(
           runningWorkers.delete(scenario.name);
           logger.error({ scenario: scenario.name, error: msg.error }, 'Worker reported error');
           const metrics = createCancelledMetrics(scenario.name, String(msg.error));
-          persistAndNotify(metrics, options);
+          await persistAndNotify(metrics, options);
           resolve(metrics);
         }
       }
     });
 
-    worker.on('error', (err) => {
+    worker.on('error', async (err) => {
       if (!resolved) {
         resolved = true;
         clearTimeout(safetyTimer);
         runningWorkers.delete(scenario.name);
         logger.error({ scenario: scenario.name, err }, 'Worker error');
         const metrics = createCancelledMetrics(scenario.name, err instanceof Error ? err.message : String(err));
-        persistAndNotify(metrics, options);
+        await persistAndNotify(metrics, options);
         resolve(metrics);
       }
     });
 
-    worker.on('exit', (code) => {
+    worker.on('exit', async (code) => {
       clearTimeout(safetyTimer);
       if (!resolved) {
         resolved = true;
         runningWorkers.delete(scenario.name);
         logger.warn({ scenario: scenario.name, exitCode: code }, 'Worker exited unexpectedly');
         const metrics = createCancelledMetrics(scenario.name, `Worker exited with code ${code}`);
-        persistAndNotify(metrics, options);
+        await persistAndNotify(metrics, options);
         resolve(metrics);
       }
     });

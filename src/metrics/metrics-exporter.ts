@@ -32,9 +32,9 @@ export function metricsAuthMiddleware(req: express.Request, res: express.Respons
 }
 
 // Generates and returns Prometheus-format metrics for all scenarios.
-export function handleMetrics(_req: express.Request, res: express.Response): void {
+export async function handleMetrics(_req: express.Request, res: express.Response): Promise<void> {
   try {
-    const list = getScenarioList();
+    const list = await getScenarioList();
     const lines: string[] = [];
 
     lines.push('# HELP scenarii_scenario_runs_total Total number of scenario runs');
@@ -74,7 +74,7 @@ export function handleMetrics(_req: express.Request, res: express.Response): voi
     const stepLines: string[] = [];
     for (const s of list) {
       try {
-        const history = getScenarioHistory(s.name, DEFAULT_HISTORY_DAYS);
+        const history = await getScenarioHistory(s.name, DEFAULT_HISTORY_DAYS);
         if (history.length > 0) {
           const latest = history[0];
           for (const step of latest.steps) {

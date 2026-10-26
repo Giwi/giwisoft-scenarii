@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite, and monitor them on a modern Dashboard with dark/light themes.
+  Execute periodic YAML-defined web test scenarios via a headless browser (or native HTTP), store metrics in SQLite or PostgreSQL, and monitor them on a modern Dashboard with dark/light themes.
 </p>
 
 ## Quick start
@@ -52,7 +52,7 @@ node dist/index.js config --init
 | Option | Default | Description |
 |--------|---------|-------------|
 | `-p, --port` | `3000` | HTTP port |
-| `--db` | `db/scenarii.db` | SQLite database path |
+| `--db` | auto | SQLite database path or PostgreSQL connection URL (e.g. `postgres://user:pass@host:5432/scenarii`) |
 | `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files (watched every 5s - add/remove/rename files without restart) |
 | `--settings` | auto-detect | Path to settings file (hot-reloaded, see Notifications below) |
 
@@ -469,6 +469,11 @@ auth:
 
 storage:
   retentionDays: 30              # data retention period (default 7)
+  # Backend: 'sqlite' (default) or 'postgres'. A postgres:// connection string
+  # selects PostgreSQL; DATABASE_URL is also honoured as a fallback.
+  type: sqlite
+  # path: ./db/scenarii.db       # SQLite file (when type is sqlite)
+  # url: postgres://user:pass@host:5432/scenarii   # when type is postgres
   backup:                        # optional automated backups
     enabled: true
     cron: "0 4 * * *"           # default: daily at 4am

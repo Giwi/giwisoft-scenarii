@@ -17,7 +17,7 @@ export async function notifyIfStateChanged(metrics: ScenarioMetrics): Promise<vo
 
   let prevSuccess: boolean | null;
   try {
-    prevSuccess = getPreviousRunSuccess(metrics.scenario_name);
+    prevSuccess = await getPreviousRunSuccess(metrics.scenario_name);
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to get previous run success');
     return;

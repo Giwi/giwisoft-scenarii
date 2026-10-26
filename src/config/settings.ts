@@ -104,6 +104,12 @@ export interface AuthConfig {
 export interface StorageConfig {
   retentionDays?: number;
   backup?: BackupConfig;
+  // Storage backend: 'sqlite' (default) or 'postgres'.
+  type?: 'sqlite' | 'postgres';
+  // PostgreSQL connection string (used when type is 'postgres').
+  url?: string;
+  // SQLite database file path (used when type is 'sqlite').
+  path?: string;
 }
 
 // Per-scenario overrides for browser and notification settings

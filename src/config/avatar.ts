@@ -26,8 +26,8 @@ export function gravatarUrl(email: string | null, size = 96): string | undefined
 
 // The avatar URL for a user: the uploaded image when there is one, Gravatar otherwise, and
 // null when there is neither (no upload and no email to derive a Gravatar from).
-export function avatarUrlFor(username: string, size = 96): string | null {
-  const profile = getProfile(username);
+export async function avatarUrlFor(username: string, size = 96): Promise<string | null> {
+  const profile = await getProfile(username);
   if (profile.has_avatar) return `/api/profile/avatar/${encodeURIComponent(username)}?s=${size}`;
   return gravatarUrl(profile.email, size) ?? null;
 }
