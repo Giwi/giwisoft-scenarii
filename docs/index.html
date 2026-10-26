@@ -853,7 +853,7 @@ notifications:
                     <tr><th>Field</th><th>Type</th><th>Description</th></tr>
                     <tr><td><code>timeout</code></td><td>number</td><td>Per-step timeout. Default 30s for browser, 10s for HTTP.</td></tr>
                     <tr><td><code>condition</code></td><td>object</td><td><code>{ if_step: "Step name", if_success: true }</code> skips unless the named step matched.</td></tr>
-                    <tr><td><code>variables</code></td><td>object</td><td>Extract from JSON responses: <code>{ varName: "$.json.path" }</code>. Use <code>{{varName}}</code> later.</td></tr>
+                    <tr><td><code>variables</code></td><td>object</td><td>Extract from JSON responses: <code>{ varName: "$.json.path" }</code>. Use <code>{{varName}}</code> later. Missing variables fail the step before the request is sent.</td></tr>
                     <tr><td><code>expect</code></td><td>object</td><td>Assertions on status, body, headers, JSON, and response time.</td></tr>
                   </table>
                 </div>

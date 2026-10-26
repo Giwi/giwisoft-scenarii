@@ -221,12 +221,12 @@ function extractVariables(step: HttpStep, body: string, vars: Record<string, str
 }
 
 // Interpolates {{variables}} in string values anywhere inside a JSON body.
-function interpolateBody(value: unknown, vars: Record<string, string>): unknown {
-  if (typeof value === 'string') return interpolateVars(value, vars);
-  if (Array.isArray(value)) return value.map(item => interpolateBody(item, vars));
+function interpolateBody(value: unknown, vars: Record<string, string>, stepName: string): unknown {
+  if (typeof value === 'string') return interpolateVars(value, vars, stepName);
+  if (Array.isArray(value)) return value.map(item => interpolateBody(item, vars, stepName));
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, interpolateBody(item, vars)])
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, interpolateBody(item, vars, stepName)])
     );
   }
   return value;
@@ -249,23 +249,23 @@ export async function executeHttpStep(
   };
 
   try {
-    const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
+    const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars, step.name));
     const method = step.action.split('.')[1].toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     let headers = step.headers
       ? Object.fromEntries(
-          Object.entries(step.headers).map(([k, v]) => [k, interpolateVars(v, vars)])
+          Object.entries(step.headers).map(([k, v]) => [k, interpolateVars(v, vars, step.name)])
         )
       : undefined;
 
     let body: string | undefined;
     if (step.body && typeof step.body === 'object') {
-      body = JSON.stringify(interpolateBody(step.body, vars));
+      body = JSON.stringify(interpolateBody(step.body, vars, step.name));
       // Object bodies are serialised as JSON; supply the header unless the user set one.
       if (!headers || !Object.keys(headers).some(k => k.toLowerCase() === 'content-type')) {
         headers = { ...(headers ?? {}), 'Content-Type': 'application/json' };
       }
     } else if (step.body) {
-      body = interpolateVars(String(step.body), vars);
+      body = interpolateVars(String(step.body), vars, step.name);
     }
 
     const response = await doFetch(resolvedUrl, method, headers, body, signal);

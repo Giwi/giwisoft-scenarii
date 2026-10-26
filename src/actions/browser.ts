@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars, resolveJsonPath } from '../utils/helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath, UnresolvedVariableError } from '../utils/helpers';
 import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD } from '../utils/constants';
 
 const BROWSER_RETRIES = 2;
@@ -19,7 +19,7 @@ async function checkBrowserExpectations(
 
   if (expect.has_text) {
     const text = await page.textContent('body');
-    const expected = interpolateVars(expect.has_text, vars);
+    const expected = interpolateVars(expect.has_text, vars, step.name);
     if (!text || !text.includes(expected)) {
       return `Page body does not contain text: "${expected}"`;
     }
@@ -27,7 +27,7 @@ async function checkBrowserExpectations(
 
   if (expect.not_has_text) {
     const text = await page.textContent('body');
-    const expected = interpolateVars(expect.not_has_text, vars);
+    const expected = interpolateVars(expect.not_has_text, vars, step.name);
     if (text && text.includes(expected)) {
       return `Page body contains unexpected text: "${expected}"`;
     }
@@ -35,7 +35,7 @@ async function checkBrowserExpectations(
 
   if (expect.url_contains) {
     const currentUrl = page.url();
-    const expected = interpolateVars(expect.url_contains, vars);
+    const expected = interpolateVars(expect.url_contains, vars, step.name);
     if (!currentUrl.includes(expected)) {
       return `URL "${currentUrl}" does not contain "${expected}"`;
     }
@@ -78,7 +78,7 @@ export async function executeBrowserStep(
       switch (step.action) {
         case 'browser.navigate': {
           if (!step.url) throw new Error('browser.navigate requires a "url" field');
-          const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars));
+          const resolvedUrl = resolveUrl(base_url, interpolateVars(step.url, vars, step.name));
           try {
             await page.goto(resolvedUrl, { waitUntil: 'load', timeout: DEFAULT_PAGE_TIMEOUT });
           } catch {
@@ -94,7 +94,7 @@ export async function executeBrowserStep(
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           // Uses native setter dispatch for reliable React/Angular form control compatibility
           const sel = JSON.stringify(step.selector);
-          const val = JSON.stringify(interpolateVars(step.value, vars));
+          const val = JSON.stringify(interpolateVars(step.value, vars, step.name));
           await page.evaluate(`(() => {
           const el = document.querySelector(${sel});
           if (!el) throw new Error('Element not found: ' + ${sel});
@@ -111,7 +111,7 @@ export async function executeBrowserStep(
           if (step.value === undefined) throw new Error('browser.type requires a "value" field');
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           const typedSel = JSON.stringify(step.selector);
-          const typedVal = JSON.stringify(interpolateVars(step.value, vars));
+          const typedVal = JSON.stringify(interpolateVars(step.value, vars, step.name));
           await page.evaluate(`(() => {
           const el = document.querySelector(${typedSel});
           if (!el) throw new Error('Element not found: ' + ${typedSel});
@@ -149,7 +149,7 @@ export async function executeBrowserStep(
           if (!step.selector) throw new Error('browser.select requires a "selector" field');
           if (step.value === undefined) throw new Error('browser.select requires a "value" field');
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
-          await page.selectOption(step.selector, interpolateVars(step.value, vars));
+          await page.selectOption(step.selector, interpolateVars(step.value, vars, step.name));
           break;
         }
 
@@ -229,6 +229,8 @@ export async function executeBrowserStep(
       stepMetrics.success = false;
       stepMetrics.error = err instanceof Error ? err.message : String(err);
       stepMetrics.response_time_ms = Date.now() - start;
+      // Missing variables will not resolve on retry.
+      if (err instanceof UnresolvedVariableError) return stepMetrics;
     }
 
     // Return on success or final attempt — otherwise retry

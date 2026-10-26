@@ -32,9 +32,24 @@ export function resolveUrl(base_url: string | undefined, url: string): string {
   return `${base_url.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
 }
 
+export class UnresolvedVariableError extends Error {
+  constructor(key: string, stepName?: string) {
+    super(stepName
+      ? `Unresolved variable "{{${key}}}" in step "${stepName}"`
+      : `Unresolved variable "{{${key}}}"`);
+    this.name = 'UnresolvedVariableError';
+  }
+}
+
 // Replaces {{variable}} placeholders in a template string with values from the vars map.
-export function interpolateVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+// Throws instead of sending a request with a literal placeholder when a variable is missing.
+export function interpolateVars(template: string, vars: Record<string, string>, stepName?: string): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+    if (!Object.prototype.hasOwnProperty.call(vars, key)) {
+      throw new UnresolvedVariableError(key, stepName);
+    }
+    return vars[key];
+  });
 }
 
 // Navigates a parsed JSON object using a dot-notation path (e.g. $.data.items[0].id).

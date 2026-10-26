@@ -247,6 +247,28 @@ describe('executeHttpStep request body', () => {
     }
   });
 
+  it('fails before fetching when a URL variable is unresolved', async () => {
+    let called = false;
+    const fetchMock = mock.method(globalThis, 'fetch', async () => {
+      called = true;
+      return new Response('{}', { status: 200 });
+    });
+    try {
+      const step = {
+        name: 'Login',
+        action: 'http.get',
+        url: '/api/{{typo}}',
+      } as HttpStep;
+      const metrics = await executeHttpStep(step, 'https://example.com', {});
+
+      assert.strictEqual(metrics.success, false);
+      assert.strictEqual(metrics.error, 'Unresolved variable "{{typo}}" in step "Login"');
+      assert.strictEqual(called, false);
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
   it('includes body download time in response_time_ms', async () => {
     const fetchMock = mock.method(globalThis, 'fetch', async () => ({
       status: 200,

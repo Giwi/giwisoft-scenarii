@@ -32,8 +32,29 @@ describe('interpolateVars', () => {
     assert.strictEqual(interpolateVars('{{a}}-{{b}}-{{a}}', { a: '1', b: '2' }), '1-2-1');
   });
 
-  it('leaves unknown variables as-is', () => {
-    assert.strictEqual(interpolateVars('/api/{{missing}}', {}), '/api/{{missing}}');
+  it('throws for unknown variables instead of leaving placeholders', () => {
+    assert.throws(
+      () => interpolateVars('/api/{{missing}}', {}),
+      /Unresolved variable "\{\{missing\}\}"/,
+    );
+  });
+
+  it('includes the step name when provided', () => {
+    assert.throws(
+      () => interpolateVars('/api/{{missing}}', {}, 'Login'),
+      /Unresolved variable "\{\{missing\}\}" in step "Login"/,
+    );
+  });
+
+  it('allows variables with an empty string value', () => {
+    assert.strictEqual(interpolateVars('/api/{{empty}}', { empty: '' }), '/api/');
+  });
+
+  it('does not resolve inherited object properties', () => {
+    assert.throws(
+      () => interpolateVars('/api/{{constructor}}', {}),
+      /Unresolved variable "\{\{constructor\}\}"/,
+    );
   });
 
   it('handles strings with no variables', () => {

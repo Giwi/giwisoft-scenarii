@@ -158,7 +158,7 @@ Browser steps automatically retry up to 2 times with exponential backoff (1s, 2s
 
 ### Variables
 
-Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses or browser evaluate results using the `variables` field with a `json_path` selector.
+Steps can reference values from previous steps using `{{variable_name}}`. Variables are extracted from HTTP responses or browser evaluate results using the `variables` field with a `json_path` selector. An unresolved placeholder fails the step before any request is sent, and the error includes the step name.
 
 ```yaml
 - name: Get token
