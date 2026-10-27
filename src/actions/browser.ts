@@ -13,6 +13,13 @@ function capString(s: string): string {
   return buf.subarray(0, MAX_CAPTURE_BYTES).toString('utf-8') + `\n... [truncated ${buf.length - MAX_CAPTURE_BYTES} bytes]`;
 }
 
+// URL matching for wait_for_response: "*" wildcards or a plain substring.
+function urlMatches(pattern: string, url: string): boolean {
+  if (!pattern.includes('*')) return url.includes(pattern);
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  return new RegExp(`^${escaped}$`).test(url);
+}
+
 // Validates browser-level expectations against the current page state.
 // Returns an error string on failure, or null if all expectations pass.
 async function checkBrowserExpectations(
@@ -153,6 +160,73 @@ export async function executeBrowserStep(
           if (!step.selector) throw new Error('browser.uncheck requires a "selector" field');
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
           await page.uncheck(step.selector);
+          break;
+        }
+
+        case 'browser.hover': {
+          if (!step.selector) throw new Error('browser.hover requires a "selector" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          await page.hover(step.selector);
+          break;
+        }
+
+        case 'browser.clear': {
+          if (!step.selector) throw new Error('browser.clear requires a "selector" field');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          await page.locator(step.selector).fill('');
+          break;
+        }
+
+        case 'browser.press': {
+          if (!step.value) throw new Error('browser.press requires a "value" field (key name)');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          if (step.selector) await page.focus(step.selector);
+          await page.keyboard.press(interpolateVars(step.value, vars, step.name));
+          break;
+        }
+
+        case 'browser.upload_file': {
+          if (!step.selector) throw new Error('browser.upload_file requires a "selector" field');
+          if (!step.value) throw new Error('browser.upload_file requires a "value" field (file path)');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          const filePath = path.resolve(interpolateVars(step.value, vars, step.name));
+          if (!fs.existsSync(filePath)) throw new Error(`Upload file not found: ${filePath}`);
+          await page.setInputFiles(step.selector, filePath);
+          break;
+        }
+
+        case 'browser.wait_for_response': {
+          if (!step.url) throw new Error('browser.wait_for_response requires a "url" field (URL pattern)');
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          const pattern = interpolateVars(step.url, vars, step.name);
+          const method = step.value ? interpolateVars(step.value, vars, step.name).toUpperCase() : undefined;
+          const response = await page.waitForResponse(
+            res => urlMatches(pattern, res.url()) && (!method || res.request().method() === method),
+            { timeout: step.timeout ?? DEFAULT_PAGE_TIMEOUT },
+          );
+          stepMetrics.status_code = response.status();
+          break;
+        }
+
+        case 'browser.assert': {
+          if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
+          const expected = step.value !== undefined ? interpolateVars(step.value, vars, step.name) : undefined;
+          if (step.selector) {
+            const locator = page.locator(step.selector).first();
+            await locator.waitFor({ state: 'visible', timeout: step.timeout ?? DEFAULT_SELECTOR_TIMEOUT });
+            if (expected !== undefined) {
+              const text = (await locator.textContent()) ?? '';
+              if (!text.includes(expected)) {
+                throw new Error(`Selector "${step.selector}" text does not contain "${expected}" (got "${text}")`);
+              }
+            }
+          } else if (expected !== undefined) {
+            const body = (await page.textContent('body')) ?? '';
+            if (!body.includes(expected)) {
+              throw new Error(`Page body does not contain "${expected}"`);
+            }
+          }
+          // Additional has_text/url_contains/selector_count checks run below via expect.
           break;
         }
 

@@ -916,6 +916,12 @@ notifications:
                     <tr><td><code>browser.select</code></td><td><code>selector</code>, <code>value</code></td><td>Select an option from a <code>&lt;select&gt;</code>.</td></tr>
                     <tr><td><code>browser.check</code></td><td><code>selector</code></td><td>Check a checkbox or radio button.</td></tr>
                     <tr><td><code>browser.uncheck</code></td><td><code>selector</code></td><td>Uncheck a checkbox.</td></tr>
+                    <tr><td><code>browser.hover</code></td><td><code>selector</code></td><td>Move the pointer over an element.</td></tr>
+                    <tr><td><code>browser.clear</code></td><td><code>selector</code></td><td>Clear an input or textarea.</td></tr>
+                    <tr><td><code>browser.press</code></td><td><code>value</code>, optional <code>selector</code></td><td>Press a key (<code>Enter</code>, <code>Escape</code>, <code>Tab</code>, ...), optionally focusing a selector first.</td></tr>
+                    <tr><td><code>browser.upload_file</code></td><td><code>selector</code>, <code>value</code></td><td>Set a file input to a path on the runner host.</td></tr>
+                    <tr><td><code>browser.wait_for_response</code></td><td><code>url</code>, optional <code>value</code>, <code>timeout</code></td><td>Wait for a matching network response; <code>url</code> supports <code>*</code> wildcards, <code>value</code> filters the method.</td></tr>
+                    <tr><td><code>browser.assert</code></td><td><code>selector</code>, <code>value</code>, or <code>expect</code></td><td>Assert visibility, expected text, or browser expectations; failures fail the step with a readable message.</td></tr>
                     <tr><td><code>browser.wait_for</code></td><td><code>selector</code>, <code>timeout</code>, <code>expect</code></td><td>Wait for an element. Check <code>has_text</code>, <code>not_has_text</code>, or <code>url_contains</code>.</td></tr>
                     <tr><td><code>browser.evaluate</code></td><td><code>script</code></td><td>Run JavaScript in the page context.</td></tr>
                     <tr><td><code>browser.scroll</code></td><td><code>value</code> or <code>selector</code></td><td>Scroll by pixels, or scroll an element into view.</td></tr>

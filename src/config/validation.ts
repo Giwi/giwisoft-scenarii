@@ -18,7 +18,8 @@ const HTTP_ACTIONS = ['http.get', 'http.post', 'http.put', 'http.patch', 'http.d
 const BROWSER_ACTIONS = [
   'browser.navigate', 'browser.fill', 'browser.click', 'browser.wait_for', 'browser.screenshot',
   'browser.screenshot_compare', 'browser.select', 'browser.evaluate', 'browser.type',
-  'browser.check', 'browser.uncheck', 'browser.scroll',
+  'browser.check', 'browser.uncheck', 'browser.scroll', 'browser.press', 'browser.hover',
+  'browser.clear', 'browser.upload_file', 'browser.wait_for_response', 'browser.assert',
 ] as const;
 
 const HTTP_EXPECT_KEYS = [
@@ -288,7 +289,31 @@ function validateStep(value: unknown, index: number): void {
     case 'browser.check':
     case 'browser.uncheck':
     case 'browser.wait_for':
+    case 'browser.hover':
+    case 'browser.clear':
       requireSelector(value, label, action);
+      break;
+    case 'browser.press':
+      if (value.value === undefined) throw new Error(`${label} (${action}) requires a "value" field (key name)`);
+      assertString(value.value, `${label}.value`);
+      if (value.selector !== undefined) assertString(value.selector, `${label}.selector`);
+      break;
+    case 'browser.upload_file':
+      requireSelector(value, label, action);
+      if (value.value === undefined) throw new Error(`${label} (${action}) requires a "value" field (file path)`);
+      assertString(value.value, `${label}.value`);
+      break;
+    case 'browser.wait_for_response':
+      if (value.url === undefined) throw new Error(`${label} (${action}) requires a "url" field (URL pattern)`);
+      assertString(value.url, `${label}.url`);
+      if (value.value !== undefined) assertString(value.value, `${label}.value`);
+      break;
+    case 'browser.assert':
+      if (value.selector !== undefined) assertString(value.selector, `${label}.selector`);
+      if (value.value !== undefined) assertString(value.value, `${label}.value`, true);
+      if (value.selector === undefined && value.value === undefined && value.expect === undefined) {
+        throw new Error(`${label} (${action}) requires a "selector", "value", or "expect" field`);
+      }
       break;
     case 'browser.evaluate':
       if (value.script === undefined) throw new Error(`${label} (${action}) requires a "script" field`);

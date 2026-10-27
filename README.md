@@ -158,6 +158,12 @@ HTTP steps do not retry by default. Set `retries` to retry a failed request or e
 | `browser.select` | `selector`, `value` |
 | `browser.evaluate` | `script` (JavaScript to run in the page), `variables` (capture return value fields via JSONPath) |
 | `browser.check` / `browser.uncheck` | `selector` |
+| `browser.hover` | `selector` |
+| `browser.clear` | `selector` (clears an input or textarea) |
+| `browser.press` | `value` (key, e.g. `Enter`, `Escape`, `Tab`, `Control+A`), optional `selector` to focus first |
+| `browser.upload_file` | `selector` (file input), `value` (path on the runner host) |
+| `browser.wait_for_response` | `url` (URL pattern with `*` wildcards or a substring), `value` (optional HTTP method), `timeout` |
+| `browser.assert` | at least one of `selector` (must be visible), `value` (expected text), or `expect` (has_text, not_has_text, url_contains, selector_count) |
 | `browser.screenshot` | `value` (output path) |
 | `browser.screenshot_compare` | `value` (baseline path - creates baseline on first run, compares on subsequent) |
 | `browser.scroll` | `value` (pixels to scroll down), `selector` (scroll element into view) |

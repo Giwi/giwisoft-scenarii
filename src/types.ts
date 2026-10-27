@@ -55,7 +55,13 @@ export interface BrowserStep {
     | 'browser.type'
     | 'browser.check'
     | 'browser.uncheck'
-    | 'browser.scroll';
+    | 'browser.scroll'
+    | 'browser.press'
+    | 'browser.hover'
+    | 'browser.clear'
+    | 'browser.upload_file'
+    | 'browser.wait_for_response'
+    | 'browser.assert';
   url?: string;
   selector?: string;
   value?: string;

@@ -342,6 +342,50 @@ steps:
     );
   });
 
+  it('validates the extended browser actions', () => {
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.press\n'),
+      /requires a "value" field/,
+    );
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.hover\n'),
+      /requires a "selector" field/,
+    );
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.upload_file\n    selector: "#file"\n'),
+      /requires a "value" field/,
+    );
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.wait_for_response\n'),
+      /requires a "url" field/,
+    );
+    assert.throws(
+      () => parseScenario('name: x\nsteps:\n  - action: browser.assert\n'),
+      /requires a "selector", "value", or "expect" field/,
+    );
+
+    const scenario = parseScenario(`name: x
+steps:
+  - action: browser.press
+    value: Enter
+  - action: browser.clear
+    selector: "#search"
+  - action: browser.hover
+    selector: "#menu"
+  - action: browser.upload_file
+    selector: "#file"
+    value: ./fixtures/a.txt
+  - action: browser.wait_for_response
+    url: "*/api/items*"
+    value: POST
+  - action: browser.assert
+    selector: "#result"
+    value: Success
+`);
+    assert.strictEqual(scenario.steps.length, 6);
+    assert.strictEqual((scenario.steps[0] as BrowserStep).action, 'browser.press');
+  });
+
   it('allows an empty browser value', () => {
     const s = parseScenario('name: x\nsteps:\n  - action: browser.fill\n    selector: "#a"\n    value: ""\n');
     assert.strictEqual((s.steps[0] as BrowserStep).value, '');
