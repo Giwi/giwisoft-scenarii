@@ -31,7 +31,7 @@ import {
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
 import { t } from '../i18n';
 import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
-import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort } from '../utils/helpers';
+import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort, getScreenshotsDir, getScreenshotBaselinesDir, getScreenshotDiffsDir, purgeOldScreenshots } from '../utils/helpers';
 import logger from '../utils/logger';
 import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from '../utils/constants';
 
@@ -664,6 +664,72 @@ export function createApp(): express.Application {
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
 
+  // Screenshots/artifacts
+  app.get('/api/artifacts/screenshots', (_req, res) => {
+    try {
+      const dirs = [getScreenshotsDir(), getScreenshotBaselinesDir(), getScreenshotDiffsDir()];
+      const files: Array<{ name: string; path: string; type: string }> = [];
+      for (const dir of dirs) {
+        if (!fs.existsSync(dir)) continue;
+        for (const f of fs.readdirSync(dir)) {
+          const full = path.join(dir, f);
+          const stat = fs.statSync(full);
+          if (stat.isFile()) {
+            files.push({ name: f, path: full, type: path.basename(dir) });
+          }
+        }
+      }
+      res.json({ files });
+    } catch (err: unknown) {
+      sendError(res, 500, err);
+    }
+  });
+  app.get('/api/artifacts/screenshots/file', (req, res) => {
+    try {
+      const file = req.query.file as string;
+      if (!file) return res.status(400).json({ error: 'file required' });
+      const resolved = path.resolve(file);
+      const allowed = [path.resolve(getScreenshotsDir()), path.resolve(getScreenshotBaselinesDir()), path.resolve(getScreenshotDiffsDir())];
+      if (!allowed.some(a => resolved.startsWith(a + path.sep) || resolved === a)) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
+      if (!fs.existsSync(resolved)) return res.status(404).json({ error: 'not found' });
+      res.sendFile(resolved);
+    } catch (err: unknown) {
+      sendError(res, 500, err);
+    }
+  });
+  app.post('/api/artifacts/screenshots/approve', (req, res) => {
+    try {
+      const { file } = req.body || {};
+      if (!file) return res.status(400).json({ error: 'file required' });
+      const resolved = path.resolve(file);
+      const diffsDir = path.resolve(getScreenshotDiffsDir());
+      const baselinesDir = path.resolve(getScreenshotBaselinesDir());
+      if (!resolved.startsWith(diffsDir + path.sep)) return res.status(403).json({ error: 'forbidden' });
+      const name = path.basename(resolved);
+      const baseName = name.replace(/^current-/, 'baseline-').replace(/-\d+\.png$/, '.png');
+      const target = path.join(baselinesDir, baseName);
+      fs.copyFileSync(resolved, target);
+      res.json({ ok: true, baseline: target });
+    } catch (err: unknown) {
+      sendError(res, 500, err);
+    }
+  });
+  app.post('/api/artifacts/screenshots/reject', (req, res) => {
+    try {
+      const { file } = req.body || {};
+      if (!file) return res.status(400).json({ error: 'file required' });
+      const resolved = path.resolve(file);
+      const diffsDir = path.resolve(getScreenshotDiffsDir());
+      if (!resolved.startsWith(diffsDir + path.sep)) return res.status(403).json({ error: 'forbidden' });
+      if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+      res.json({ ok: true });
+    } catch (err: unknown) {
+      sendError(res, 500, err);
+    }
+  });
+
   // Public (unauthenticated) endpoints
   app.get('/api/public/scenario/:name', handlePublicScenarioApi);
   app.get('/public/status/:name', handlePublicScenarioStatus);
@@ -751,6 +817,26 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
     } catch (err: unknown) {
       logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to schedule backup');
     }
+  }
+
+  // Purge old screenshots based on retention
+  try {
+    const retentionDays = s.storage?.retentionDays;
+    if (retentionDays && retentionDays > 0) {
+      const cron = require('node-cron');
+      if (cron.validate('0 3 * * *')) {
+        cron.schedule('0 3 * * *', () => {
+          try {
+            const removed = purgeOldScreenshots(retentionDays);
+            if (removed > 0) logger.info({ removed }, 'Purged old screenshots');
+          } catch (err: unknown) {
+            logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to purge old screenshots');
+          }
+        });
+      }
+    }
+  } catch (err: unknown) {
+    logger.warn({ err: err instanceof Error ? err.message : err }, 'Failed to schedule screenshot purge');
   }
 
   return server;

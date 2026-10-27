@@ -2,8 +2,59 @@
 // JSON path resolution, port polling, and various output-formatting helpers (CSV, Prometheus, HTML).
 
 import net from 'net';
+import fs from 'fs';
+import path from 'path';
 import { ScenarioMetrics } from '../types';
 import { DEFAULT_HISTORY_DAYS, MIN_DAYS, MAX_DAYS } from './constants';
+
+export function getDataDir(): string {
+  const envDir = process.env.SCENARII_DATA_DIR || process.env.DATA_DIR;
+  if (envDir) return path.resolve(envDir);
+  return path.resolve(process.cwd(), 'data');
+}
+
+export function ensureDir(dir: string): void {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+export function getScreenshotsDir(): string {
+  const dir = path.join(getDataDir(), 'screenshots');
+  ensureDir(dir);
+  return dir;
+}
+
+export function getScreenshotBaselinesDir(): string {
+  const dir = path.join(getDataDir(), 'screenshots', 'baselines');
+  ensureDir(dir);
+  return dir;
+}
+
+export function getScreenshotDiffsDir(): string {
+  const dir = path.join(getDataDir(), 'screenshots', 'diffs');
+  ensureDir(dir);
+  return dir;
+}
+
+export function purgeOldScreenshots(maxAgeDays: number): number {
+  if (maxAgeDays <= 0) return 0;
+  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  let removed = 0;
+  const dirs = [getScreenshotsDir(), getScreenshotDiffsDir()];
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir)) {
+      const full = path.join(dir, f);
+      try {
+        const stat = fs.statSync(full);
+        if (stat.isFile() && stat.mtimeMs < cutoff) {
+          fs.unlinkSync(full);
+          removed++;
+        }
+      } catch { /* ignore */ }
+    }
+  }
+  return removed;
+}
 
 // Polls a TCP port until it becomes reachable or the timeout is exceeded.
 export function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {

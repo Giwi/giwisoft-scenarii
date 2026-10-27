@@ -1,7 +1,8 @@
 import fs from 'fs';
+import path from 'path';
 import { Page } from 'playwright-core';
 import { BrowserStep, StepMetrics } from '../types';
-import { resolveUrl, interpolateVars, resolveJsonPath, UnresolvedVariableError } from '../utils/helpers';
+import { resolveUrl, interpolateVars, resolveJsonPath, UnresolvedVariableError, getScreenshotsDir, getScreenshotBaselinesDir, getScreenshotDiffsDir } from '../utils/helpers';
 import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD, DEFAULT_BROWSER_RETRIES, DEFAULT_RETRY_DELAY } from '../utils/constants';
 
 const MAX_CAPTURE_BYTES = 8192;
@@ -172,30 +173,37 @@ export async function executeBrowserStep(
 
         case 'browser.screenshot': {
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
-          const path = step.value || `screenshot-${Date.now()}.png`;
-          await page.screenshot({ path, fullPage: true });
+          const screenshotsDir = getScreenshotsDir();
+          const filename = step.value && path.isAbsolute(step.value) ? step.value : path.join(screenshotsDir, step.value || `screenshot-${Date.now()}.png`);
+          await page.screenshot({ path: filename, fullPage: true });
+          stepMetrics.error = `Screenshot saved: ${filename}`;
           break;
         }
 
         case 'browser.screenshot_compare': {
           if (signal?.aborted) throw new Error(`Step "${step.name}" aborted by user`);
-          const basePath = step.value || `baseline-${step.name}.png`;
-          const currentPath = `current-${step.name}-${Date.now()}.png`;
+          const baselinesDir = getScreenshotBaselinesDir();
+          const diffsDir = getScreenshotDiffsDir();
+          const basePath = step.value && path.isAbsolute(step.value) ? step.value : path.join(baselinesDir, step.value || `baseline-${step.name}.png`);
+          const currentPath = path.join(diffsDir, `current-${step.name}-${Date.now()}.png`);
           await page.screenshot({ path: currentPath, fullPage: true });
           if (!fs.existsSync(basePath)) {
             // First run — save as baseline and skip comparison
+            fs.mkdirSync(path.dirname(basePath), { recursive: true });
             fs.renameSync(currentPath, basePath);
             stepMetrics.error = `Baseline created at ${basePath}`;
             throw new Error('Baseline created — no comparison performed');
           }
           const baseBuf = fs.readFileSync(basePath);
           const curBuf = fs.readFileSync(currentPath);
-          fs.unlinkSync(currentPath);
           if (baseBuf.length !== curBuf.length) {
             const diff = Math.abs(baseBuf.length - curBuf.length) / Math.max(baseBuf.length, curBuf.length);
             if (diff > SCREENSHOT_COMPARE_THRESHOLD) {
               throw new Error(`Screenshot differs from baseline (size diff ${(diff * 100).toFixed(1)}%)`);
             }
+            fs.unlinkSync(currentPath);
+          } else {
+            fs.unlinkSync(currentPath);
           }
           break;
         }
