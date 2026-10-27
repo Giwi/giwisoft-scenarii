@@ -135,6 +135,36 @@ export interface ScenarioOverrides {
   notifications?: { enabled?: boolean };
 }
 
+// Inbound CI webhooks (GitHub/GitLab push and pull/merge request events)
+export type WebhookProvider = 'github' | 'gitlab';
+
+export interface WebhookRuleConfig {
+  provider?: WebhookProvider;
+  // Repository full name: "org/repo" (GitHub) or "group/project" (GitLab).
+  repository?: string;
+  // Events to accept: "push", "pull_request", "merge_request". Defaults to all.
+  events?: string[];
+  // Branch patterns matched against the pushed branch or the PR/MR target branch.
+  // Supports "*" wildcards, e.g. "main", "release/*".
+  branches?: string[];
+  // Scenario to run when the rule matches.
+  scenario: string;
+  // Extra scenario variables. Supports {{repository}}, {{branch}}, {{target_branch}},
+  // {{sha}}, {{pr}}, {{event}}, {{action}}.
+  variables?: Record<string, string>;
+}
+
+export interface InboundWebhookConfig {
+  enabled?: boolean;
+  // Shared secret. GitHub uses HMAC-SHA256 (X-Hub-Signature-256); GitLab uses the
+  // secret token (X-Gitlab-Token).
+  secret?: string;
+  // Scenario used when no rule matches, if set.
+  scenario?: string;
+  rules?: WebhookRuleConfig[];
+}
+
+
 // Top-level settings object loaded from settings.yaml
 export interface Settings {
   api?: ApiConfig;
@@ -142,6 +172,7 @@ export interface Settings {
   storage?: StorageConfig;
   notifications?: NotificationsConfig;
   scenarios?: Record<string, ScenarioOverrides>;
+  webhooks?: InboundWebhookConfig;
 }
 
 let settings: Settings | undefined;

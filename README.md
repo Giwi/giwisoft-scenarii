@@ -362,6 +362,8 @@ node dist/index.js server
 | `GET /api/scenarios/export` | Download all scenarios as a YAML bundle file |
 | `GET /api/groups` | List all distinct scenario groups |
 | `GET /api/runs/:id` | Fetch one persisted run with all steps (requires `read`) |
+| `POST /api/webhooks/github` | Inbound GitHub push/PR webhook (HMAC-SHA256 signature, no session) |
+| `POST /api/webhooks/gitlab` | Inbound GitLab push/MR webhook (`X-Gitlab-Token`, no session) |
 | `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |
 | `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=&days=`) |
 | `POST /api/scenarios/:name/run` | Trigger an ad-hoc run. `?wait=true` blocks until completion and returns `{status, run_id, metrics}` (requires `trigger`) |
@@ -430,6 +432,32 @@ curl -X POST -H "Authorization: Bearer $TRIGGER_TOKEN" \
   "https://scenarii.example.com/api/scenarios/smoke/run?wait=true"
 # { "status": "passed", "run_id": 42, "metrics": { ... } }
 ```
+
+## Inbound CI webhooks
+
+Turn Scenarii into a preview-deploy checker: a GitHub or GitLab push / pull request runs a scenario, with the branch, commit, and PR number exposed as variables.
+
+```yaml
+webhooks:
+  enabled: true
+  secret: "YOUR_WEBHOOK_SECRET"
+  # Optional fallback scenario when no rule matches.
+  # scenario: "smoke"
+  rules:
+    - provider: github
+      repository: "acme/web"
+      events: ["push", "pull_request"]
+      branches: ["main", "release/*"]   # source or target branch; * wildcard
+      scenario: "preview-check"
+      variables:
+        PREVIEW_URL: "https://preview-{{pr}}.example.com"
+```
+
+- GitHub: add a webhook with content type `application/json` and the same secret. The `X-Hub-Signature-256` HMAC over the raw body is verified in constant time.
+- GitLab: enable the webhook with the secret token. `X-Gitlab-Token` is compared in constant time.
+- Events: GitHub pushes and `pull_request` actions `opened`, `reopened`, `synchronize`, `ready_for_review`; GitLab pushes and merge-request actions `open`, `reopen`, `update`.
+- Variables available to the scenario: `WEBHOOK_EVENT`, `WEBHOOK_REPOSITORY`, `WEBHOOK_BRANCH`, `WEBHOOK_TARGET_BRANCH`, `WEBHOOK_SHA`, `WEBHOOK_PR`. Rule variables support `{{repository}}`, `{{branch}}`, `{{target_branch}}`, `{{sha}}`, `{{pr}}`, `{{event}}`, `{{action}}`.
+- Responses: `202` accepted/ignored/duplicate, `200` ping, `401` bad signature/token, `404` unknown scenario, `503` secret not configured. Deliveries are deduplicated for 10 minutes.
 
 ## Real-time updates
 

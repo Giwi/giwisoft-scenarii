@@ -1034,8 +1034,33 @@ GET    /api/status
 GET    /api/health
 POST   /api/backup
 GET    /api/tags
-GET    /api/metrics                    <span class="tok-comment">Prometheus format</span></code></pre>
+GET    /api/metrics                    <span class="tok-comment">Prometheus format</span>
+
+<span class="tok-comment"># Inbound webhooks (signature auth, no session)</span>
+POST   /api/webhooks/github            <span class="tok-comment">X-Hub-Signature-256</span>
+POST   /api/webhooks/gitlab            <span class="tok-comment">X-Gitlab-Token</span></code></pre>
                 </div>
+
+                <h4>Inbound CI webhooks</h4>
+                <p>Run a scenario from a GitHub or GitLab push / pull request. This is the building block for preview-deploy checks: point the provider at <code>/api/webhooks/github</code> or <code>/api/webhooks/gitlab</code>, set the same secret, and map repositories and branches to scenarios.</p>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">settings.yml</span>
+                    <button class="copy" type="button" data-copy="code-webhooks">Copy</button>
+                  </div>
+                  <pre id="code-webhooks"><code>webhooks:
+  enabled: true
+  secret: <span class="tok-string">"YOUR_WEBHOOK_SECRET"</span>
+  rules:
+    - provider: github
+      repository: <span class="tok-string">"acme/web"</span>
+      events: [<span class="tok-string">"push"</span>, <span class="tok-string">"pull_request"</span>]
+      branches: [<span class="tok-string">"main"</span>, <span class="tok-string">"release/*"</span>]
+      scenario: <span class="tok-string">"preview-check"</span>
+      variables:
+        PREVIEW_URL: <span class="tok-string">"https://preview-{{pr}}.example.com"</span></code></pre>
+                </div>
+                <p>Scenarios receive <code>WEBHOOK_EVENT</code>, <code>WEBHOOK_REPOSITORY</code>, <code>WEBHOOK_BRANCH</code>, <code>WEBHOOK_TARGET_BRANCH</code>, <code>WEBHOOK_SHA</code>, and <code>WEBHOOK_PR</code>. GitHub signatures are verified as HMAC-SHA256 over the raw body; GitLab uses the secret token header. Retries are deduplicated for 10 minutes.</p>
               </div>
             </details>
 

@@ -29,6 +29,7 @@ import {
   handleTotpSetup, handleTotpEnable, handleTotpDisable,
 } from './profile';
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
+import { handleWebhook } from './webhooks';
 import { t } from '../i18n';
 import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
 import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort, getScreenshotsDir, getScreenshotBaselinesDir, getScreenshotDiffsDir, purgeOldScreenshots, pruneBackups } from '../utils/helpers';
@@ -635,7 +636,13 @@ export function createApp(): express.Application {
     },
   }));
   // 2 MB: an avatar is a cropped base64 PNG and an import can carry a whole YAML bundle.
-  app.use(express.json({ limit: '2mb' }));
+  // The raw bytes are kept for inbound webhook HMAC verification.
+  app.use(express.json({
+    limit: '2mb',
+    verify: (req, _res, buf) => {
+      (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  }));
   app.use(requestIdMiddleware);
   app.use(requestLogger);
 
@@ -651,6 +658,15 @@ export function createApp(): express.Application {
   // Avatars are public: the navbar renders one before any profile request, and Gravatar
   // is a third-party fetch anyway.
   app.get('/api/profile/avatar/:username', handleGetAvatar);
+
+  // Inbound CI webhooks authenticate with an HMAC/signature secret, not a session.
+  app.post('/api/webhooks/github', (req, res) => {
+    void handleWebhook('github', req, res, { scenariosDir: _scenariosDir, runOptions: _runOptions });
+  });
+  app.post('/api/webhooks/gitlab', (req, res) => {
+    void handleWebhook('gitlab', req, res, { scenariosDir: _scenariosDir, runOptions: _runOptions });
+  });
+
   app.use(authMiddleware);
 
   // User management: admin only. With OIDC, users come from the provider groups instead.

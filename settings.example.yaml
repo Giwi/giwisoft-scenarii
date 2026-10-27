@@ -86,6 +86,20 @@ notifications:
     enabled: false
     url: "https://your-endpoint/hook"
 
+# Inbound CI webhooks (optional). GitHub uses HMAC-SHA256 (X-Hub-Signature-256),
+# GitLab uses its secret token (X-Gitlab-Token). Rules are evaluated in order.
+# webhooks:
+#   enabled: true
+#   secret: "YOUR_WEBHOOK_SECRET"
+#   rules:
+#     - provider: github
+#       repository: "acme/web"
+#       events: ["push", "pull_request"]
+#       branches: ["main", "release/*"]
+#       scenario: "preview-check"
+#       variables:
+#         DEPLOY_TARGET: "https://preview-{{pr}}.example.com"
+
 # Per-scenario overrides (optional)
 scenarios:
   my-scenario:
