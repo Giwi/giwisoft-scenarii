@@ -991,7 +991,7 @@ node dist/index.js trigger scenarios/example.yml --env staging
 node dist/index.js status
 
 <span class="tok-comment"># Generate a settings template</span>
-node dist/index.js config --init</code></pre>
+node dist/index.js config -o settings.yaml</code></pre>
                 </div>
 
                 <div class="table-wrap">
@@ -1002,7 +1002,7 @@ node dist/index.js config --init</code></pre>
                     <tr><td><code>trigger &lt;file&gt;</code></td><td>Run immediately, with no scheduling.</td></tr>
                     <tr><td><code>status</code></td><td>List scheduled scenarios and show database connectivity.</td></tr>
                     <tr><td><code>user &lt;action&gt;</code></td><td><code>list</code>, <code>add</code>, <code>passwd</code>, <code>role</code>, <code>del</code>.</td></tr>
-                    <tr><td><code>config --init</code></td><td>Generate <code>settings.yaml</code> with channels commented out.</td></tr>
+                    <tr><td><code>config [-o path]</code></td><td>Generate <code>settings.yaml</code> with channels commented out.</td></tr>
                   </table>
                 </div>
 

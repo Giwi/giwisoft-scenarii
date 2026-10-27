@@ -35,7 +35,7 @@ Open http://localhost:3000 to see the dashboard. Each scenario also has a sharea
 | `trigger <file>` | Run a scenario immediately. Exits 1 when the run fails; pass `--fail-on none` to always exit 0 |
 | `status` | Show scheduled scenarios and storage status |
 | `user <action>` | Manage dashboard users: `list`, `add`, `passwd`, `role`, `del` (also available in the UI at `/users`, admins only) |
-| `config --init` | Generate a `settings.yaml` template |
+| `config [-o path]` | Generate a `settings.yaml` template |
 
 ```bash
 node dist/index.js validate scenarios/lusk.yml
@@ -45,7 +45,7 @@ node dist/index.js trigger scenarios/lusk.yml --fail-on none   # always exit 0
 node dist/index.js trigger scenarios/lusk.yml --env staging     # use a settings profile
 node dist/index.js status
 node dist/index.js user list
-node dist/index.js config --init
+node dist/index.js config -o settings.yaml
 ```
 
 ### Server options
