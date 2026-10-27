@@ -183,6 +183,15 @@ export interface ScenarioOverrides {
   notifications?: { enabled?: boolean };
 }
 
+// Named environment profile selected with `--env`. Values override scenario fields;
+// secrets are merged into variables so scenarios can reference them like any other.
+export interface EnvironmentConfig {
+  base_url?: string;
+  headers?: Record<string, string>;
+  variables?: Record<string, string>;
+  secrets?: Record<string, string>;
+}
+
 // Inbound CI webhooks (GitHub/GitLab push and pull/merge request events)
 export type WebhookProvider = 'github' | 'gitlab';
 
@@ -221,6 +230,7 @@ export interface Settings {
   notifications?: NotificationsConfig;
   scenarios?: Record<string, ScenarioOverrides>;
   webhooks?: InboundWebhookConfig;
+  environments?: Record<string, EnvironmentConfig>;
 }
 
 let settings: Settings | undefined;

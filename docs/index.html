@@ -984,6 +984,9 @@ node dist/index.js validate --all --json
 <span class="tok-comment"># Run immediately (exits 1 on failure; add --fail-on none to always exit 0)</span>
 node dist/index.js trigger scenarios/example.yml
 
+<span class="tok-comment"># Target a settings environment profile</span>
+node dist/index.js trigger scenarios/example.yml --env staging
+
 <span class="tok-comment"># Scheduled scenarios and storage status</span>
 node dist/index.js status
 
@@ -1010,7 +1013,30 @@ node dist/index.js config --init</code></pre>
                     <tr><td><code>--db</code></td><td>auto</td><td>SQLite path or PostgreSQL URL.</td></tr>
                     <tr><td><code>--scenarios-dir</code></td><td><code>./scenarios</code></td><td>YAML directory, watched every 5s.</td></tr>
                     <tr><td><code>--settings</code></td><td>auto-detect</td><td><code>settings.yaml</code> path. Hot-reloaded.</td></tr>
+                    <tr><td><code>--env</code></td><td>none</td><td>Environment profile from <code>settings.environments</code>.</td></tr>
                   </table>
+                </div>
+
+                <h4>Environment profiles</h4>
+                <p><code>--env staging</code> applies a profile from settings before the scenario runs. Profile <code>base_url</code> replaces the scenario value, <code>headers</code> merge, and <code>variables</code>/<code>secrets</code> merge into the scenario variables. Values can use <code>{{env.NAME}}</code>, so credentials stay in the process environment.</p>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">settings.yml</span>
+                    <button class="copy" type="button" data-copy="code-environments">Copy</button>
+                  </div>
+                  <pre id="code-environments"><code>environments:
+  staging:
+    base_url: <span class="tok-string">"https://staging.example.com"</span>
+    headers:
+      X-Environment: <span class="tok-string">"staging"</span>
+    variables:
+      REGION: <span class="tok-string">"eu"</span>
+    secrets:
+      API_TOKEN: <span class="tok-string">"{{env.STAGING_API_TOKEN}}"</span>
+  production:
+    base_url: <span class="tok-string">"https://example.com"</span>
+    secrets:
+      API_TOKEN: <span class="tok-string">"{{env.PROD_API_TOKEN}}"</span></code></pre>
                 </div>
               </div>
             </details>

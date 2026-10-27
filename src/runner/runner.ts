@@ -7,6 +7,7 @@ import { storeMetrics, purgeOldData, upsertScenarioTags, createRun, completeRun 
 import { notifyIfStateChanged } from '../notifications/index';
 import { broadcastScenarioRun, broadcastStepProgress } from '../routes/ws';
 import { getScenarioSettings, getSettings } from '../config/settings';
+import { applyEnvironment } from '../config/environments';
 import { resolveIncludes } from '../config/parser';
 import logger from '../utils/logger';
 import { DEFAULT_SCENARIO_TIMEOUT, DEFAULT_PURGE_DAYS } from '../utils/constants';
@@ -84,6 +85,10 @@ export async function runScenario(
   scenario: Scenario,
   options: RunOptions = {}
 ): Promise<ScenarioMetrics> {
+  if (options.env) {
+    scenario = applyEnvironment(scenario, options.env);
+  }
+
   if (scenario.tags?.length) {
     try {
       await upsertScenarioTags(scenario.name, scenario.tags);

@@ -185,6 +185,8 @@ export interface RunOptions {
   timeout?: number;
   ignoreHTTPSErrors?: boolean;
   scenariosDir?: string;
+  // Named environment profile from settings.environments.
+  env?: string;
 }
 
 // Function signature for output reporters (console or JSON)

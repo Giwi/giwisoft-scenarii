@@ -39,7 +39,7 @@ import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from '../utils/constants';
 
 // Module-level state shared across request handlers
 let _scenariosDir: string | undefined;
-let _runOptions: { headless: boolean; persist: boolean; lightpandaUrl?: string; scenariosDir?: string } | undefined;
+let _runOptions: { headless: boolean; persist: boolean; lightpandaUrl?: string; scenariosDir?: string; env?: string } | undefined;
 
 // Global Lightpanda process — started once with the server and shared across all worker threads.
 // This keeps the headless browser alive for the server's lifetime, avoiding per-run startup
@@ -952,7 +952,7 @@ export function createApp(): express.Application {
 }
 
 // Creates the full server: Express app, global Lightpanda, HTTP listener, WebSocket, and backup scheduler.
-export function createServer(port: number = 3000, scenariosDir?: string, runOptions?: { headless: boolean; persist: boolean; scenariosDir?: string }): http.Server {
+export function createServer(port: number = 3000, scenariosDir?: string, runOptions?: { headless: boolean; persist: boolean; scenariosDir?: string; env?: string }): http.Server {
   _scenariosDir = scenariosDir;
   if (runOptions) _runOptions = runOptions;
   const app = createApp();

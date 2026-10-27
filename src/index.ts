@@ -9,6 +9,7 @@ import { runScenario, RunOptions } from './runner/runner';
 import { scheduleScenario, stopAll, listScheduled, scheduleReport, watchScenarios } from './runner/scheduler';
 import { initStorage, closeStorage, isStorageReady } from './config/storage';
 import { loadSettings, watchSettings } from './config/settings';
+import { getEnvironment } from './config/environments';
 import {
   ensureDefaultUser, listUsers, createUser, setPassword, setRole, deleteUser,
   generatePassword, normalizeRole,
@@ -60,15 +61,24 @@ program
   .option('--json', 'Output metrics as JSON')
   .option('--once', 'Run scenarios once without scheduling')
   .option('--db <path>', 'SQLite database path or PostgreSQL connection URL for persisting metrics')
+  .option('--env <name>', 'Environment profile from settings (e.g. staging, production)')
   .action(async (files: string[], options) => {
     const persist = !!(options.db || process.env.DATABASE_URL);
-    if (persist) {
-      await initStorage(options.db);
+    if (persist || options.env) {
+      if (persist) await initStorage(options.db);
       loadSettings();
+    }
+    if (options.env) {
+      try {
+        getEnvironment(options.env);
+      } catch (err: unknown) {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Invalid environment');
+        process.exit(1);
+      }
     }
 
     const headless = options.headless !== 'false';
-    const runOptions = { headless, json_output: options.json, persist, scenariosDir: path.dirname(path.resolve(files[0])) };
+    const runOptions = { headless, json_output: options.json, persist, env: options.env, scenariosDir: path.dirname(path.resolve(files[0])) };
 
     const scenarios = files.map((f) => {
       logger.info({ file: f }, 'Loading scenario');
@@ -108,8 +118,17 @@ program
   .option('--db <path>', 'SQLite database path or PostgreSQL connection URL')
   .option('--scenarios-dir <path>', 'Directory containing YAML scenario files', './scenarios')
   .option('--settings <path>', 'Path to settings.yaml')
+  .option('--env <name>', 'Environment profile from settings (e.g. staging, production)')
   .action(async (options) => {
     loadSettings(options.settings);
+    if (options.env) {
+      try {
+        getEnvironment(options.env);
+      } catch (err: unknown) {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Invalid environment');
+        process.exit(1);
+      }
+    }
     try {
       await initStorage(options.db);
     } catch (err: unknown) {
@@ -134,7 +153,7 @@ program
       logger.warn(`No .yml or .yaml files found in ${scenariosDir} — server will start with no scenarios`);
     }
 
-    const runOptions = { headless: true, persist: true, scenariosDir };
+    const runOptions = { headless: true, persist: true, scenariosDir, env: options.env };
 
     // Start the API server immediately so it's available
     const port = parseInt(options.port);
@@ -253,6 +272,7 @@ program
   .option('--json', 'Output metrics as JSON')
   .option('--db <path>', 'SQLite database path or PostgreSQL connection URL')
   .option('--fail-on <when>', 'Exit 1 on failed runs: failure | none', 'failure')
+  .option('--env <name>', 'Environment profile from settings (e.g. staging, production)')
   .action(async (file: string, options) => {
     if (options.failOn !== 'failure' && options.failOn !== 'none') {
       logger.error({ fail_on: options.failOn }, 'Invalid --fail-on value, expected "failure" or "none"');
@@ -262,8 +282,17 @@ program
     if (persist) {
       await initStorage(options.db);
     }
+    if (options.env) {
+      loadSettings();
+      try {
+        getEnvironment(options.env);
+      } catch (err: unknown) {
+        logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Invalid environment');
+        process.exit(1);
+      }
+    }
     const headless = options.headless !== 'false';
-    const runOptions: RunOptions = { headless, json_output: options.json, persist };
+    const runOptions: RunOptions = { headless, json_output: options.json, persist, env: options.env };
     const scenario = loadScenarioFile(file);
     logger.info({ scenario: scenario.name }, 'Triggering scenario');
     const metrics = await runScenario(scenario, runOptions);

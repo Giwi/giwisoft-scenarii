@@ -42,6 +42,7 @@ node dist/index.js validate scenarios/lusk.yml
 node dist/index.js validate --all --json   # check every scenario, machine-readable
 node dist/index.js trigger scenarios/lusk.yml
 node dist/index.js trigger scenarios/lusk.yml --fail-on none   # always exit 0
+node dist/index.js trigger scenarios/lusk.yml --env staging     # use a settings profile
 node dist/index.js status
 node dist/index.js user list
 node dist/index.js config --init
@@ -55,6 +56,31 @@ node dist/index.js config --init
 | `--db` | auto | SQLite database path or PostgreSQL connection URL (e.g. `postgres://user:pass@host:5432/scenarii`) |
 | `--scenarios-dir` | `./scenarios` | Directory with `.yml`/`.yaml` scenario files (watched every 5s - add/remove/rename files without restart) |
 | `--settings` | auto-detect | Path to settings file (hot-reloaded, see Notifications below) |
+| `--env` | none | Environment profile from `settings.environments` (e.g. staging, production) |
+
+### Environment profiles
+
+Select a profile with `--env` on `server`, `trigger`, or the default run command. The same scenario file then runs against different targets without duplicating YAML:
+
+```yaml
+environments:
+  staging:
+    base_url: "https://staging.example.com"
+    headers:
+      X-Environment: "staging"
+    variables:
+      REGION: "eu"
+    secrets:
+      API_TOKEN: "{{env.STAGING_API_TOKEN}}"
+  production:
+    base_url: "https://example.com"
+    headers:
+      X-Environment: "production"
+    secrets:
+      API_TOKEN: "{{env.PROD_API_TOKEN}}"
+```
+
+Profile `base_url` replaces the scenario's; `headers` merge over scenario headers; `variables` and `secrets` merge over scenario variables. Values keep the usual `{{env.NAME}}` resolution, so credentials stay in the process environment. The profile is applied by the runner, covering CLI runs, scheduled runs, API triggers, bulk runs, and CI webhooks.
 
 ## Writing scenarios
 

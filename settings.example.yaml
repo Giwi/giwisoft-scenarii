@@ -112,6 +112,21 @@ notifications:
     # start: "2026-07-01T22:00:00Z"
     # end: "2026-07-01T23:00:00Z"
 
+# Environment profiles selected with --env. The same scenario can target staging or prod.
+# environments:
+#   staging:
+#     base_url: "https://staging.example.com"
+#     headers:
+#       X-Environment: "staging"
+#     variables:
+#       REGION: "eu"
+#     secrets:
+#       API_TOKEN: "{{env.STAGING_API_TOKEN}}"
+#   production:
+#     base_url: "https://example.com"
+#     secrets:
+#       API_TOKEN: "{{env.PROD_API_TOKEN}}"
+
 # Inbound CI webhooks (optional). GitHub uses HMAC-SHA256 (X-Hub-Signature-256),
 # GitLab uses its secret token (X-Gitlab-Token). Rules are evaluated in order.
 # webhooks:
