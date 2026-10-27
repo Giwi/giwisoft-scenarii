@@ -42,6 +42,7 @@ export const es: Messages = {
   'nav.profile_title': 'Tu perfil',
   'nav.docs_title': 'Documentación',
   'nav.signout_title': 'Cerrar sesión',
+  'nav.auth_disabled': 'Auth. desactivada',
   'nav.theme': 'Esquema de color',
   'nav.signed_in_as': 'Sesión iniciada como {username}',
 

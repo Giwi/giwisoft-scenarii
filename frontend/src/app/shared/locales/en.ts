@@ -45,6 +45,7 @@ export const en = {
   'nav.profile_title': 'Your profile',
   'nav.docs_title': 'Documentation',
   'nav.signout_title': 'Sign out',
+  'nav.auth_disabled': 'Auth off',
   'nav.theme': 'Colour scheme',
   'nav.signed_in_as': 'Signed in as {username}',
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy, effect, inject, untracked } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, computed, effect, inject, untracked } from '@angular/core';
 import { Router, RouterOutlet, RouterLink } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { AuthService } from './shared/auth';
@@ -20,6 +20,9 @@ export class App implements OnInit {
 
   status = this.auth.status;
   isAdmin = this.auth.isAdmin;
+  // provider === null means the server runs with auth.enabled: false: there is no
+  // session to close, so the sign-out button must not be offered.
+  authDisabled = computed(() => this.status().provider === null);
   ready = this.auth.ready;
   router = inject(Router);
 

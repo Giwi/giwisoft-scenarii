@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, OnInit, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../shared/auth';
@@ -151,6 +151,9 @@ export class ProfileComponent implements OnInit {
   readonly langs = LANGS;
   readonly langNames = LANG_NAMES;
   readonly schemes = SCHEMES;
+  // Auth disabled: the page still edits the default user's profile, but there is no
+  // password login or session to protect it. Say so instead of pretending otherwise.
+  readonly authDisabled = computed(() => this.auth.status().provider === null);
   readonly minPasswordLength = MIN_PASSWORD_LENGTH;
   // Labels for the colour scheme picker, keyed so the template can look them up.
   readonly schemeLabels: Record<ColorScheme, MessageKey> = {

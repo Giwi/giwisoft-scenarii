@@ -39,8 +39,15 @@
         <ng-template #avatarGlyph><i class="bi bi-person-circle"></i></ng-template>
         <span class="d-none d-md-inline">{{ t('nav.profile') }}</span>
       </a>
+      <span
+        *ngIf="authDisabled()"
+        class="badge text-bg-warning align-self-center"
+        [title]="t('login.open_disabled')"
+      >
+        <i class="bi bi-unlock me-1"></i>{{ t('nav.auth_disabled') }}
+      </span>
       <button
-        *ngIf="status().authenticated"
+        *ngIf="status().authenticated && !authDisabled()"
         class="btn btn-sm btn-outline-secondary border-0"
         (click)="logout()"
         [title]="t('nav.signout_title')"

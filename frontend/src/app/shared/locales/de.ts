@@ -42,6 +42,7 @@ export const de: Messages = {
   'nav.profile_title': 'Ihr Profil',
   'nav.docs_title': 'Dokumentation',
   'nav.signout_title': 'Abmelden',
+  'nav.auth_disabled': 'Auth aus',
   'nav.theme': 'Farbschema',
   'nav.signed_in_as': 'Angemeldet als {username}',
 

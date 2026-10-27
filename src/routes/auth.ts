@@ -461,7 +461,20 @@ export async function handleOidcCallback(req: express.Request, res: express.Resp
 export async function handleAuthMe(req: express.Request, res: express.Response): Promise<void> {
   const provider = authProvider();
   if (!provider) {
-    res.json({ authenticated: true, username: null, role: null, provider: null, lang: requestLang(req) });
+    // Auth disabled: there is no session, but every request acts as the default user.
+    // Return that profile instead of a stubbed status, otherwise a profile save reloads
+    // the status without the saved language/theme and the interface falls back to them.
+    const username = getSettings().auth?.default_user || 'admin';
+    const [user, profile] = await Promise.all([getUser(username), getProfile(username)]);
+    res.json({
+      authenticated: true,
+      username,
+      role: user?.role ?? normalizeRole(getSettings().auth?.default_user_role),
+      provider: null,
+      lang: profile.lang,
+      color_scheme: profile.color_scheme,
+      avatar_url: await avatarUrlFor(username),
+    });
     return;
   }
   const session = getSession(req);
