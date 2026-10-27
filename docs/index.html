@@ -761,7 +761,7 @@ docker run -d \
               <summary>
                 <div>
                   <h3>Notifications</h3>
-                  <p>Five channels, state transitions, per-scenario overrides, retries.</p>
+                  <p>Eight channels, state transitions, webhook routing, per-scenario overrides, retries.</p>
                 </div>
                 <span class="ref-plus" aria-hidden="true"></span>
               </summary>
@@ -776,9 +776,13 @@ docker run -d \
                     <tr><td>Email</td><td>SMTP (<code>host</code>/<code>port</code>, optional auth, TLS/STARTTLS, and certificate verification with a custom CA) or Mailgun API key and domain. Multiple recipients. Daily report at 08:00.</td></tr>
                     <tr><td>Slack</td><td>Webhook URL. JSON payload with scenario, status, and duration.</td></tr>
                     <tr><td>Discord</td><td>Webhook URL. Embedded message with color-coded pass or fail.</td></tr>
-                    <tr><td>Generic webhook</td><td>Any endpoint that accepts the JSON payload.</td></tr>
+                    <tr><td>Generic webhook</td><td>Configurable method, headers, body template, and HMAC-SHA256 signing over the exact body.</td></tr>
+                    <tr><td>Microsoft Teams</td><td>Incoming webhook URL. MessageCard with facts and failed steps.</td></tr>
+                    <tr><td>ntfy</td><td>Server URL and topic, optional token and priority. Plain-text push notification.</td></tr>
+                    <tr><td>PagerDuty</td><td>Events API v2 routing key. Failures trigger; recoveries resolve via the scenario dedup key.</td></tr>
                   </table>
                 </div>
+                <p>Set <code>notifications.muted: true</code> to silence every channel, or <code>notifications.maintenance</code> with ISO <code>start</code>/<code>end</code> timestamps to suppress alerts during a window. Invalid timestamps fail open rather than muting forever.</p>
 
                 <h4>Sample configuration</h4>
                 <div class="code">
@@ -821,7 +825,31 @@ notifications:
     webhook_url: <span class="tok-string">"https://discord.com/api/webhooks/..."</span>
   webhook:
     enabled: true
-    url: <span class="tok-string">"https://example.com/scenarii"</span></code></pre>
+    url: <span class="tok-string">"https://example.com/scenarii"</span>
+    method: POST
+    headers:
+      X-Environment: <span class="tok-string">"production"</span>
+    template: <span class="tok-string">'{"text":"{{event}} {{scenario}} ({{duration_ms}}ms)"}'</span>
+    signing_secret: <span class="tok-string">"YOUR_HMAC_SECRET"</span>
+    signing_header: <span class="tok-string">"X-Scenarii-Signature"</span>
+    signature_prefix: <span class="tok-string">"sha256="</span>
+  teams:
+    enabled: true
+    webhook_url: <span class="tok-string">"https://outlook.office.com/webhook/..."</span>
+  ntfy:
+    enabled: true
+    url: <span class="tok-string">"https://ntfy.sh"</span>
+    topic: <span class="tok-string">"scenarii-alerts"</span>
+    priority: <span class="tok-number">4</span>
+  pagerduty:
+    enabled: true
+    routing_key: <span class="tok-string">"YOUR_EVENTS_V2_ROUTING_KEY"</span>
+    severity: critical
+  muted: <span class="tok-keyword">false</span>
+  maintenance:
+    enabled: <span class="tok-keyword">false</span>
+    start: <span class="tok-string">"2026-07-01T22:00:00Z"</span>
+    end: <span class="tok-string">"2026-07-01T23:00:00Z"</span></code></pre>
                 </div>
 
                 <h4>Per-scenario overrides</h4>

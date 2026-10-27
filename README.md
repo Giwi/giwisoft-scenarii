@@ -582,11 +582,51 @@ notifications:
   webhook:
     enabled: true
     url: "https://your-endpoint/hook"
+  teams:
+    enabled: true
+    webhook_url: "https://outlook.office.com/webhook/..."
+  ntfy:
+    enabled: true
+    url: "https://ntfy.sh"
+    topic: "scenarii-alerts"
+    # token: "tk_..."          # for protected topics
+    priority: 4
+  pagerduty:
+    enabled: true
+    routing_key: "YOUR_EVENTS_V2_ROUTING_KEY"
+    severity: critical
+  # Global suppression
+  muted: false
+  maintenance:
+    enabled: false
+    start: "2026-07-01T22:00:00Z"
+    end: "2026-07-01T23:00:00Z"
 ```
+
+Generic webhooks accept routing and signing options:
+
+```yaml
+notifications:
+  webhook:
+    enabled: true
+    url: "https://your-endpoint/hook"
+    method: POST                    # POST | PUT | PATCH
+    headers:
+      X-Environment: "production"
+    template: |
+      {"text":"{{event}} {{scenario}} ({{duration_ms}}ms)"}
+    signing_secret: "YOUR_HMAC_SECRET"
+    signing_header: "X-Scenarii-Signature"
+    signature_prefix: "sha256="
+```
+
+The HMAC is computed over the exact delivered body. Optional templates support `{{scenario}}`, `{{event}}`, `{{success}}`, `{{duration_ms}}`, `{{started_at}}`, `{{finished_at}}`, and `{{steps}}` (JSON).
 
 Secrets can be overridden via environment variables: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`.
 
 The server looks for `settings.yaml` in the current directory or `/app/settings.yaml` (container). Use `--settings` to specify a custom path. Notifications trigger on state transitions (pass>fail, fail>pass). Notifications include retry logic (3 attempts, exponential backoff).
+
+Channels: Telegram, email (SMTP/Mailgun), Slack, Discord, generic webhook, Microsoft Teams, ntfy, and PagerDuty (Events API v2, with recovery resolving the incident via a stable dedup key). `notifications.muted: true` silences every channel; `notifications.maintenance` suppresses alerts only between the ISO `start` and `end` timestamps.
 
 A **daily email report** is automatically sent at 8:00 AM (cron) if email notifications are configured.
 

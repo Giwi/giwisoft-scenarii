@@ -52,6 +52,49 @@ export interface DiscordConfig {
 export interface WebhookConfig {
   enabled: boolean;
   url: string;
+  // HTTP method for the delivery request. Defaults to POST.
+  method?: 'POST' | 'PUT' | 'PATCH';
+  // Extra headers merged into the request.
+  headers?: Record<string, string>;
+  // Optional body template. Supports {{scenario}}, {{event}}, {{success}},
+  // {{duration_ms}}, {{started_at}}, {{finished_at}}, and {{steps}} (JSON).
+  template?: string;
+  // Sign the exact request body with HMAC-SHA256.
+  signing_secret?: string;
+  signing_header?: string;
+  // Defaults to "sha256=".
+  signature_prefix?: string;
+}
+
+export interface TeamsConfig {
+  enabled: boolean;
+  webhook_url: string;
+}
+
+export interface NtfyConfig {
+  enabled: boolean;
+  // Server base URL, e.g. https://ntfy.sh
+  url: string;
+  topic: string;
+  // Optional bearer token for protected topics.
+  token?: string;
+  // ntfy priority 1-5. Defaults to 4.
+  priority?: number;
+}
+
+export interface PagerDutyConfig {
+  enabled: boolean;
+  routing_key: string;
+  // Incident severity. Defaults to "critical".
+  severity?: 'critical' | 'error' | 'warning' | 'info';
+}
+
+// Global suppression. `muted` silences everything until turned off; `maintenance`
+// suppresses only inside the ISO timestamp window.
+export interface MaintenanceWindowConfig {
+  enabled?: boolean;
+  start?: string;
+  end?: string;
 }
 
 export interface NotificationsConfig {
@@ -60,6 +103,11 @@ export interface NotificationsConfig {
   slack?: SlackConfig;
   discord?: DiscordConfig;
   webhook?: WebhookConfig;
+  teams?: TeamsConfig;
+  ntfy?: NtfyConfig;
+  pagerduty?: PagerDutyConfig;
+  muted?: boolean;
+  maintenance?: MaintenanceWindowConfig;
 }
 
 // API-level authentication settings (API key or OIDC)

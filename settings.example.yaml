@@ -85,6 +85,32 @@ notifications:
   webhook:
     enabled: false
     url: "https://your-endpoint/hook"
+    # method: POST                       # POST | PUT | PATCH
+    # headers:
+    #   X-Environment: "production"
+    # template: '{"text":"{{event}} {{scenario}} ({{duration_ms}}ms)"}'
+    # signing_secret: "YOUR_HMAC_SECRET" # HMAC-SHA256 over the exact body
+    # signing_header: "X-Scenarii-Signature"
+    # signature_prefix: "sha256="
+  teams:
+    enabled: false
+    webhook_url: "https://outlook.office.com/webhook/..."
+  ntfy:
+    enabled: false
+    url: "https://ntfy.sh"
+    topic: "scenarii-alerts"
+    # token: "tk_..."                    # protected topics
+    priority: 4
+  pagerduty:
+    enabled: false
+    routing_key: "YOUR_EVENTS_V2_ROUTING_KEY"
+    severity: critical                   # critical | error | warning | info
+  # Global suppression
+  muted: false
+  maintenance:
+    enabled: false
+    # start: "2026-07-01T22:00:00Z"
+    # end: "2026-07-01T23:00:00Z"
 
 # Inbound CI webhooks (optional). GitHub uses HMAC-SHA256 (X-Hub-Signature-256),
 # GitLab uses its secret token (X-Gitlab-Token). Rules are evaluated in order.
