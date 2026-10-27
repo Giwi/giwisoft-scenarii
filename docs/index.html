@@ -765,6 +765,8 @@ docker run -d \
   backup:
     enabled: true
     cron: <span class="tok-string">"0 4 * * *"</span>
+    directory: <span class="tok-string">"./backups"</span>
+    retention: <span class="tok-number">7</span>  <span class="tok-comment"># keep the 7 most recent backups</span>
 
 notifications:
   telegram:

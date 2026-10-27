@@ -31,7 +31,7 @@ import {
 import { handlePublicScenarioStatus, handlePublicScenarioApi } from './public-status';
 import { t } from '../i18n';
 import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
-import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort, getScreenshotsDir, getScreenshotBaselinesDir, getScreenshotDiffsDir, purgeOldScreenshots } from '../utils/helpers';
+import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort, getScreenshotsDir, getScreenshotBaselinesDir, getScreenshotDiffsDir, purgeOldScreenshots, pruneBackups } from '../utils/helpers';
 import logger from '../utils/logger';
 import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from '../utils/constants';
 
@@ -551,7 +551,8 @@ async function handleBackup(_req: express.Request, res: express.Response): Promi
     const settings = getSettings();
     const dir = settings.storage?.backup?.directory || './backups';
     const dst = await backupDatabase(dir);
-    res.json({ status: 'ok', path: dst });
+    const pruned = pruneBackups(dir, settings.storage?.backup?.retention);
+    res.json({ status: 'ok', path: dst, pruned });
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -807,7 +808,8 @@ export function createServer(port: number = 3000, scenariosDir?: string, runOpti
           try {
             const dir = s.storage?.backup?.directory || './backups';
             const dst = await backupDatabase(dir);
-            logger.info({ path: dst }, 'Automated database backup completed');
+            const pruned = pruneBackups(dir, s.storage?.backup?.retention);
+            logger.info({ path: dst, pruned }, 'Automated database backup completed');
           } catch (err: unknown) {
             logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Automated backup failed');
           }

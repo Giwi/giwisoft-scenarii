@@ -56,6 +56,34 @@ export function purgeOldScreenshots(maxAgeDays: number): number {
   return removed;
 }
 
+// Keeps only the newest `retention` backup files in `directory` (oldest are deleted).
+// A retention of 0 or less disables pruning. Returns the number of files removed.
+export function pruneBackups(directory: string, retention: number | undefined): number {
+  if (!retention || retention <= 0 || !fs.existsSync(directory)) return 0;
+  let removed = 0;
+  try {
+    const files = fs.readdirSync(directory)
+      .map(name => {
+        const full = path.join(directory, name);
+        try {
+          const stat = fs.statSync(full);
+          return stat.isFile() ? { full, mtimeMs: stat.mtimeMs } : undefined;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((f): f is { full: string; mtimeMs: number } => f !== undefined)
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+    for (let i = retention; i < files.length; i++) {
+      try {
+        fs.unlinkSync(files[i].full);
+        removed++;
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+  return removed;
+}
+
 // Polls a TCP port until it becomes reachable or the timeout is exceeded.
 export function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
   const start = Date.now();

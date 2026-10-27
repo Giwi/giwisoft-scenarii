@@ -74,6 +74,7 @@ export interface BackupConfig {
   enabled: boolean;
   cron?: string;
   directory?: string;
+  retention?: number;
 }
 
 export interface OidcConfig {
