@@ -1016,6 +1016,7 @@ POST   /api/scenarios/bulk/run          <span class="tok-comment">{ tag } or { g
 POST   /api/scenarios/bulk/pause
 POST   /api/scenarios/bulk/resume
 GET    /api/runs/:id                    <span class="tok-comment">one persisted run + steps</span>
+GET    /api/runs/:id/diff/:baseId       <span class="tok-comment">step status/duration/error diff</span>
 POST   /api/scenarios/:name/run         <span class="tok-comment">?wait=true returns run_id + metrics</span>
 
 <span class="tok-comment"># Authentication</span>

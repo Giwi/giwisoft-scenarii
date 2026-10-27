@@ -210,7 +210,7 @@ The dashboard provides:
 
 - **Scenario list** - overview of all scenarios with pass/fail status, tag badges, group badges, tag/group filter dropdowns, depends-on column, auto-refreshes via WebSocket
 - **Cross-scenario overview** - pass-rate calendar heatmap, slowest scenarios by p95, flakiest scenarios, and bulk run/pause/resume by tag or group at `/overview`
-- **Scenario detail** - response time trend chart, success rate over time, step breakdown, SLA gauge (7-day window), paginated run history, JSON/CSV/YAML export, live ticker (inline step progress in the toolbar), copy public permalink
+- **Scenario detail** - response time trend chart, success rate over time, step breakdown, SLA gauge (7-day window), paginated run history, run diff (side-by-side step status, duration delta, error changes), JSON/CSV/YAML export, live ticker (inline step progress in the toolbar), copy public permalink
 - **Scenario editor** - click the pencil icon on the detail page to edit a scenario's YAML directly in the browser with syntax highlighting (comments, strings, keys, numbers). "New" opens a blank scenario at `/scenario/new`, "Import" uploads a `.yml`/`.yaml` file and stores it with the others
 - **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
 - **Pause/Resume** - toggle scheduled scenarios on/off without deleting files
@@ -367,6 +367,7 @@ node dist/index.js server
 | `POST /api/scenarios/bulk/pause` | Pause matching scheduled scenarios (`{tag}` or `{group}`) |
 | `POST /api/scenarios/bulk/resume` | Resume matching scheduled scenarios (`{tag}` or `{group}`) |
 | `GET /api/runs/:id` | Fetch one persisted run with all steps (requires `read`) |
+| `GET /api/runs/:id/diff/:baseId` | Side-by-side diff of two runs: step status, duration delta, error changes |
 | `POST /api/webhooks/github` | Inbound GitHub push/PR webhook (HMAC-SHA256 signature, no session) |
 | `POST /api/webhooks/gitlab` | Inbound GitLab push/MR webhook (`X-Gitlab-Token`, no session) |
 | `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |

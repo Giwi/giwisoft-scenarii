@@ -7,7 +7,8 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { NgFor, NgIf, JsonPipe } from '@angular/common';
+import { NgFor, NgIf, JsonPipe, NgClass } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import Chart from 'chart.js/auto';
 import { onScenarioRun, removeScenarioRunListener, onStepProgress, removeStepProgressListener } from '../../shared/ws';
 import { I18nService } from '../../shared/i18n';
@@ -57,12 +58,41 @@ interface StepMetricsData {
 }
 
 interface ScenarioRun {
+  run_id?: number;
   scenario_name: string;
   started_at: string;
   finished_at: string;
   duration_ms: number;
   success: boolean;
   steps: StepMetricsData[];
+}
+
+interface DiffSide {
+  success: boolean;
+  status_code?: number;
+  duration_ms: number;
+  error?: string;
+}
+
+interface StepDiff {
+  step_name: string;
+  action: string;
+  base?: DiffSide;
+  target?: DiffSide;
+  status_changed: boolean;
+  duration_delta_ms?: number;
+  duration_delta_pct?: number;
+  error_changed: boolean;
+}
+
+interface RunDiff {
+  scenario_name: string;
+  base: { run_id?: number; started_at: string; success: boolean; duration_ms: number };
+  target: { run_id?: number; started_at: string; success: boolean; duration_ms: number };
+  status_changed: boolean;
+  duration_delta_ms: number;
+  duration_delta_pct: number;
+  steps: StepDiff[];
 }
 
 interface ScenarioDetail {
@@ -74,7 +104,7 @@ interface ScenarioDetail {
 @Component({
   selector: 'app-scenario-detail',
   standalone: true,
-  imports: [NgFor, NgIf, RouterModule, LangDatePipe, JsonPipe],
+  imports: [NgFor, NgIf, RouterModule, LangDatePipe, JsonPipe, FormsModule, NgClass],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './scenario-detail.html',
   styleUrl: './scenario-detail.css',
@@ -95,6 +125,12 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
   scenarioName = '';
   pageSize = 15;
   currentPage = 1;
+  compareOpen = false;
+  compareBaseId: number | null = null;
+  compareTargetId: number | null = null;
+  diff: RunDiff | null = null;
+  diffLoading = false;
+  diffError = '';
 
   readonly i18n = inject(I18nService);
 
@@ -230,6 +266,62 @@ export class ScenarioDetailComponent implements OnInit, OnDestroy {
     if (page < 1 || page > this.totalPages || page === this.currentPage) return;
     this.currentPage = page;
     this.cdr.detectChanges();
+  }
+
+  openCompare(): void {
+    const runs = this.detail?.history ?? [];
+    if (runs.length < 2) return;
+    this.compareOpen = true;
+    this.compareTargetId = runs[0].run_id ?? null;
+    this.compareBaseId = runs[1].run_id ?? null;
+    void this.loadDiff();
+  }
+
+  closeCompare(): void {
+    this.compareOpen = false;
+    this.diff = null;
+    this.diffError = '';
+    this.cdr.detectChanges();
+  }
+
+  async loadDiff(): Promise<void> {
+    if (this.compareBaseId == null || this.compareTargetId == null) return;
+    this.diffLoading = true;
+    this.diffError = '';
+    this.cdr.detectChanges();
+    try {
+      const res = await fetch(
+        `/api/runs/${this.compareTargetId}/diff/${this.compareBaseId}`,
+        { credentials: 'include' },
+      );
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        this.diffError = payload.error || `HTTP ${res.status}`;
+        this.diff = null;
+      } else {
+        this.diff = await res.json();
+      }
+    } catch {
+      this.diffError = this.t('detail.compare_failed');
+      this.diff = null;
+    } finally {
+      this.diffLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  stepClass(side: DiffSide | undefined): string {
+    if (!side) return 'bg-secondary';
+    return side.success ? 'bg-success' : 'bg-danger';
+  }
+
+  deltaClass(delta: number | undefined): string {
+    if (delta === undefined || delta === 0) return 'text-secondary';
+    return delta > 0 ? 'text-danger' : 'text-success';
+  }
+
+  signed(value: number, suffix = ''): string {
+    return `${value > 0 ? '+' : ''}${Math.round(value)}${suffix}`;
   }
 
   private async reloadData(): Promise<void> {

@@ -5,6 +5,9 @@
   <button class="btn btn-sm btn-outline-primary" (click)="refresh()" [disabled]="loading">
     <i class="bi bi-arrow-clockwise"></i>
   </button>
+  <button class="btn btn-sm btn-outline-secondary" (click)="openCompare()" *ngIf="detail && detail.history.length > 1" [title]="t('detail.compare_title')">
+    <i class="bi bi-columns-gap me-1"></i>{{ t('detail.compare') }}
+  </button>
   <button class="btn btn-sm btn-outline-success" (click)="runNow()" [disabled]="running" [title]="t('list.run_now')">
     <i class="bi bi-send-fill"></i>{{ running ? '...' : '' }}
   </button>
@@ -220,6 +223,115 @@
             <a class="page-link" (click)="goToPage(currentPage + 1)">{{ t('common.next') }}</a>
           </li>
         </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal d-block" tabindex="-1" *ngIf="compareOpen" style="background:rgba(0,0,0,.5)">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">{{ t('detail.compare_title') }}</h5>
+          <button type="button" class="btn-close" (click)="closeCompare()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+            <div>
+              <label class="form-label small mb-1">{{ t('detail.compare_base') }}</label>
+              <select class="form-select form-select-sm" [(ngModel)]="compareBaseId" (ngModelChange)="loadDiff()">
+                <option *ngFor="let run of detail.history" [ngValue]="run.run_id">
+                  #{{ run.run_id }} · {{ run.started_at | langDate: 'withSeconds' }} · {{ run.success ? t('common.pass') : t('common.fail') }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small mb-1">{{ t('detail.compare_target') }}</label>
+              <select class="form-select form-select-sm" [(ngModel)]="compareTargetId" (ngModelChange)="loadDiff()">
+                <option *ngFor="let run of detail.history" [ngValue]="run.run_id">
+                  #{{ run.run_id }} · {{ run.started_at | langDate: 'withSeconds' }} · {{ run.success ? t('common.pass') : t('common.fail') }}
+                </option>
+              </select>
+            </div>
+            <button class="btn btn-sm btn-primary" (click)="loadDiff()" [disabled]="diffLoading">
+              <i class="bi bi-arrow-left-right me-1"></i>{{ t('detail.compare_run') }}
+            </button>
+          </div>
+
+          <div class="alert alert-danger py-2 px-3 small" *ngIf="diffError">{{ diffError }}</div>
+          <div class="text-secondary" *ngIf="diffLoading">{{ t('common.loading') }}</div>
+
+          <ng-container *ngIf="diff && !diffLoading">
+            <div class="row g-2 mb-3">
+              <div class="col-md-4">
+                <div class="border rounded p-2 small">
+                  <div class="text-secondary">{{ t('detail.compare_base') }} · #{{ diff.base.run_id }}</div>
+                  <span class="badge" [class.bg-success]="diff.base.success" [class.bg-danger]="!diff.base.success">
+                    {{ diff.base.success ? t('common.pass') : t('common.fail') }}
+                  </span>
+                  <span class="font-monospace ms-2">{{ diff.base.duration_ms }}ms</span>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="border rounded p-2 small">
+                  <div class="text-secondary">{{ t('detail.compare_target') }} · #{{ diff.target.run_id }}</div>
+                  <span class="badge" [class.bg-success]="diff.target.success" [class.bg-danger]="!diff.target.success">
+                    {{ diff.target.success ? t('common.pass') : t('common.fail') }}
+                  </span>
+                  <span class="font-monospace ms-2">{{ diff.target.duration_ms }}ms</span>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="border rounded p-2 small">
+                  <div class="text-secondary">{{ t('detail.compare_delta') }}</div>
+                  <span class="font-monospace" [ngClass]="deltaClass(diff.duration_delta_ms)">{{ signed(diff.duration_delta_ms, 'ms') }}</span>
+                  <span class="font-monospace ms-1" [ngClass]="deltaClass(diff.duration_delta_ms)">({{ signed(diff.duration_delta_pct, '%') }})</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th [attr.rowspan]="2">{{ t('detail.compare_step') }}</th>
+                    <th colspan="3" class="text-center">{{ t('detail.compare_base') }}</th>
+                    <th colspan="3" class="text-center">{{ t('detail.compare_target') }}</th>
+                    <th [attr.rowspan]="2" class="text-end">{{ t('detail.compare_delta') }}</th>
+                  </tr>
+                  <tr>
+                    <th>{{ t('detail.compare_status') }}</th>
+                    <th class="text-end">{{ t('detail.compare_duration') }}</th>
+                    <th>{{ t('detail.compare_error') }}</th>
+                    <th>{{ t('detail.compare_status') }}</th>
+                    <th class="text-end">{{ t('detail.compare_duration') }}</th>
+                    <th>{{ t('detail.compare_error') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let step of diff.steps" [class.table-warning]="step.status_changed || step.error_changed">
+                    <td class="fw-semibold">{{ step.step_name }}</td>
+                    <td>
+                      <span *ngIf="step.base" class="badge" [ngClass]="stepClass(step.base)">{{ step.base.success ? t('common.pass') : t('common.fail') }}</span>
+                      <span *ngIf="!step.base" class="text-secondary small">—</span>
+                    </td>
+                    <td class="text-end font-monospace">{{ step.base ? step.base.duration_ms + 'ms' : '—' }}</td>
+                    <td class="small text-danger">{{ step.base?.error || '' }}</td>
+                    <td>
+                      <span *ngIf="step.target" class="badge" [ngClass]="stepClass(step.target)">{{ step.target.success ? t('common.pass') : t('common.fail') }}</span>
+                      <span *ngIf="!step.target" class="text-secondary small">—</span>
+                    </td>
+                    <td class="text-end font-monospace">{{ step.target ? step.target.duration_ms + 'ms' : '—' }}</td>
+                    <td class="small text-danger">{{ step.target?.error || '' }}</td>
+                    <td class="text-end font-monospace" [ngClass]="deltaClass(step.duration_delta_ms)">
+                      {{ step.duration_delta_ms !== undefined ? signed(step.duration_delta_ms, 'ms') : '—' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="small text-secondary" *ngIf="!diff.steps.length">{{ t('detail.compare_no_steps') }}</div>
+          </ng-container>
+        </div>
       </div>
     </div>
   </div>

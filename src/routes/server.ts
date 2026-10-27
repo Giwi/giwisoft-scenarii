@@ -33,6 +33,7 @@ import { handleWebhook } from './webhooks';
 import { t } from '../i18n';
 import { metricsAuthMiddleware, handleMetrics } from '../metrics/metrics-exporter';
 import { escapeCsv, toCsv, parseDaysParam, parseLimitParam, waitForPort, getScreenshotsDir, getScreenshotBaselinesDir, getScreenshotDiffsDir, purgeOldScreenshots, pruneBackups } from '../utils/helpers';
+import { diffRuns } from '../utils/run-diff';
 import logger from '../utils/logger';
 import { DEFAULT_LIMIT, PORT_WAIT_TIMEOUT } from '../utils/constants';
 
@@ -465,6 +466,31 @@ async function handleGetRun(req: express.Request, res: express.Response): Promis
   }
 }
 
+// Compares two persisted runs of the same scenario. `:id` is the newer run, `:baseId`
+// the baseline. Steps are matched by name; added/removed steps appear on one side.
+async function handleRunDiff(req: express.Request, res: express.Response): Promise<void> {
+  try {
+    const targetId = Number(req.params.id);
+    const baseId = Number(req.params.baseId);
+    if (!Number.isInteger(targetId) || targetId <= 0 || !Number.isInteger(baseId) || baseId <= 0) {
+      res.status(400).json({ error: 'Invalid run id' });
+      return;
+    }
+    const [target, base] = await Promise.all([getRun(targetId), getRun(baseId)]);
+    if (!target || !base) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+    if (target.scenario_name !== base.scenario_name) {
+      res.status(400).json({ error: 'Runs belong to different scenarios' });
+      return;
+    }
+    res.json(diffRuns(base, target));
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
 // Cancels a currently running scenario by terminating its worker thread.
 function handleCancel(req: express.Request, res: express.Response): void {
   const name = req.params.name as string;
@@ -795,6 +821,7 @@ export function createApp(): express.Application {
   app.get('/api/groups', requireScope('read'), handleGroups);
   app.get('/api/overview', requireScope('read'), handleOverview);
   app.get('/api/runs/:id', requireScope('read'), handleGetRun);
+  app.get('/api/runs/:id/diff/:baseId', requireScope('read'), handleRunDiff);
   // Bulk actions must be registered before the /:name routes.
   app.post('/api/scenarios/bulk/run', requireScope('trigger'), handleBulkRun);
   app.post('/api/scenarios/bulk/pause', requireScope('trigger'), (req, res) => { void handleBulkPauseResume('pause', req, res); });
