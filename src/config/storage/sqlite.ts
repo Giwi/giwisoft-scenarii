@@ -30,6 +30,7 @@ export class SqliteBackend implements StorageBackend {
     if (resolved !== ':memory:') fs.mkdirSync(path.dirname(resolved), { recursive: true });
     const db = new Database(resolved);
     db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');
     this.db = db;
 
