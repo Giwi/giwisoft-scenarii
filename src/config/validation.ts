@@ -27,7 +27,7 @@ const HTTP_EXPECT_KEYS = [
 ] as const;
 const BROWSER_EXPECT_KEYS = ['has_text', 'not_has_text', 'url_contains', 'selector_count'] as const;
 const CONDITION_KEYS = ['if_step', 'if_status', 'if_success'] as const;
-const ALERT_KEYS = ['consecutive_failures'] as const;
+const ALERT_KEYS = ['consecutive_failures', 'max_silence', 'failures_in_window'] as const;
 const TIME_WINDOW_KEYS = ['start', 'end', 'timezone'] as const;
 const SCHEMA_KEYS = [
   'type', 'properties', 'required', 'items', 'enum', 'pattern', 'min', 'max', 'nullable',
@@ -358,6 +358,17 @@ export function validateScenario(raw: Record<string, unknown>): void {
     unknownKeys(raw.alert, ALERT_KEYS, 'scenario.alert');
     if (raw.alert.consecutive_failures !== undefined) {
       assertInteger(raw.alert.consecutive_failures, 'scenario.alert.consecutive_failures', 1);
+    }
+    if ((raw.alert as any).max_silence !== undefined) {
+      assertInteger((raw.alert as any).max_silence, 'scenario.alert.max_silence', 1);
+    }
+    if ((raw.alert as any).failures_in_window !== undefined) {
+      const fw = (raw.alert as any).failures_in_window;
+      if (typeof fw !== 'object' || fw === null || Array.isArray(fw)) {
+        throw new Error('scenario.alert.failures_in_window must be an object');
+      }
+      assertInteger(fw.count, 'scenario.alert.failures_in_window.count', 1);
+      assertInteger(fw.window, 'scenario.alert.failures_in_window.window', 1);
     }
   }
 

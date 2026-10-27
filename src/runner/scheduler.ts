@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Scenario, AlertConfig, TimeWindow } from '../types';
 import { runScenario, RunOptions } from './runner';
-import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess, getScenarioList, getScenarioHistory } from '../config/storage';
+import { upsertScenarioTags, getPreviousRunSuccess, getLastRunSuccess, getScenarioList, getScenarioHistory, getScenarioHistoryCount } from '../config/storage';
 import { getSettings } from '../config/settings';
 import { loadScenarioFile } from '../config/parser';
 import { sendEmailMessage } from '../notifications/email-client';
@@ -86,7 +86,7 @@ export function scheduleScenario(
     logger.info({ scenario: scenario.name }, 'Running scenario');
     const metrics = await runScenario(scenario, options);
 
-    // Check for consecutive failures and emit a warning if threshold is exceeded
+    // Check for alerts and emit a warning if threshold is exceeded
     const alertConfig: AlertConfig = scenario.alert || {};
     const threshold = alertConfig.consecutive_failures ?? DEFAULT_ALERT_CONSECUTIVE_FAILURES;
     if (!metrics.success && threshold > 0) {
@@ -98,6 +98,39 @@ export function scheduleScenario(
       }
       if (consecutive >= threshold) {
         logger.warn({ scenario: scenario.name, consecutive_failures: consecutive, threshold }, 'Alert: consecutive failures threshold reached');
+      }
+    }
+
+    if (alertConfig.failures_in_window) {
+      try {
+        const { count, window } = alertConfig.failures_in_window;
+        if (count > 0 && window > 0) {
+          const history = await getScenarioHistory(scenario.name, window, 1000, 0);
+          const failures = history.filter(h => !h.success).length;
+          if (failures >= count) {
+            logger.warn({ scenario: scenario.name, failures_in_window: failures, window_minutes: window, threshold: count }, 'Alert: failures in window threshold reached');
+          }
+        }
+      } catch (err: unknown) {
+        logger.warn({ scenario: scenario.name, err: err instanceof Error ? err.message : err }, 'Failed to check failures_in_window alert');
+      }
+    }
+
+    if (alertConfig.max_silence !== undefined && alertConfig.max_silence > 0) {
+      try {
+        const history = await getScenarioHistory(scenario.name, Math.max(60, alertConfig.max_silence * 2), 1, 0);
+        if (history.length === 0) {
+          logger.warn({ scenario: scenario.name, max_silence_minutes: alertConfig.max_silence }, 'Alert: no runs recorded, possible broken scheduler/workers');
+        } else {
+          const lastRun = history[0];
+          const lastTime = lastRun.finished_at ? new Date(lastRun.finished_at).getTime() : lastRun.started_at ? new Date(lastRun.started_at).getTime() : Date.now();
+          const minutesSince = (Date.now() - lastTime) / 60000;
+          if (minutesSince >= alertConfig.max_silence) {
+            logger.warn({ scenario: scenario.name, max_silence_minutes: alertConfig.max_silence, minutes_since_last_run: Math.round(minutesSince) }, 'Alert: max silence threshold reached');
+          }
+        }
+      } catch (err: unknown) {
+        logger.warn({ scenario: scenario.name, err: err instanceof Error ? err.message : err }, 'Failed to check max_silence alert');
       }
     }
   });

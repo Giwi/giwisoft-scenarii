@@ -117,6 +117,11 @@ export interface Scenario {
 // Per-scenario alerting threshold overrides
 export interface AlertConfig {
   consecutive_failures?: number;
+  max_silence?: number;
+  failures_in_window?: {
+    count: number;
+    window: number;
+  };
 }
 
 // Runtime metrics for a single step execution

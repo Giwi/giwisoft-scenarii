@@ -62,7 +62,7 @@ export class DocsComponent {
     {
       name: 'alert',
       type: 'map',
-      desc: 'consecutive_failures: how many runs in a row trigger the alert state.',
+      desc: 'consecutive_failures: how many runs in a row trigger the alert state. max_silence: minutes with no run before alert. failures_in_window: {count, window} failures within window minutes.',
     },
   ];
 
