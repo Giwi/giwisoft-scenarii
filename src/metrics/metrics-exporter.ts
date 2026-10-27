@@ -3,9 +3,9 @@
 import express from 'express';
 import { getScenarioList, getScenarioHistory } from '../config/storage';
 import { escapePrometheusLabel } from '../utils/helpers';
-import { getSettings } from '../config/settings';
 import { DEFAULT_HISTORY_DAYS } from '../utils/constants';
 import logger from '../utils/logger';
+import { apiAuthEnabled, tokenScopesFromRequest, scopesSatisfy } from '../config/api-auth';
 
 let notificationSuccessCount = 0;
 let notificationFailureCount = 0;
@@ -20,11 +20,11 @@ function getNotificationMetrics(): { success: number; failure: number } {
 }
 
 // Middleware that enforces Bearer token auth on the /api/metrics endpoint.
+// Scoped tokens with read (or admin) access are accepted.
 export function metricsAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  const config = getSettings().api?.auth;
-  if (!config?.enabled) return next();
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ') || header.slice(7) !== config.api_key) {
+  if (!apiAuthEnabled()) return next();
+  const scopes = tokenScopesFromRequest(req);
+  if (!scopes || !scopesSatisfy(scopes, 'read')) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

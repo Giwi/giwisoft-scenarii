@@ -361,9 +361,10 @@ node dist/index.js server
 | `POST /api/scenarios/import` | Import scenario(s) from a YAML string (`{"yaml":"..."}` - single scenario or array). Stored in the scenarios directory, picked up by the scheduler; updates the file when the name already exists (any logged-in user) |
 | `GET /api/scenarios/export` | Download all scenarios as a YAML bundle file |
 | `GET /api/groups` | List all distinct scenario groups |
+| `GET /api/runs/:id` | Fetch one persisted run with all steps (requires `read`) |
 | `GET /api/scenarios/:name` | Scenario detail with paginated run history (`?limit=&offset=&days=`) |
 | `GET /api/scenarios/:name/history` | Raw run history (`?limit=&offset=&days=`) |
-| `POST /api/scenarios/:name/run` | Trigger an immediate ad-hoc run |
+| `POST /api/scenarios/:name/run` | Trigger an ad-hoc run. `?wait=true` blocks until completion and returns `{status, run_id, metrics}` (requires `trigger`) |
 | `POST /api/scenarios/:name/cancel` | Abort a running scenario |
 | `POST /api/scenarios/:name/pause` | Pause a scheduled scenario |
 | `POST /api/scenarios/:name/resume` | Resume a paused scenario |
@@ -414,6 +415,22 @@ Prometheus can scrape `http://localhost:3000/api/metrics` for:
 - `scenarii_step_success{scenario,step,action}` - per-step success
 - `scenarii_notification_delivery_total{status}` - notification delivery success/failure count
 
+### Scoped API tokens
+
+Bearer tokens work alongside dashboard sessions. Send `Authorization: Bearer <token>` to any `/api/*` route:
+
+- `read`: list scenarios, fetch run history, `GET /api/runs/:id`, exports, metrics.
+- `trigger`: `POST /api/scenarios/:name/run?wait=true`, cancel/pause/resume. Combine with `read` if the caller also needs run history.
+- `admin`: import/delete configs, backup, user management, artifact approval. `admin` implies `read` and `trigger`.
+
+When `api.auth.enabled` is true, a token is required for API calls made without a session. Session users keep their existing role-based access. Example CI call:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TRIGGER_TOKEN" \
+  "https://scenarii.example.com/api/scenarios/smoke/run?wait=true"
+# { "status": "passed", "run_id": 42, "metrics": { ... } }
+```
+
 ## Real-time updates
 
 The server exposes a WebSocket endpoint at `/ws`. After each scenario run, a JSON message is broadcast to all connected clients:
@@ -421,6 +438,7 @@ The server exposes a WebSocket endpoint at `/ws`. After each scenario run, a JSO
 ```json
 {
   "type": "scenario_run",
+  "run_id": 42,
   "scenario_name": "Lusk.bzh validation",
   "success": true,
   "duration_ms": 2500,
@@ -428,11 +446,12 @@ The server exposes a WebSocket endpoint at `/ws`. After each scenario run, a JSO
 }
 ```
 
-During a run, **step progress** messages are streamed in real-time:
+During a run, **step progress** messages are streamed in real-time. `run_id` is stable from the first step event and matches `GET /api/runs/:id`:
 
 ```json
 {
   "type": "step_progress",
+  "run_id": 42,
   "scenario_name": "Example",
   "step_name": "Homepage",
   "action": "http.get",
@@ -451,7 +470,17 @@ Get alerted when a scenario fails and when it recovers. Create a `settings.yaml`
 api:
   auth:
     enabled: true
-    api_key: "YOUR_API_KEY"      # protects /api/metrics
+    api_key: "YOUR_API_KEY"      # legacy key, treated as an admin-scoped token
+    tokens:                      # optional scoped tokens for CI and integrations
+      - name: ci-read
+        token: "READ_ONLY_TOKEN"
+        scopes: ["read"]
+      - name: ci-trigger
+        token: "TRIGGER_TOKEN"
+        scopes: ["trigger"]
+      - name: ci-admin
+        token: "ADMIN_TOKEN"
+        scopes: ["admin"]        # admin implies read + trigger
 
 auth:
   enabled: true                  # dashboard authentication (on by default)

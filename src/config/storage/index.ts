@@ -57,8 +57,20 @@ export function getBackend(): StorageBackend {
 }
 
 // ── Scenario run metrics (async public API) ──────────────────────────────────
-export function storeMetrics(metrics: ScenarioMetrics): Promise<void> {
+export function createRun(scenarioName: string, startedAt: Date): Promise<number> {
+  return getBackend().createRun(scenarioName, startedAt);
+}
+
+export function completeRun(runId: number, metrics: ScenarioMetrics): Promise<void> {
+  return getBackend().completeRun(runId, metrics);
+}
+
+export function storeMetrics(metrics: ScenarioMetrics): Promise<number> {
   return getBackend().storeMetrics(metrics);
+}
+
+export function getRun(id: number): Promise<ScenarioMetrics | undefined> {
+  return getBackend().getRun(id);
 }
 
 export function upsertScenarioTags(name: string, tags: string[]): Promise<void> {

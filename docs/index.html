@@ -300,7 +300,7 @@ scenarii_step_duration_ms{step=<em>"Get health"</em>} <b>204</b>
           <article class="feature"><span class="feature-num">05</span><div><h3>CLI and API</h3><p>Validate, trigger, and manage from the terminal. 30+ REST endpoints power the dashboard.</p></div></article>
           <article class="feature"><span class="feature-num">06</span><div><h3>One container</h3><p>Multi-arch image for amd64 and arm64, non-root, with a healthcheck and dumb-init.</p></div></article>
           <article class="feature"><span class="feature-num">07</span><div><h3>Node test suite</h3><p>Built-in runner covering the queue, state machine, variable interpolation, and YAML parsing.</p></div></article>
-          <article class="feature"><span class="feature-num">08</span><div><h3>Private by default</h3><p>Session cookies, local roles, OIDC group mapping, and an API key for the metrics endpoint.</p></div></article>
+          <article class="feature"><span class="feature-num">08</span><div><h3>Private by default</h3><p>Session cookies, local roles, OIDC group mapping, and scoped API tokens for CI (read, trigger, admin).</p></div></article>
         </div>
       </div>
     </section>
@@ -703,6 +703,32 @@ docker run -d \
                 </div>
                 <p>An admin can neither delete their own account nor change their own role, so the last admin cannot be locked out of user management.</p>
 
+                <h4>Scoped API tokens</h4>
+                <p>CI and integrations can use bearer tokens instead of a dashboard session. Send <code>Authorization: Bearer &lt;token&gt;</code>. Scopes are <code>read</code> (history, runs, exports, metrics), <code>trigger</code> (start, cancel, pause, resume), and <code>admin</code> (import, delete, backup, users). <code>admin</code> implies the other two. The legacy <code>api_key</code> is treated as an admin token.</p>
+                <div class="code">
+                  <div class="code-head">
+                    <span class="code-file">settings.yml</span>
+                    <button class="copy" type="button" data-copy="code-api-tokens">Copy</button>
+                  </div>
+                  <pre id="code-api-tokens"><code>api:
+  auth:
+    enabled: true
+    api_key: <span class="tok-string">"LEGACY_ADMIN_KEY"</span>
+    tokens:
+      - name: ci-read
+        token: <span class="tok-string">"READ_TOKEN"</span>
+        scopes: [<span class="tok-string">"read"</span>]
+      - name: ci-trigger
+        token: <span class="tok-string">"TRIGGER_TOKEN"</span>
+        scopes: [<span class="tok-string">"trigger"</span>]</code></pre>
+                </div>
+                <p>Blocking CI call:</p>
+                <div class="code">
+                  <pre><code>curl -X POST -H <span class="tok-string">"Authorization: Bearer $TRIGGER_TOKEN"</span> \
+  <span class="tok-string">"http://localhost:3000/api/scenarios/smoke/run?wait=true"</span>
+<span class="tok-comment"># { "status": "passed", "run_id": 42, "metrics": { ... } }</span></code></pre>
+                </div>
+
                 <h4>OIDC notes</h4>
                 <ul>
                   <li><code>username_claim</code> is used as the local username. Unset, it falls back to <code>preferred_username</code>, then <code>email</code>, then <code>sub</code>.</li>
@@ -985,6 +1011,8 @@ DELETE /api/scenarios/:name/config
 GET    /api/scenarios/:name/export/json
 GET    /api/scenarios/:name/export/csv
 GET    /api/scenarios/:name/sla         <span class="tok-comment">?days=7</span>
+GET    /api/runs/:id                    <span class="tok-comment">one persisted run + steps</span>
+POST   /api/scenarios/:name/run         <span class="tok-comment">?wait=true returns run_id + metrics</span>
 
 <span class="tok-comment"># Authentication</span>
 POST   /api/auth/login
@@ -1064,6 +1092,7 @@ scenarii_notification_delivery_total{status=<span class="tok-string">"success"</
                   </div>
                   <pre id="code-ws-run"><code>{
   <span class="tok-key">"type"</span>: <span class="tok-string">"scenario_run"</span>,
+  <span class="tok-key">"run_id"</span>: <span class="tok-number">42</span>,
   <span class="tok-key">"scenario_name"</span>: <span class="tok-string">"Lusk.bzh validation"</span>,
   <span class="tok-key">"success"</span>: true,
   <span class="tok-key">"duration_ms"</span>: <span class="tok-number">2500</span>,
@@ -1078,6 +1107,7 @@ scenarii_notification_delivery_total{status=<span class="tok-string">"success"</
                   </div>
                   <pre id="code-ws-step"><code>{
   <span class="tok-key">"type"</span>: <span class="tok-string">"step_progress"</span>,
+  <span class="tok-key">"run_id"</span>: <span class="tok-number">42</span>,
   <span class="tok-key">"scenario_name"</span>: <span class="tok-string">"Lusk.bzh validation"</span>,
   <span class="tok-key">"step_name"</span>: <span class="tok-string">"Homepage"</span>,
   <span class="tok-key">"action"</span>: <span class="tok-string">"http.get"</span>,

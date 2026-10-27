@@ -92,24 +92,23 @@ export class PostgresBackend implements StorageBackend {
   }
 
   // ── Scenario runs ──────────────────────────────────────────────────────────
-  async storeMetrics(metrics: ScenarioMetrics): Promise<void> {
+  async createRun(scenarioName: string, startedAt: Date): Promise<number> {
+    const res = await this.handle.query(
+      `INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success, flaky, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [scenarioName, startedAt.toISOString(), startedAt.toISOString(), 0, 0, 0, sqlNow()],
+    );
+    return Number(res.rows[0].id);
+  }
+
+  async completeRun(runId: number, metrics: ScenarioMetrics): Promise<void> {
     const client = await this.handle.connect();
     try {
       await client.query('BEGIN');
-      const res = await client.query(
-        `INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success, flaky, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [
-          metrics.scenario_name,
-          metrics.started_at.toISOString(),
-          metrics.finished_at.toISOString(),
-          metrics.duration_ms,
-          metrics.success ? 1 : 0,
-          metrics.flaky ? 1 : 0,
-          sqlNow(),
-        ],
+      await client.query(
+        `UPDATE scenario_runs SET finished_at = $1, duration_ms = $2, success = $3, flaky = $4 WHERE id = $5`,
+        [metrics.finished_at.toISOString(), metrics.duration_ms, metrics.success ? 1 : 0, metrics.flaky ? 1 : 0, runId],
       );
-      const runId = res.rows[0].id as string | number;
       for (const step of metrics.steps) {
         await client.query(
           `INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp, request_url, request_method, request_headers, request_body, response_headers, response_body)
@@ -140,6 +139,63 @@ export class PostgresBackend implements StorageBackend {
     } finally {
       client.release();
     }
+  }
+
+  async storeMetrics(metrics: ScenarioMetrics): Promise<number> {
+    const runId = await this.createRun(metrics.scenario_name, metrics.started_at);
+    await this.completeRun(runId, metrics);
+    return runId;
+  }
+
+  async getRun(id: number): Promise<ScenarioMetrics | undefined> {
+    const res = await this.handle.query(
+      `SELECT id::int AS run_id, scenario_name, started_at, finished_at, duration_ms, success, flaky
+       FROM scenario_runs WHERE id = $1`,
+      [id],
+    );
+    const row = res.rows[0] as {
+      run_id: number; scenario_name: string; started_at: string; finished_at: string;
+      duration_ms: number; success: number; flaky: number;
+    } | undefined;
+    if (!row) return undefined;
+
+    const stepRes = await this.handle.query(
+      `SELECT step_name, action, success, status_code, response_time_ms, attempts, error, timestamp,
+              request_url, request_method, request_headers, request_body, response_headers, response_body
+       FROM step_metrics WHERE run_id = $1 ORDER BY id`,
+      [id],
+    );
+
+    return {
+      run_id: row.run_id,
+      scenario_name: row.scenario_name,
+      started_at: new Date(row.started_at),
+      finished_at: new Date(row.finished_at),
+      duration_ms: row.duration_ms,
+      success: row.success === 1,
+      flaky: row.flaky === 1,
+      steps: (stepRes.rows as Array<{
+        step_name: string; action: string; success: number; status_code: number | null;
+        response_time_ms: number; attempts: number | null; error: string | null; timestamp: string;
+        request_url: string | null; request_method: string | null; request_headers: string | null;
+        request_body: string | null; response_headers: string | null; response_body: string | null;
+      }>).map(s => ({
+        step_name: s.step_name,
+        action: s.action,
+        success: s.success === 1,
+        status_code: s.status_code ?? undefined,
+        response_time_ms: s.response_time_ms,
+        attempts: s.attempts ?? undefined,
+        error: s.error ?? undefined,
+        timestamp: new Date(s.timestamp),
+        request_url: s.request_url ?? undefined,
+        request_method: s.request_method ?? undefined,
+        request_headers: s.request_headers ? JSON.parse(s.request_headers) as Record<string, string> : undefined,
+        request_body: s.request_body ?? undefined,
+        response_headers: s.response_headers ? JSON.parse(s.response_headers) as Record<string, string> : undefined,
+        response_body: s.response_body ?? undefined,
+      })),
+    };
   }
 
   async upsertScenarioTags(name: string, tags: string[]): Promise<void> {

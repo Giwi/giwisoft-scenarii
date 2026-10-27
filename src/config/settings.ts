@@ -63,11 +63,26 @@ export interface NotificationsConfig {
 }
 
 // API-level authentication settings (API key or OIDC)
+export type ApiScope = 'trigger' | 'read' | 'admin';
+
+export interface ApiTokenConfig {
+  // Human-readable label, used in logs and docs.
+  name?: string;
+  token: string;
+  // Granted scopes. `admin` implies trigger and read. Defaults to ['admin'].
+  scopes?: ApiScope[];
+}
+
+export interface ApiAuthConfig {
+  enabled?: boolean;
+  // Legacy single key. Treated as an admin-scoped token when present.
+  api_key: string;
+  // Scoped bearer tokens for CI and integrations.
+  tokens?: ApiTokenConfig[];
+}
+
 export interface ApiConfig {
-  auth?: {
-    enabled?: boolean;
-    api_key: string;
-  };
+  auth?: ApiAuthConfig;
 }
 
 export interface BackupConfig {

@@ -141,27 +141,32 @@ export class SqliteBackend implements StorageBackend {
   }
 
   // ── Scenario runs ──────────────────────────────────────────────────────────
-  async storeMetrics(metrics: ScenarioMetrics): Promise<void> {
-    const db = this.handle;
-    const insertRun = db.prepare(`
+  async createRun(scenarioName: string, startedAt: Date): Promise<number> {
+    const createdAt = sqlNow();
+    const result = this.handle.prepare(`
       INSERT INTO scenario_runs (scenario_name, started_at, finished_at, duration_ms, success, flaky, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(scenarioName, startedAt.toISOString(), startedAt.toISOString(), 0, 0, 0, createdAt);
+    return Number(result.lastInsertRowid);
+  }
+
+  async completeRun(runId: number, metrics: ScenarioMetrics): Promise<void> {
+    const db = this.handle;
+    const updateRun = db.prepare(`
+      UPDATE scenario_runs SET finished_at = ?, duration_ms = ?, success = ?, flaky = ? WHERE id = ?
     `);
     const insertStep = db.prepare(`
       INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp, request_url, request_method, request_headers, request_body, response_headers, response_body)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const tx = db.transaction(() => {
-      const result = insertRun.run(
-        metrics.scenario_name,
-        metrics.started_at.toISOString(),
+      updateRun.run(
         metrics.finished_at.toISOString(),
         metrics.duration_ms,
         metrics.success ? 1 : 0,
         metrics.flaky ? 1 : 0,
-        sqlNow(),
+        runId,
       );
-      const runId = result.lastInsertRowid as number;
       for (const step of metrics.steps) {
         insertStep.run(
           runId,
@@ -183,6 +188,60 @@ export class SqliteBackend implements StorageBackend {
       }
     });
     tx();
+  }
+
+  async storeMetrics(metrics: ScenarioMetrics): Promise<number> {
+    const runId = await this.createRun(metrics.scenario_name, metrics.started_at);
+    await this.completeRun(runId, metrics);
+    return runId;
+  }
+
+  async getRun(id: number): Promise<ScenarioMetrics | undefined> {
+    const row = this.handle.prepare(`
+      SELECT id AS run_id, scenario_name, started_at, finished_at, duration_ms, success, flaky
+      FROM scenario_runs WHERE id = ?
+    `).get(id) as {
+      run_id: number; scenario_name: string; started_at: string; finished_at: string;
+      duration_ms: number; success: number; flaky: number;
+    } | undefined;
+    if (!row) return undefined;
+
+    const steps = this.handle.prepare(`
+      SELECT step_name, action, success, status_code, response_time_ms, attempts, error, timestamp,
+             request_url, request_method, request_headers, request_body, response_headers, response_body
+      FROM step_metrics WHERE run_id = ? ORDER BY id
+    `).all(id) as Array<{
+      step_name: string; action: string; success: number; status_code: number | null;
+      response_time_ms: number; attempts: number | null; error: string | null; timestamp: string;
+      request_url: string | null; request_method: string | null; request_headers: string | null;
+      request_body: string | null; response_headers: string | null; response_body: string | null;
+    }>;
+
+    return {
+      run_id: row.run_id,
+      scenario_name: row.scenario_name,
+      started_at: new Date(row.started_at),
+      finished_at: new Date(row.finished_at),
+      duration_ms: row.duration_ms,
+      success: row.success === 1,
+      flaky: row.flaky === 1,
+      steps: steps.map(s => ({
+        step_name: s.step_name,
+        action: s.action,
+        success: s.success === 1,
+        status_code: s.status_code ?? undefined,
+        response_time_ms: s.response_time_ms,
+        attempts: s.attempts ?? undefined,
+        error: s.error ?? undefined,
+        timestamp: new Date(s.timestamp),
+        request_url: s.request_url ?? undefined,
+        request_method: s.request_method ?? undefined,
+        request_headers: s.request_headers ? JSON.parse(s.request_headers) as Record<string, string> : undefined,
+        request_body: s.request_body ?? undefined,
+        response_headers: s.response_headers ? JSON.parse(s.response_headers) as Record<string, string> : undefined,
+        response_body: s.response_body ?? undefined,
+      })),
+    };
   }
 
   async upsertScenarioTags(name: string, tags: string[]): Promise<void> {

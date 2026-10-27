@@ -1,7 +1,8 @@
 import express from 'express';
 import crypto from 'crypto';
 import path from 'path';
-import { getSettings, AuthProvider } from '../config/settings';
+import { getSettings, AuthProvider, ApiScope } from '../config/settings';
+import { apiAuthEnabled, tokenScopesFromRequest, scopesSatisfy } from '../config/api-auth';
 import {
   verifyCredentials, ensureUser, getUser, listUsers, createUser, setPassword, setRole,
   deleteUser, generatePassword, normalizeRole, UserRole, ColorScheme, getProfile,
@@ -77,6 +78,21 @@ export function sessionUsername(req: express.Request): string | undefined {
   return getSession(req)?.username;
 }
 
+// The role cached on the request's session, or undefined when unauthenticated.
+export function sessionRole(req: express.Request): UserRole | undefined {
+  return getSession(req)?.role;
+}
+
+// Resolves the effective scopes for a request. API tokens carry explicit scopes;
+// sessions get read/trigger for every user and admin for admins.
+export function requestScopes(req: express.Request): Set<ApiScope> | undefined {
+  const tokenScopes = tokenScopesFromRequest(req);
+  if (tokenScopes) return tokenScopes;
+  const role = sessionRole(req);
+  if (role) return new Set<ApiScope>(role === 'admin' ? ['read', 'trigger', 'admin'] : ['read', 'trigger']);
+  return undefined;
+}
+
 // The language a response should use: the signed-in user's profile choice, and for
 // anonymous visitors (login page, public status page) the Accept-Language header.
 export function requestLang(req: express.Request): Lang {
@@ -123,11 +139,16 @@ export function isAuthenticatedRequest(req: { headers: { cookie?: string } }): b
   return Date.now() - sessions.get(sessionId)!.createdAt <= SESSION_TTL;
 }
 
-// Express middleware guarding the API: any /api/* path outside PUBLIC_API_PATHS needs a session.
+// Express middleware guarding the API: any /api/* path outside PUBLIC_API_PATHS needs a
+// session or a valid bearer token. Fine-grained scope checks happen on each route.
 export function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  if (!authProvider()) return next();
   if (!req.path.startsWith('/api/')) return next();
   if (PUBLIC_API_PATHS.some(p => req.path === p || req.path.startsWith(p))) return next();
+
+  // Valid bearer tokens pass here; requireScope decides what they may do.
+  if (tokenScopesFromRequest(req)) return next();
+
+  if (!authProvider() && !apiAuthEnabled()) return next();
   if (!getSession(req)) {
     res.status(401).json({ error: t('auth.required', requestLang(req)) });
     return;
@@ -135,10 +156,34 @@ export function authMiddleware(req: express.Request, res: express.Response, next
   next();
 }
 
-// Guards admin-only API routes: requires a session whose user has the admin role.
-// When auth is disabled every request passes through.
+// Guards a route with a required API scope. Sessions are accepted (admin sessions
+// satisfy every scope) and bearer tokens must carry the matching scope.
+export function requireScope(scope: ApiScope): (req: express.Request, res: express.Response, next: express.NextFunction) => void {
+  return (req, res, next) => {
+    if (!authProvider() && !apiAuthEnabled()) return next();
+    const scopes = requestScopes(req);
+    if (!scopes) {
+      res.status(401).json({ error: t('auth.required', requestLang(req)) });
+      return;
+    }
+    if (!scopesSatisfy(scopes, scope)) {
+      res.status(403).json({ error: `API token is missing the "${scope}" scope` });
+      return;
+    }
+    next();
+  };
+}
+
+// Guards admin-only API routes: requires a session whose user has the admin role, or a
+// bearer token carrying the admin scope. When auth is disabled every request passes.
 export async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> {
-  if (!authProvider()) return next();
+  const tokenScopes = tokenScopesFromRequest(req);
+  if (tokenScopes) {
+    if (scopesSatisfy(tokenScopes, 'admin')) return next();
+    res.status(403).json({ error: t('auth.admin_required', requestLang(req)) });
+    return;
+  }
+  if (!authProvider() && !apiAuthEnabled()) return next();
   const session = getSession(req);
   if (!session) {
     res.status(401).json({ error: t('auth.required', requestLang(req)) });

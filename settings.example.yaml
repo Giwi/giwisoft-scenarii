@@ -1,8 +1,21 @@
-# API key auth for Prometheus metrics endpoint
+# API authentication. Bearer tokens protect /api/* (and /api/metrics).
 api:
   auth:
     enabled: true
+    # Legacy single key. Treated as an admin-scoped token.
     api_key: "YOUR_API_KEY"
+    # Optional scoped tokens for CI and integrations.
+    # Scopes: read | trigger | admin (admin implies read + trigger).
+    # tokens:
+    #   - name: ci-read
+    #     token: "READ_ONLY_TOKEN"
+    #     scopes: ["read"]
+    #   - name: ci-trigger
+    #     token: "TRIGGER_TOKEN"
+    #     scopes: ["trigger"]
+    #   - name: ci-admin
+    #     token: "ADMIN_TOKEN"
+    #     scopes: ["admin"]
 
 # Dashboard authentication (optional)
 #

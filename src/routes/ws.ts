@@ -24,6 +24,7 @@ export function initWebSocket(server: HttpServer): void {
 
 // Broadcasts a completed scenario run to all connected WebSocket clients.
 export function broadcastScenarioRun(data: {
+  run_id?: number;
   scenario_name: string;
   success: boolean;
   duration_ms: number;
@@ -45,6 +46,7 @@ export function broadcastScenarioRun(data: {
 
 // Sends a per-step progress update to all connected WebSocket clients.
 export function broadcastStepProgress(data: {
+  run_id?: number;
   scenario_name: string;
   step_name: string;
   action: string;

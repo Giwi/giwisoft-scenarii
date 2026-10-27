@@ -71,7 +71,13 @@ export interface StorageBackend {
   close(): Promise<void>;
 
   // ── Scenario runs / metrics ────────────────────────────────────────────────
-  storeMetrics(metrics: ScenarioMetrics): Promise<void>;
+  // Inserts the run row up front so the id can be broadcast while steps execute.
+  createRun(scenarioName: string, startedAt: Date): Promise<number>;
+  // Writes the terminal state and step rows for a run created by createRun.
+  completeRun(runId: number, metrics: ScenarioMetrics): Promise<void>;
+  // Convenience for callers that only have the final metrics.
+  storeMetrics(metrics: ScenarioMetrics): Promise<number>;
+  getRun(id: number): Promise<ScenarioMetrics | undefined>;
   upsertScenarioTags(name: string, tags: string[]): Promise<void>;
   getScenarioList(tagFilter?: string): Promise<ScenarioInfo[]>;
   getScenarioHistory(name: string, limitDays: number, limit: number, offset: number): Promise<ScenarioMetrics[]>;

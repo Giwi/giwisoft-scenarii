@@ -146,6 +146,8 @@ export interface StepMetrics {
 
 // Aggregate metrics for a full scenario run
 export interface ScenarioMetrics {
+  // Persisted database id when the run was stored. Also broadcast in WebSocket events.
+  run_id?: number;
   scenario_name: string;
   started_at: Date;
   finished_at: Date;

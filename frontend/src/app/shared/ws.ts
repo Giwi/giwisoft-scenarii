@@ -1,5 +1,6 @@
 export interface ScenarioRunEvent {
   type: 'scenario_run';
+  run_id?: number;
   scenario_name: string;
   success: boolean;
   duration_ms: number;
@@ -8,6 +9,7 @@ export interface ScenarioRunEvent {
 
 export interface StepProgressEvent {
   type: 'step_progress';
+  run_id?: number;
   scenario_name: string;
   step_name: string;
   action: string;

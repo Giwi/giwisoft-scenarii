@@ -9,7 +9,7 @@ import { ChildProcess } from 'child_process';
 import { lightpanda } from '@lightpanda/browser';
 import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
-  getScenarioStepNames, getDistinctTags, getDbScenarioTags,
+  getScenarioStepNames, getDistinctTags, getDbScenarioTags, getRun,
   isStorageReady, backupDatabase,
 } from '../config/storage';
 import { initWebSocket } from './ws';
@@ -19,7 +19,7 @@ import { loadScenarioFile, parseScenario } from '../config/parser';
 import { runScenario, cancelScenario } from '../runner/runner';
 import { pauseScenario, resumeScenario, isPaused, isScheduled, listScheduled } from '../runner/scheduler';
 import {
-  authMiddleware, requireAdmin, pageAuthMiddleware, handleLocalLogin, handleTwoFactorLogin,
+  authMiddleware, requireAdmin, requireScope, pageAuthMiddleware, handleLocalLogin, handleTwoFactorLogin,
   handleOidcLogin, handleOidcCallback, handleAuthMe, handleLogout, handleListUsers,
   handleCreateUser, handleSetUserPassword, handleSetUserRole, handleDeleteUser, requestLang,
 } from './auth';
@@ -310,25 +310,56 @@ async function handleScenarioHistory(req: express.Request, res: express.Response
   }
 }
 
-// Triggers an immediate run of a scenario by loading its YAML file and passing it to the runner.
-function handleRunNow(req: express.Request, res: express.Response): void {
+// Triggers a run of a scenario. With ?wait=true the request blocks until the run finishes
+// and returns the persisted metrics (including run_id); otherwise it returns immediately.
+async function handleRunNow(req: express.Request, res: express.Response): Promise<void> {
   const name = req.params.name as string;
   if (!_scenariosDir) {
     res.status(400).json({ error: t('error.run_unconfigured', requestLang(req)) });
     return;
   }
   try {
+    const wait = req.query.wait === 'true' || req.query.wait === '1';
     const files = fs.readdirSync(_scenariosDir)
       .filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
     for (const file of files) {
       const scenario = loadScenarioFile(path.join(_scenariosDir, file));
       if (scenario.name === name) {
-        runScenario(scenario, _runOptions ?? { headless: true, persist: true });
+        const options = { ...(_runOptions ?? { headless: true, persist: true }) };
+        if (wait) {
+          // A blocking CI call must produce a retrievable run.
+          options.persist = true;
+          const metrics = await runScenario(scenario, options);
+          res.json({ status: metrics.success ? 'passed' : 'failed', run_id: metrics.run_id, metrics });
+          return;
+        }
+        runScenario(scenario, options).catch((err: unknown) => {
+          logger.error({ scenario: name, err: err instanceof Error ? err.message : String(err) }, 'Background run failed');
+        });
         res.json({ status: 'triggered', scenario: name });
         return;
       }
     }
     res.status(404).json({ error: t('scenario.not_found', requestLang(req)) });
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+// Returns a single persisted run by id, including its steps.
+async function handleGetRun(req: express.Request, res: express.Response): Promise<void> {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({ error: 'Invalid run id' });
+      return;
+    }
+    const run = await getRun(id);
+    if (!run) {
+      res.status(404).json({ error: 'Run not found' });
+      return;
+    }
+    res.json(run);
   } catch (err: unknown) {
     sendError(res, 500, err);
   }
@@ -643,30 +674,31 @@ export function createApp(): express.Application {
   app.use(pageAuthMiddleware);
 
   // Scenario CRUD and management
-  app.get('/api/scenarios', handleScenarioList);
-  app.post('/api/scenarios/import', handleBulkImport);
-  app.get('/api/scenarios/export', handleBulkExport);
-  app.get('/api/groups', handleGroups);
-  app.get('/api/scenarios/:name', handleScenarioDetail);
-  app.get('/api/scenarios/:name/history', handleScenarioHistory);
-  app.post('/api/scenarios/:name/run', handleRunNow);
-  app.post('/api/scenarios/:name/cancel', handleCancel);
-  app.post('/api/scenarios/:name/pause', handlePause);
-  app.post('/api/scenarios/:name/resume', handleResume);
-  app.get('/api/scenarios/:name/config', handleConfigExport);
-  app.put('/api/scenarios/:name/config', handleConfigSave);
-  app.delete('/api/scenarios/:name/config', handleConfigDelete);
-  app.get('/api/scenarios/:name/export/json', handleExportJson);
-  app.get('/api/scenarios/:name/export/csv', handleExportCsv);
-  app.get('/api/scenarios/:name/sla', handleSla);
-  app.get('/api/tags', handleTags);
+  app.get('/api/scenarios', requireScope('read'), handleScenarioList);
+  app.post('/api/scenarios/import', requireScope('admin'), handleBulkImport);
+  app.get('/api/scenarios/export', requireScope('read'), handleBulkExport);
+  app.get('/api/groups', requireScope('read'), handleGroups);
+  app.get('/api/runs/:id', requireScope('read'), handleGetRun);
+  app.get('/api/scenarios/:name', requireScope('read'), handleScenarioDetail);
+  app.get('/api/scenarios/:name/history', requireScope('read'), handleScenarioHistory);
+  app.post('/api/scenarios/:name/run', requireScope('trigger'), handleRunNow);
+  app.post('/api/scenarios/:name/cancel', requireScope('trigger'), handleCancel);
+  app.post('/api/scenarios/:name/pause', requireScope('trigger'), handlePause);
+  app.post('/api/scenarios/:name/resume', requireScope('trigger'), handleResume);
+  app.get('/api/scenarios/:name/config', requireScope('read'), handleConfigExport);
+  app.put('/api/scenarios/:name/config', requireScope('admin'), handleConfigSave);
+  app.delete('/api/scenarios/:name/config', requireScope('admin'), handleConfigDelete);
+  app.get('/api/scenarios/:name/export/json', requireScope('read'), handleExportJson);
+  app.get('/api/scenarios/:name/export/csv', requireScope('read'), handleExportCsv);
+  app.get('/api/scenarios/:name/sla', requireScope('read'), handleSla);
+  app.get('/api/tags', requireScope('read'), handleTags);
   app.get('/api/status', handleStatus);
-  app.post('/api/backup', handleBackup);
+  app.post('/api/backup', requireScope('admin'), handleBackup);
   app.get('/api/health', handleHealth);
   app.get('/api/metrics', metricsAuthMiddleware, handleMetrics);
 
   // Screenshots/artifacts
-  app.get('/api/artifacts/screenshots', (_req, res) => {
+  app.get('/api/artifacts/screenshots', requireScope('read'), (_req, res) => {
     try {
       const dirs = [getScreenshotsDir(), getScreenshotBaselinesDir(), getScreenshotDiffsDir()];
       const files: Array<{ name: string; path: string; type: string }> = [];
@@ -685,7 +717,7 @@ export function createApp(): express.Application {
       sendError(res, 500, err);
     }
   });
-  app.get('/api/artifacts/screenshots/file', (req, res) => {
+  app.get('/api/artifacts/screenshots/file', requireScope('read'), (req, res) => {
     try {
       const file = req.query.file as string;
       if (!file) return res.status(400).json({ error: 'file required' });
@@ -700,7 +732,7 @@ export function createApp(): express.Application {
       sendError(res, 500, err);
     }
   });
-  app.post('/api/artifacts/screenshots/approve', (req, res) => {
+  app.post('/api/artifacts/screenshots/approve', requireScope('admin'), (req, res) => {
     try {
       const { file } = req.body || {};
       if (!file) return res.status(400).json({ error: 'file required' });
@@ -717,7 +749,7 @@ export function createApp(): express.Application {
       sendError(res, 500, err);
     }
   });
-  app.post('/api/artifacts/screenshots/reject', (req, res) => {
+  app.post('/api/artifacts/screenshots/reject', requireScope('admin'), (req, res) => {
     try {
       const { file } = req.body || {};
       if (!file) return res.status(400).json({ error: 'file required' });

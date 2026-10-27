@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { Scenario, ScenarioMetrics, RunOptions } from '../types';
 import { createScenarioMetrics, consoleReporter, jsonReporter } from '../metrics/metrics';
-import { storeMetrics, purgeOldData, upsertScenarioTags } from '../config/storage';
+import { storeMetrics, purgeOldData, upsertScenarioTags, createRun, completeRun } from '../config/storage';
 import { notifyIfStateChanged } from '../notifications/index';
 import { broadcastScenarioRun, broadcastStepProgress } from '../routes/ws';
 import { getScenarioSettings, getSettings } from '../config/settings';
@@ -41,10 +41,17 @@ function createCancelledMetrics(scenarioName: string, error: string): ScenarioMe
 }
 
 // Persists metrics to the database, prints the report, sends notifications, and broadcasts over WebSocket.
-async function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): Promise<void> {
+// When `runId` is provided (the run row was created before execution) it is completed in place,
+// otherwise the run is stored wholesale. The persisted id is attached to the metrics.
+async function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions, runId?: number): Promise<void> {
   if (options.persist) {
     try {
-      await storeMetrics(metrics);
+      if (runId !== undefined) {
+        await completeRun(runId, metrics);
+        metrics.run_id = runId;
+      } else {
+        metrics.run_id = await storeMetrics(metrics);
+      }
       await purgeOldData(getSettings().storage?.retentionDays ?? DEFAULT_PURGE_DAYS);
     } catch (err: unknown) {
       logger.error({ err: err instanceof Error ? err.message : String(err) }, 'Failed to store metrics');
@@ -64,6 +71,7 @@ async function persistAndNotify(metrics: ScenarioMetrics, options: RunOptions): 
   }
 
   broadcastScenarioRun({
+    run_id: metrics.run_id,
     scenario_name: metrics.scenario_name,
     success: metrics.success,
     duration_ms: metrics.duration_ms,
@@ -87,12 +95,23 @@ export async function runScenario(
   const scenarioSettings = getScenarioSettings(scenario.name);
   const timeoutMs = options.timeout ?? scenarioSettings.timeout ?? scenario.timeout ?? DEFAULT_SCENARIO_TIMEOUT;
 
+  // Reserve the run row before execution so the id is stable in step_progress events
+  // and clients can GET /api/runs/:id while the run is still in flight.
+  let runId: number | undefined;
+  if (options.persist) {
+    try {
+      runId = await createRun(scenario.name, new Date());
+    } catch (err: unknown) {
+      logger.error({ scenario: scenario.name, err: err instanceof Error ? err.message : String(err) }, 'Failed to create run row');
+    }
+  }
+
   if (options.scenariosDir) {
     try {
       scenario.steps = resolveIncludes(scenario, options.scenariosDir);
     } catch (err: unknown) {
       const metrics = createCancelledMetrics(scenario.name, `Include resolution failed: ${err instanceof Error ? err.message : String(err)}`);
-      await persistAndNotify(metrics, options);
+      await persistAndNotify(metrics, options, runId);
       return metrics;
     }
   }
@@ -118,7 +137,7 @@ export async function runScenario(
         runningWorkers.delete(scenario.name);
         worker.terminate();
         const metrics = createCancelledMetrics(scenario.name, `Scenario "${scenario.name}" timed out after ${timeoutMs}ms`);
-        await persistAndNotify(metrics, options);
+        await persistAndNotify(metrics, options, runId);
         resolve(metrics);
       }
     }, timeoutMs + 60000).unref();
@@ -126,6 +145,7 @@ export async function runScenario(
     worker.on('message', async (msg: Record<string, unknown>) => {
       if (msg.type === 'step_progress') {
         broadcastStepProgress({
+          run_id: runId,
           scenario_name: msg.scenario_name as string,
           step_name: msg.step_name as string,
           action: msg.action as string,
@@ -139,7 +159,7 @@ export async function runScenario(
           clearTimeout(safetyTimer);
           runningWorkers.delete(scenario.name);
           const metrics = msg.metrics as ScenarioMetrics;
-          await persistAndNotify(metrics, options);
+          await persistAndNotify(metrics, options, runId);
           resolve(metrics);
         }
       } else if (msg.type === 'error') {
@@ -149,7 +169,7 @@ export async function runScenario(
           runningWorkers.delete(scenario.name);
           logger.error({ scenario: scenario.name, error: msg.error }, 'Worker reported error');
           const metrics = createCancelledMetrics(scenario.name, String(msg.error));
-          await persistAndNotify(metrics, options);
+          await persistAndNotify(metrics, options, runId);
           resolve(metrics);
         }
       }
@@ -162,7 +182,7 @@ export async function runScenario(
         runningWorkers.delete(scenario.name);
         logger.error({ scenario: scenario.name, err }, 'Worker error');
         const metrics = createCancelledMetrics(scenario.name, err instanceof Error ? err.message : String(err));
-        await persistAndNotify(metrics, options);
+        await persistAndNotify(metrics, options, runId);
         resolve(metrics);
       }
     });
@@ -174,7 +194,7 @@ export async function runScenario(
         runningWorkers.delete(scenario.name);
         logger.warn({ scenario: scenario.name, exitCode: code }, 'Worker exited unexpectedly');
         const metrics = createCancelledMetrics(scenario.name, `Worker exited with code ${code}`);
-        await persistAndNotify(metrics, options);
+        await persistAndNotify(metrics, options, runId);
         resolve(metrics);
       }
     });

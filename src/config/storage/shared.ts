@@ -19,6 +19,7 @@ export function collapseHistory(rows: HistoryRow[]): ScenarioMetrics[] {
   for (const row of rows) {
     if (!runMap.has(row.run_id)) {
       runMap.set(row.run_id, {
+        run_id: row.run_id,
         scenario_name: row.scenario_name,
         started_at: new Date(row.started_at),
         finished_at: new Date(row.finished_at),
