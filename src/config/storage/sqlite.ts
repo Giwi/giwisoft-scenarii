@@ -2,8 +2,8 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { ScenarioMetrics } from '../../types';
-import { StorageBackend, ScenarioInfo, UserRow, ProfileRow, PasswordResetRow, HistoryRow } from './types';
-import { collapseHistory, daysAgo, parseTags, sqlNow } from './shared';
+import { StorageBackend, ScenarioInfo, UserRow, ProfileRow, PasswordResetRow, HistoryRow, OverviewData } from './types';
+import { buildOverview, collapseHistory, daysAgo, parseTags, sqlNow } from './shared';
 
 const PROFILE_COLUMNS: [string, string][] = [
   ['email', 'TEXT'],
@@ -196,8 +196,7 @@ export class SqliteBackend implements StorageBackend {
     return runId;
   }
 
-  async getRun(id: number): Promise<ScenarioMetrics | undefined> {
-    const row = this.handle.prepare(`
+  async getRun(id: number): Promise<ScenarioMetrics | undefined> {    const row = this.handle.prepare(`
       SELECT id AS run_id, scenario_name, started_at, finished_at, duration_ms, success, flaky
       FROM scenario_runs WHERE id = ?
     `).get(id) as {
@@ -242,6 +241,23 @@ export class SqliteBackend implements StorageBackend {
         response_body: s.response_body ?? undefined,
       })),
     };
+  }
+
+  async getOverview(days: number): Promise<OverviewData> {
+    const since = daysAgo(days);
+    const daily = this.handle.prepare(`
+      SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS total, SUM(success) AS passed
+      FROM scenario_runs WHERE created_at >= ?
+      GROUP BY date ORDER BY date
+    `).all(since) as Array<{ date: string; total: number; passed: number }>;
+    const runs = this.handle.prepare(`
+      SELECT scenario_name, duration_ms, success, flaky
+      FROM scenario_runs WHERE created_at >= ?
+    `).all(since) as Array<{ scenario_name: string; duration_ms: number; success: number; flaky: number }>;
+    return buildOverview(days, {
+      daily: daily.map(d => ({ date: d.date, total: Number(d.total), passed: Number(d.passed) })),
+      runs,
+    });
   }
 
   async upsertScenarioTags(name: string, tags: string[]): Promise<void> {

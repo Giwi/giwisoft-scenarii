@@ -1,0 +1,156 @@
+<div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+  <h1 class="h4 mb-0">{{ t('overview.title') }}</h1>
+  <div class="btn-group btn-group-sm ms-md-auto" role="group" [attr.aria-label]="t('overview.period')">
+    <button class="btn" [class.btn-primary]="days === 7" [class.btn-outline-primary]="days !== 7" (click)="setDays(7)">7d</button>
+    <button class="btn" [class.btn-primary]="days === 30" [class.btn-outline-primary]="days !== 30" (click)="setDays(30)">30d</button>
+    <button class="btn" [class.btn-primary]="days === 90" [class.btn-outline-primary]="days !== 90" (click)="setDays(90)">90d</button>
+  </div>
+  <button class="btn btn-sm btn-outline-primary" (click)="load()" [title]="t('common.refresh')">
+    <i class="bi bi-arrow-clockwise"></i>
+  </button>
+</div>
+
+<div class="card border-0 shadow-sm py-5 text-center text-secondary" *ngIf="loading && !data">
+  <i class="bi bi-hourglass-split fs-2 mb-2 d-block"></i>
+  {{ t('overview.loading') }}
+</div>
+
+<ng-container *ngIf="data">
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3 h-100">
+        <div class="fs-3 fw-bold">{{ data.totals.runs }}</div>
+        <div class="small text-secondary text-uppercase">{{ t('overview.total_runs') }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3 h-100">
+        <div class="fs-3 fw-bold" [class.text-success]="passRate >= 95" [class.text-warning]="passRate >= 80 && passRate < 95" [class.text-danger]="passRate < 80">
+          {{ passRate | number: '1.1-1' }}%
+        </div>
+        <div class="small text-secondary text-uppercase">{{ t('overview.pass_rate') }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3 h-100">
+        <div class="fs-3 fw-bold text-danger">{{ data.totals.failed }}</div>
+        <div class="small text-secondary text-uppercase">{{ t('overview.failed_runs') }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center p-3 h-100">
+        <div class="fs-3 fw-bold text-warning">{{ data.totals.flaky }}</div>
+        <div class="small text-secondary text-uppercase">{{ t('overview.flaky_runs') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h3 class="card-title small text-secondary text-uppercase mb-3">{{ t('overview.heatmap') }}</h3>
+      <div class="heatmap" *ngIf="data.daily.length">
+        <div class="heatmap-row" *ngFor="let row of heatmapRows; let i = index">
+          <span class="heatmap-weekday">{{ weekdayLabels[i] }}</span>
+          <span
+            *ngFor="let cell of row"
+            class="heat-cell"
+            [class.heat-empty]="cell.empty"
+            [ngClass]="'heat-' + cell.level"
+            [title]="cell.empty ? '' : cell.date + ': ' + cell.passed + '/' + cell.total"
+          ></span>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-1 mt-2 small text-secondary">
+        <span>{{ t('overview.heatmap_less') }}</span>
+        <span class="heat-cell heat-0"></span>
+        <span class="heat-cell heat-1"></span>
+        <span class="heat-cell heat-2"></span>
+        <span class="heat-cell heat-3"></span>
+        <span class="heat-cell heat-4"></span>
+        <span>{{ t('overview.heatmap_more') }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="card-title small text-secondary text-uppercase mb-3">{{ t('overview.slowest') }}</h3>
+          <div class="text-secondary small" *ngIf="!data.slowest.length">{{ t('overview.no_runs') }}</div>
+          <table class="table table-sm mb-0" *ngIf="data.slowest.length">
+            <thead class="table-light">
+              <tr>
+                <th>{{ t('overview.scenario') }}</th>
+                <th class="text-end">{{ t('overview.p95') }}</th>
+                <th class="text-end">{{ t('overview.avg') }}</th>
+                <th class="text-end">{{ t('overview.runs') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of data.slowest">
+                <td><a [routerLink]="['/scenario', s.name]" class="text-decoration-none">{{ s.name }}</a></td>
+                <td class="text-end font-monospace">{{ s.p95_ms }}ms</td>
+                <td class="text-end font-monospace text-secondary">{{ s.avg_ms }}ms</td>
+                <td class="text-end font-monospace">{{ s.total_runs }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <h3 class="card-title small text-secondary text-uppercase mb-3">{{ t('overview.flakiest') }}</h3>
+          <div class="text-secondary small" *ngIf="!data.flakiest.length">{{ t('overview.no_flaky') }}</div>
+          <table class="table table-sm mb-0" *ngIf="data.flakiest.length">
+            <thead class="table-light">
+              <tr>
+                <th>{{ t('overview.scenario') }}</th>
+                <th class="text-end">{{ t('overview.flaky') }}</th>
+                <th class="text-end">{{ t('overview.flaky_rate') }}</th>
+                <th class="text-end">{{ t('overview.runs') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let s of data.flakiest">
+                <td><a [routerLink]="['/scenario', s.name]" class="text-decoration-none">{{ s.name }}</a></td>
+                <td class="text-end font-monospace text-warning">{{ s.flaky_runs }}</td>
+                <td class="text-end font-monospace">{{ flakyRate(s) | number: '1.1-1' }}%</td>
+                <td class="text-end font-monospace">{{ s.total_runs }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <h3 class="card-title small text-secondary text-uppercase mb-3">{{ t('overview.bulk') }}</h3>
+      <p class="small text-secondary">{{ t('overview.bulk_hint') }}</p>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <select class="form-select form-select-sm" style="width:auto" [(ngModel)]="selectedGroup">
+          <option value="">{{ t('overview.all_groups') }}</option>
+          <option *ngFor="let g of groups" [value]="g">{{ g }}</option>
+        </select>
+        <select class="form-select form-select-sm" style="width:auto" [(ngModel)]="selectedTag">
+          <option value="">{{ t('overview.all_tags') }}</option>
+          <option *ngFor="let tag of tags" [value]="tag">{{ tag }}</option>
+        </select>
+        <button class="btn btn-sm btn-outline-success" [disabled]="!hasBulkTarget || busy" (click)="bulk('run')">
+          <i class="bi bi-send-fill me-1"></i>{{ t('overview.run') }}
+        </button>
+        <button class="btn btn-sm btn-outline-warning" [disabled]="!hasBulkTarget || busy" (click)="bulk('pause')">
+          <i class="bi bi-pause-fill me-1"></i>{{ t('overview.pause') }}
+        </button>
+        <button class="btn btn-sm btn-outline-success" [disabled]="!hasBulkTarget || busy" (click)="bulk('resume')">
+          <i class="bi bi-play-fill me-1"></i>{{ t('overview.resume') }}
+        </button>
+      </div>
+      <div class="alert alert-info py-2 px-3 small mt-3 mb-0" *ngIf="actionMessage">{{ actionMessage }}</div>
+    </div>
+  </div>
+</ng-container>

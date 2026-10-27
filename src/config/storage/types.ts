@@ -32,8 +32,49 @@ export interface PasswordResetRow {
   expires_at: string;
 }
 
-// Flat join row produced by getScenarioHistory, collapsed into ScenarioMetrics by
-// the shared collapseHistory helper.
+// Aggregated cross-scenario statistics for the overview page.
+export interface DailyPassRate {
+  date: string;
+  total: number;
+  passed: number;
+}
+
+export interface ScenarioStat {
+  name: string;
+  total_runs: number;
+  passed_runs: number;
+  failed_runs: number;
+  flaky_runs: number;
+  avg_ms: number;
+  p95_ms: number;
+}
+
+export interface OverviewData {
+  days: number;
+  totals: {
+    runs: number;
+    passed: number;
+    failed: number;
+    flaky: number;
+  };
+  daily: DailyPassRate[];
+  slowest: ScenarioStat[];
+  flakiest: ScenarioStat[];
+}
+
+// Flat rows used to compute OverviewData in the shared helper.
+export interface OverviewRunRow {
+  scenario_name: string;
+  duration_ms: number;
+  success: number;
+  flaky: number;
+}
+
+export interface OverviewRowSet {
+  daily: Array<{ date: string; total: number; passed: number }>;
+  runs: OverviewRunRow[];
+}
+
 export interface HistoryRow {
   run_id: number;
   scenario_name: string;
@@ -78,6 +119,7 @@ export interface StorageBackend {
   // Convenience for callers that only have the final metrics.
   storeMetrics(metrics: ScenarioMetrics): Promise<number>;
   getRun(id: number): Promise<ScenarioMetrics | undefined>;
+  getOverview(days: number): Promise<OverviewData>;
   upsertScenarioTags(name: string, tags: string[]): Promise<void>;
   getScenarioList(tagFilter?: string): Promise<ScenarioInfo[]>;
   getScenarioHistory(name: string, limitDays: number, limit: number, offset: number): Promise<ScenarioMetrics[]>;

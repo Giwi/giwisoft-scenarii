@@ -1,5 +1,5 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
-import { NgFor, NgIf, DatePipe } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { I18nService } from '../../shared/i18n';
 
@@ -12,7 +12,7 @@ interface ArtifactFile {
 @Component({
   selector: 'app-artifacts',
   standalone: true,
-  imports: [NgFor, NgIf, DatePipe],
+  imports: [NgFor, NgIf],
   templateUrl: './artifacts.html',
   styleUrl: './artifacts.css',
 })

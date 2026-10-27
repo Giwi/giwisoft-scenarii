@@ -9,7 +9,7 @@ import { ChildProcess } from 'child_process';
 import { lightpanda } from '@lightpanda/browser';
 import {
   getScenarioList, getScenarioDetail, getScenarioHistory, getScenarioHistoryCount, getScenarioPassedRunCount,
-  getScenarioStepNames, getDistinctTags, getDbScenarioTags, getRun,
+  getScenarioStepNames, getDistinctTags, getDbScenarioTags, getRun, getOverview,
   isStorageReady, backupDatabase,
 } from '../config/storage';
 import { initWebSocket } from './ws';
@@ -347,7 +347,106 @@ async function handleRunNow(req: express.Request, res: express.Response): Promis
   }
 }
 
-// Returns a single persisted run by id, including its steps.
+// Cross-scenario overview: daily pass-rate heatmap, slowest p95, flakiest list.
+async function handleOverview(req: express.Request, res: express.Response): Promise<void> {
+  try {
+    const days = req.query.days !== undefined ? parseDaysParam(req.query.days as string) : 30;
+    res.json(await getOverview(days));
+  } catch (err: unknown) {
+    sendError(res, 500, err);
+  }
+}
+
+// Resolves scenario names from a bulk request: explicit names, or a tag/group filter.
+async function resolveBulkTargets(body: { names?: unknown; tag?: unknown; group?: unknown }): Promise<string[]> {
+  const names = Array.isArray(body.names) ? body.names.map(String) : undefined;
+  const tag = typeof body.tag === 'string' && body.tag ? body.tag : undefined;
+  const group = typeof body.group === 'string' && body.group ? body.group : undefined;
+
+  if (!names && !tag && !group) throw new Error('Provide names, tag or group');
+
+  const disk: Array<{ name: string; group?: string; tags?: string[] }> = [];
+  if (_scenariosDir) {
+    const files = fs.readdirSync(_scenariosDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+    for (const file of files) {
+      try {
+        const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+        disk.push({ name: scenario.name, group: scenario.group, tags: scenario.tags });
+      } catch { /* skip invalid */ }
+    }
+  }
+
+  const wanted = new Set<string>();
+  for (const entry of disk) {
+    if (names) {
+      if (names.includes(entry.name)) wanted.add(entry.name);
+      continue;
+    }
+    if (group && entry.group !== group) continue;
+    if (tag) {
+      const dbTags = await getDbScenarioTags(entry.name);
+      const tags = dbTags ?? entry.tags ?? [];
+      if (!tags.includes(tag)) continue;
+    }
+    wanted.add(entry.name);
+  }
+  return [...wanted].sort();
+}
+
+// Triggers every scenario matching a tag/group (or explicit names).
+async function handleBulkRun(req: express.Request, res: express.Response): Promise<void> {
+  try {
+    const names = await resolveBulkTargets(req.body ?? {});
+    if (!_scenariosDir) {
+      res.status(400).json({ error: t('error.run_unconfigured', requestLang(req)) });
+      return;
+    }
+    const options = _runOptions ?? { headless: true, persist: true };
+    let triggered = 0;
+    for (const name of names) {
+      try {
+        const files = fs.readdirSync(_scenariosDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+        const file = files.find(f => {
+          try { return loadScenarioFile(path.join(_scenariosDir!, f)).name === name; } catch { return false; }
+        });
+        if (!file) continue;
+        const scenario = loadScenarioFile(path.join(_scenariosDir, file));
+        runScenario(scenario, options).catch((err: unknown) => {
+          logger.error({ scenario: name, err: err instanceof Error ? err.message : String(err) }, 'Bulk run failed');
+        });
+        triggered++;
+      } catch (err: unknown) {
+        logger.warn({ scenario: name, err: err instanceof Error ? err.message : String(err) }, 'Bulk run skipped');
+      }
+    }
+    res.json({ matched: names.length, triggered, names });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'Provide names, tag or group') {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    sendError(res, 500, err);
+  }
+}
+
+// Pauses or resumes every scheduled scenario matching a tag/group.
+async function handleBulkPauseResume(action: 'pause' | 'resume', req: express.Request, res: express.Response): Promise<void> {
+  try {
+    const names = await resolveBulkTargets(req.body ?? {});
+    const changed: string[] = [];
+    for (const name of names) {
+      const ok = action === 'pause' ? pauseScenario(name) : resumeScenario(name);
+      if (ok) changed.push(name);
+    }
+    res.json({ matched: names.length, [action === 'pause' ? 'paused' : 'resumed']: changed.length, names: changed });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'Provide names, tag or group') {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    sendError(res, 500, err);
+  }
+}
 async function handleGetRun(req: express.Request, res: express.Response): Promise<void> {
   try {
     const id = Number(req.params.id);
@@ -694,7 +793,12 @@ export function createApp(): express.Application {
   app.post('/api/scenarios/import', requireScope('admin'), handleBulkImport);
   app.get('/api/scenarios/export', requireScope('read'), handleBulkExport);
   app.get('/api/groups', requireScope('read'), handleGroups);
+  app.get('/api/overview', requireScope('read'), handleOverview);
   app.get('/api/runs/:id', requireScope('read'), handleGetRun);
+  // Bulk actions must be registered before the /:name routes.
+  app.post('/api/scenarios/bulk/run', requireScope('trigger'), handleBulkRun);
+  app.post('/api/scenarios/bulk/pause', requireScope('trigger'), (req, res) => { void handleBulkPauseResume('pause', req, res); });
+  app.post('/api/scenarios/bulk/resume', requireScope('trigger'), (req, res) => { void handleBulkPauseResume('resume', req, res); });
   app.get('/api/scenarios/:name', requireScope('read'), handleScenarioDetail);
   app.get('/api/scenarios/:name/history', requireScope('read'), handleScenarioHistory);
   app.post('/api/scenarios/:name/run', requireScope('trigger'), handleRunNow);

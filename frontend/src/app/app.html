@@ -7,6 +7,9 @@
       <a class="btn btn-sm btn-outline-secondary border-0" routerLink="/scenarios" [title]="t('nav.dashboard_title')">
         <i class="bi bi-speedometer2 me-1"></i><span class="d-none d-sm-inline">{{ t('nav.dashboard') }}</span>
       </a>
+      <a class="btn btn-sm btn-outline-secondary border-0" routerLink="/overview" [title]="t('nav.overview_title')">
+        <i class="bi bi-grid-3x3-gap me-1"></i><span class="d-none d-sm-inline">{{ t('nav.overview') }}</span>
+      </a>
       <a
         *ngIf="isAdmin()"
         class="btn btn-sm btn-outline-secondary border-0"

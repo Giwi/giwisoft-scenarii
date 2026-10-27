@@ -3,8 +3,8 @@ import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { ScenarioMetrics } from '../../types';
-import { StorageBackend, ScenarioInfo, UserRow, ProfileRow, PasswordResetRow, HistoryRow } from './types';
-import { collapseHistory, daysAgo, parseTags, sqlNow } from './shared';
+import { StorageBackend, ScenarioInfo, UserRow, ProfileRow, PasswordResetRow, HistoryRow, OverviewData } from './types';
+import { buildOverview, collapseHistory, daysAgo, parseTags, sqlNow } from './shared';
 
 // PostgreSQL backend using node-postgres. All operations are async; timestamps are
 // stored as sortable TEXT (UTC) to keep parity with the SQLite schema and simplify
@@ -196,6 +196,34 @@ export class PostgresBackend implements StorageBackend {
         response_body: s.response_body ?? undefined,
       })),
     };
+  }
+
+  async getOverview(days: number): Promise<OverviewData> {
+    const since = daysAgo(days);
+    const dailyRes = await this.handle.query(
+      `SELECT substr(created_at, 1, 10) AS date, COUNT(*)::int AS total, SUM(success)::int AS passed
+       FROM scenario_runs WHERE created_at >= $1
+       GROUP BY date ORDER BY date`,
+      [since],
+    );
+    const runsRes = await this.handle.query(
+      `SELECT scenario_name, duration_ms, success, flaky
+       FROM scenario_runs WHERE created_at >= $1`,
+      [since],
+    );
+    return buildOverview(days, {
+      daily: (dailyRes.rows as Array<{ date: string; total: number; passed: number }>).map(d => ({
+        date: d.date,
+        total: Number(d.total),
+        passed: Number(d.passed),
+      })),
+      runs: (runsRes.rows as Array<{ scenario_name: string; duration_ms: number; success: number; flaky: number }>).map(r => ({
+        scenario_name: r.scenario_name,
+        duration_ms: Number(r.duration_ms),
+        success: Number(r.success),
+        flaky: Number(r.flaky),
+      })),
+    });
   }
 
   async upsertScenarioTags(name: string, tags: string[]): Promise<void> {

@@ -1,10 +1,10 @@
 import { ScenarioMetrics } from '../../types';
-import { StorageBackend, ScenarioInfo } from './types';
+import { StorageBackend, ScenarioInfo, OverviewData } from './types';
 import { SqliteBackend } from './sqlite';
 import { PostgresBackend } from './postgres';
 import { getSettings } from '../settings';
 
-export type { StorageBackend, ScenarioInfo, UserRow, ProfileRow } from './types';
+export type { StorageBackend, ScenarioInfo, UserRow, ProfileRow, OverviewData, DailyPassRate, ScenarioStat } from './types';
 
 let backend: StorageBackend | undefined;
 
@@ -71,6 +71,10 @@ export function storeMetrics(metrics: ScenarioMetrics): Promise<number> {
 
 export function getRun(id: number): Promise<ScenarioMetrics | undefined> {
   return getBackend().getRun(id);
+}
+
+export function getOverview(days: number): Promise<OverviewData> {
+  return getBackend().getOverview(days);
 }
 
 export function upsertScenarioTags(name: string, tags: string[]): Promise<void> {

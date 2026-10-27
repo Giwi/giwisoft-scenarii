@@ -209,6 +209,7 @@ steps:
 The dashboard provides:
 
 - **Scenario list** - overview of all scenarios with pass/fail status, tag badges, group badges, tag/group filter dropdowns, depends-on column, auto-refreshes via WebSocket
+- **Cross-scenario overview** - pass-rate calendar heatmap, slowest scenarios by p95, flakiest scenarios, and bulk run/pause/resume by tag or group at `/overview`
 - **Scenario detail** - response time trend chart, success rate over time, step breakdown, SLA gauge (7-day window), paginated run history, JSON/CSV/YAML export, live ticker (inline step progress in the toolbar), copy public permalink
 - **Scenario editor** - click the pencil icon on the detail page to edit a scenario's YAML directly in the browser with syntax highlighting (comments, strings, keys, numbers). "New" opens a blank scenario at `/scenario/new`, "Import" uploads a `.yml`/`.yaml` file and stores it with the others
 - **Run Now / Cancel** - trigger an immediate ad-hoc run or abort a running scenario from list or detail
@@ -361,6 +362,10 @@ node dist/index.js server
 | `POST /api/scenarios/import` | Import scenario(s) from a YAML string (`{"yaml":"..."}` - single scenario or array). Stored in the scenarios directory, picked up by the scheduler; updates the file when the name already exists (any logged-in user) |
 | `GET /api/scenarios/export` | Download all scenarios as a YAML bundle file |
 | `GET /api/groups` | List all distinct scenario groups |
+| `GET /api/overview` | Cross-scenario stats (`?days=30`): daily pass-rate heatmap, slowest p95, flakiest |
+| `POST /api/scenarios/bulk/run` | Trigger all scenarios matching `{tag}` or `{group}` (requires `trigger`) |
+| `POST /api/scenarios/bulk/pause` | Pause matching scheduled scenarios (`{tag}` or `{group}`) |
+| `POST /api/scenarios/bulk/resume` | Resume matching scheduled scenarios (`{tag}` or `{group}`) |
 | `GET /api/runs/:id` | Fetch one persisted run with all steps (requires `read`) |
 | `POST /api/webhooks/github` | Inbound GitHub push/PR webhook (HMAC-SHA256 signature, no session) |
 | `POST /api/webhooks/gitlab` | Inbound GitLab push/MR webhook (`X-Gitlab-Token`, no session) |

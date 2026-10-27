@@ -8,11 +8,13 @@ import { UsersComponent } from './features/users/users';
 import { DocsComponent } from './features/docs/docs';
 import { ProfileComponent } from './features/profile/profile';
 import { ArtifactsComponent } from './features/artifacts/artifacts';
+import { OverviewComponent } from './features/overview/overview';
 import { authGuard, adminGuard } from './shared/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LandingComponent },
   { path: 'scenarios', component: ScenarioListComponent, canActivate: [authGuard] },
+  { path: 'overview', component: OverviewComponent, canActivate: [authGuard] },
   { path: 'users', component: UsersComponent, canActivate: [adminGuard] },
   { path: 'docs', component: DocsComponent, canActivate: [authGuard] },
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },

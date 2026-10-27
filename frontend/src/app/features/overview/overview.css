@@ -1,0 +1,56 @@
+.heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-x: auto;
+}
+
+.heatmap-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.heatmap-weekday {
+  width: 14px;
+  flex: 0 0 14px;
+  font-size: 0.65rem;
+  color: var(--bs-secondary-color);
+  text-align: center;
+}
+
+.heat-cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  display: inline-block;
+  background: var(--bs-tertiary-bg);
+}
+
+.heat-empty {
+  background: transparent;
+}
+
+.heat-0 {
+  background: var(--bs-tertiary-bg);
+}
+
+.heat-cell.heat-empty {
+  background: transparent;
+}
+
+.heat-1 {
+  background: #f8d7da;
+}
+
+.heat-2 {
+  background: #ffc107;
+}
+
+.heat-3 {
+  background: #9fd48a;
+}
+
+.heat-4 {
+  background: #198754;
+}
