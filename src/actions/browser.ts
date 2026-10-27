@@ -4,6 +4,14 @@ import { BrowserStep, StepMetrics } from '../types';
 import { resolveUrl, interpolateVars, resolveJsonPath, UnresolvedVariableError } from '../utils/helpers';
 import { DEFAULT_PAGE_TIMEOUT, DEFAULT_SELECTOR_TIMEOUT, SCREENSHOT_COMPARE_THRESHOLD, DEFAULT_BROWSER_RETRIES, DEFAULT_RETRY_DELAY } from '../utils/constants';
 
+const MAX_CAPTURE_BYTES = 8192;
+
+function capString(s: string): string {
+  const buf = Buffer.from(s);
+  if (buf.length <= MAX_CAPTURE_BYTES) return s;
+  return buf.subarray(0, MAX_CAPTURE_BYTES).toString('utf-8') + `\n... [truncated ${buf.length - MAX_CAPTURE_BYTES} bytes]`;
+}
+
 // Validates browser-level expectations against the current page state.
 // Returns an error string on failure, or null if all expectations pass.
 async function checkBrowserExpectations(
@@ -79,6 +87,8 @@ export async function executeBrowserStep(
           if (!step.url) throw new Error('browser.navigate requires a "url" field');
           const resolvedBase = base_url === undefined ? undefined : interpolateVars(base_url, vars, step.name);
           const resolvedUrl = resolveUrl(resolvedBase, interpolateVars(step.url, vars, step.name));
+          stepMetrics.request_url = resolvedUrl;
+          stepMetrics.request_method = 'GET';
           try {
             await page.goto(resolvedUrl, { waitUntil: 'load', timeout: DEFAULT_PAGE_TIMEOUT });
           } catch {
@@ -218,6 +228,13 @@ export async function executeBrowserStep(
 
       stepMetrics.response_time_ms = Date.now() - start;
 
+      try {
+        stepMetrics.request_url = stepMetrics.request_url ?? page.url();
+        stepMetrics.response_headers = { url: page.url() };
+        const body = await page.content().catch(() => '');
+        if (body) stepMetrics.response_body = capString(body);
+      } catch { /* ignore */ }
+
       const error = await checkBrowserExpectations(page, step, vars);
       if (error) {
         stepMetrics.success = false;
@@ -229,6 +246,12 @@ export async function executeBrowserStep(
       stepMetrics.success = false;
       stepMetrics.error = err instanceof Error ? err.message : String(err);
       stepMetrics.response_time_ms = Date.now() - start;
+      try {
+        if (!stepMetrics.request_url) stepMetrics.request_url = page.url();
+        stepMetrics.response_headers = { url: page.url() };
+        const body = await page.content().catch(() => '');
+        if (body) stepMetrics.response_body = capString(body);
+      } catch { /* ignore */ }
       // Missing variables will not resolve on retry.
       if (err instanceof UnresolvedVariableError) return stepMetrics;
     }

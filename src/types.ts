@@ -130,6 +130,13 @@ export interface StepMetrics {
   attempts?: number;
   error?: string;
   timestamp: Date;
+  // Captured request/response details for failed steps (redacted, capped)
+  request_url?: string;
+  request_method?: string;
+  request_headers?: Record<string, string>;
+  request_body?: string;
+  response_headers?: Record<string, string>;
+  response_body?: string;
 }
 
 // Aggregate metrics for a full scenario run

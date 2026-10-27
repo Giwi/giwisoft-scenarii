@@ -52,6 +52,12 @@ export interface HistoryRow {
   attempts: number | null;
   error: string | null;
   timestamp: string | null;
+  request_url?: string | null;
+  request_method?: string | null;
+  request_headers?: string | null;
+  request_body?: string | null;
+  response_headers?: string | null;
+  response_body?: string | null;
 }
 
 // Pluggable storage backend. One implementation stores scenario runs and dashboard

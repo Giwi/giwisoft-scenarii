@@ -39,6 +39,12 @@ export function collapseHistory(rows: HistoryRow[]): ScenarioMetrics[] {
         attempts: row.attempts ?? undefined,
         error: row.error ?? undefined,
         timestamp: new Date(row.timestamp!),
+        request_url: row.request_url ?? undefined,
+        request_method: row.request_method ?? undefined,
+        request_headers: row.request_headers ? (JSON.parse(row.request_headers as string) as Record<string, string>) : undefined,
+        request_body: row.request_body ?? undefined,
+        response_headers: row.response_headers ? (JSON.parse(row.response_headers as string) as Record<string, string>) : undefined,
+        response_body: row.response_body ?? undefined,
       });
     }
   }

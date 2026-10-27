@@ -41,7 +41,13 @@ export class PostgresBackend implements StorageBackend {
         response_time_ms INTEGER NOT NULL,
         attempts INTEGER NOT NULL DEFAULT 1,
         error TEXT,
-        timestamp TEXT NOT NULL
+        timestamp TEXT NOT NULL,
+        request_url TEXT,
+        request_method TEXT,
+        request_headers TEXT,
+        request_body TEXT,
+        response_headers TEXT,
+        response_body TEXT
       );
       CREATE TABLE IF NOT EXISTS scenario_tags (
         scenario_name TEXT PRIMARY KEY,
@@ -106,8 +112,8 @@ export class PostgresBackend implements StorageBackend {
       const runId = res.rows[0].id as string | number;
       for (const step of metrics.steps) {
         await client.query(
-          `INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          `INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp, request_url, request_method, request_headers, request_body, response_headers, response_body)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             runId,
             step.step_name,
@@ -118,6 +124,12 @@ export class PostgresBackend implements StorageBackend {
             step.attempts ?? 1,
             step.error ?? null,
             step.timestamp.toISOString(),
+            step.request_url ?? null,
+            step.request_method ?? null,
+            step.request_headers ? JSON.stringify(step.request_headers) : null,
+            step.request_body ?? null,
+            step.response_headers ? JSON.stringify(step.response_headers) : null,
+            step.response_body ?? null,
           ],
         );
       }
@@ -171,7 +183,8 @@ export class PostgresBackend implements StorageBackend {
     const res = await this.handle.query(
       `SELECT
         r.id::int AS run_id, r.scenario_name, r.started_at, r.finished_at, r.duration_ms, r.success, r.flaky, r.created_at,
-        s.id::int AS step_id, s.step_name, s.action, s.success AS step_success, s.status_code, s.response_time_ms, s.attempts, s.error, s.timestamp
+        s.id::int AS step_id, s.step_name, s.action, s.success AS step_success, s.status_code, s.response_time_ms, s.attempts, s.error, s.timestamp,
+        s.request_url, s.request_method, s.request_headers, s.request_body, s.response_headers, s.response_body
       FROM (
         SELECT * FROM scenario_runs
         WHERE scenario_name = $1 AND created_at >= $2

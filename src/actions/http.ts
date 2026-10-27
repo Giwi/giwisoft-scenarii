@@ -3,6 +3,28 @@ import { HttpStep, StepMetrics } from '../types';
 import { resolveUrl, interpolateVars, resolveJsonPath, mergeHeaders, UnresolvedVariableError } from '../utils/helpers';
 import { DEFAULT_HTTP_RETRIES, DEFAULT_RETRY_DELAY } from '../utils/constants';
 
+const MAX_CAPTURE_BYTES = 8192;
+
+function redactHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
+  if (!headers) return undefined;
+  const redacted: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) {
+    const lk = k.toLowerCase();
+    if (lk === 'authorization' || lk === 'cookie' || lk === 'x-api-key' || lk === 'proxy-authorization' || lk === 'x-auth-token') {
+      redacted[k] = '[REDACTED]';
+    } else {
+      redacted[k] = v;
+    }
+  }
+  return redacted;
+}
+
+function capString(s: string): string {
+  const buf = Buffer.from(s);
+  if (buf.length <= MAX_CAPTURE_BYTES) return s;
+  return buf.subarray(0, MAX_CAPTURE_BYTES).toString('utf-8') + `\n... [truncated ${buf.length - MAX_CAPTURE_BYTES} bytes]`;
+}
+
 interface FetchResponse {
   status: number;
   headers: Record<string, string>;
@@ -278,6 +300,11 @@ export async function executeHttpStep(
         body = interpolateVars(String(step.body), vars, step.name);
       }
 
+      stepMetrics.request_url = resolvedUrl;
+      stepMetrics.request_method = method;
+      stepMetrics.request_headers = redactHeaders(headers);
+      if (body !== undefined) stepMetrics.request_body = capString(body);
+
       const response = await doFetch(resolvedUrl, method, headers, body, signal);
 
       const responseBody = await response.text();
@@ -286,6 +313,8 @@ export async function executeHttpStep(
 
       stepMetrics.status_code = response.status;
       stepMetrics.response_time_ms = elapsed;
+      stepMetrics.response_headers = redactHeaders(response.headers);
+      stepMetrics.response_body = capString(responseBody);
 
       const error = checkExpectations(step, response, responseBody, elapsed);
       if (error) {

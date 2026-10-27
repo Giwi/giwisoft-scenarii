@@ -175,6 +175,32 @@
                       </td>
                     </tr>
                   </table>
+                  <div class="mt-2" *ngFor="let step of run.steps">
+                    <details *ngIf="!step.success && (step.request_url || step.response_body || step.request_body)" class="ms-2">
+                      <summary class="text-warning small" style="cursor:pointer">Request/Response</summary>
+                      <div class="mt-1 ps-2" style="font-size: .7rem">
+                        <div *ngIf="step.request_method || step.request_url">
+                          <strong>Request:</strong> {{ step.request_method }} {{ step.request_url }}
+                        </div>
+                        <div *ngIf="step.request_headers">
+                          <strong>Request Headers:</strong>
+                          <pre class="mb-1 bg-light p-1" style="max-height: 150px; overflow:auto;">{{ step.request_headers | json }}</pre>
+                        </div>
+                        <div *ngIf="step.request_body">
+                          <strong>Request Body:</strong>
+                          <pre class="mb-1 bg-light p-1" style="max-height: 150px; overflow:auto;">{{ step.request_body }}</pre>
+                        </div>
+                        <div *ngIf="step.response_headers">
+                          <strong>Response Headers:</strong>
+                          <pre class="mb-1 bg-light p-1" style="max-height: 150px; overflow:auto;">{{ step.response_headers | json }}</pre>
+                        </div>
+                        <div *ngIf="step.response_body">
+                          <strong>Response Body:</strong>
+                          <pre class="mb-1 bg-light p-1" style="max-height: 200px; overflow:auto;">{{ step.response_body }}</pre>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
                 </details>
               </td>
             </tr>

@@ -48,6 +48,12 @@ interface StepMetricsData {
   response_time_ms: number;
   error: string | null;
   timestamp: string;
+  request_url?: string;
+  request_method?: string;
+  request_headers?: Record<string, string>;
+  request_body?: string;
+  response_headers?: Record<string, string>;
+  response_body?: string;
 }
 
 interface ScenarioRun {
@@ -68,7 +74,7 @@ interface ScenarioDetail {
 @Component({
   selector: 'app-scenario-detail',
   standalone: true,
-  imports: [NgFor, NgIf, RouterModule, LangDatePipe],
+  imports: [NgFor, NgIf, RouterModule, LangDatePipe, JsonPipe],
   changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './scenario-detail.html',
   styleUrl: './scenario-detail.css',

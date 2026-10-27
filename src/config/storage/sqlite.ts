@@ -55,6 +55,12 @@ export class SqliteBackend implements StorageBackend {
         attempts INTEGER NOT NULL DEFAULT 1,
         error TEXT,
         timestamp TEXT NOT NULL,
+        request_url TEXT,
+        request_method TEXT,
+        request_headers TEXT,
+        request_body TEXT,
+        response_headers TEXT,
+        response_body TEXT,
         FOREIGN KEY (run_id) REFERENCES scenario_runs(id)
       );
       CREATE TABLE IF NOT EXISTS scenario_tags (
@@ -101,6 +107,15 @@ export class SqliteBackend implements StorageBackend {
     if (!stepColumns.includes('attempts')) {
       db.exec('ALTER TABLE step_metrics ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1');
     }
+    const addCol = (name: string, def: string) => {
+      if (!stepColumns.includes(name)) db.exec(`ALTER TABLE step_metrics ADD COLUMN ${name} ${def}`);
+    };
+    addCol('request_url', 'TEXT');
+    addCol('request_method', 'TEXT');
+    addCol('request_headers', 'TEXT');
+    addCol('request_body', 'TEXT');
+    addCol('response_headers', 'TEXT');
+    addCol('response_body', 'TEXT');
     const userColumns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
     if (!userColumns.includes('role')) {
       db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
@@ -132,8 +147,8 @@ export class SqliteBackend implements StorageBackend {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const insertStep = db.prepare(`
-      INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO step_metrics (run_id, step_name, action, success, status_code, response_time_ms, attempts, error, timestamp, request_url, request_method, request_headers, request_body, response_headers, response_body)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const tx = db.transaction(() => {
       const result = insertRun.run(
@@ -157,6 +172,12 @@ export class SqliteBackend implements StorageBackend {
           step.attempts ?? 1,
           step.error ?? null,
           step.timestamp.toISOString(),
+          step.request_url ?? null,
+          step.request_method ?? null,
+          step.request_headers ? JSON.stringify(step.request_headers) : null,
+          step.request_body ?? null,
+          step.response_headers ? JSON.stringify(step.response_headers) : null,
+          step.response_body ?? null,
         );
       }
     });
@@ -197,7 +218,8 @@ export class SqliteBackend implements StorageBackend {
     const rows = this.handle.prepare(`
       SELECT
         r.id AS run_id, r.scenario_name, r.started_at, r.finished_at, r.duration_ms, r.success, r.flaky, r.created_at,
-        s.id AS step_id, s.step_name, s.action, s.success AS step_success, s.status_code, s.response_time_ms, s.attempts, s.error, s.timestamp
+        s.id AS step_id, s.step_name, s.action, s.success AS step_success, s.status_code, s.response_time_ms, s.attempts, s.error, s.timestamp,
+        s.request_url, s.request_method, s.request_headers, s.request_body, s.response_headers, s.response_body
       FROM (
         SELECT * FROM scenario_runs
         WHERE scenario_name = ? AND created_at >= ?
